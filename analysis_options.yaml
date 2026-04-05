@@ -1,0 +1,12 @@
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    avoid_print: false
+    prefer_const_constructors: false
+    use_build_context_synchronously: false
+
+analyzer:
+  exclude:
+    - build/**
+    - .dart_tool/**
