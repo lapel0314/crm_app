@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/utils/store_utils.dart';
 import '../services/auth_service.dart';
 import 'home_page.dart';
 
@@ -19,15 +20,11 @@ class _AuthPageState extends State<AuthPage> {
 
   Future<void> handleAuth() async {
     try {
-      print('버튼 눌림');
-
       if (isLogin) {
         final profile = await authService.signIn(
           emailController.text.trim(),
           passwordController.text.trim(),
         );
-
-        print('profile: $profile');
 
         if (profile == null) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -36,12 +33,13 @@ class _AuthPageState extends State<AuthPage> {
           return;
         }
 
-        final role = profile['role'] ?? '사원';
+        final role = (profile['role'] ?? '사원').toString();
+        final store = normalizeStoreName(profile['store']);
 
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
-            builder: (_) => HomePage(role: role),
+            builder: (_) => HomePage(role: role, currentStore: store),
           ),
         );
       } else {
@@ -59,11 +57,7 @@ class _AuthPageState extends State<AuthPage> {
         });
       }
     } catch (e) {
-      print('에러 발생: $e');
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('에러: $e')),
-      );
+      debugPrint('legacy auth failed: $e');
     }
   }
 

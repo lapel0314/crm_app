@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static const Color primaryPink = Color(0xFFFF2D8D);
-  static const Color softPink = Color(0xFFFDECF4);
-  static const Color lightPink = Color(0xFFFFF5F9);
+  static const Color primaryPink = Color(0xFFC94C6E);
+  static const Color softPink = Color(0xFFF7E7EC);
+  static const Color lightPink = Color(0xFFFCF4F6);
 
-  static const Color background = Color(0xFFF7F8FA);
+  static const Color background = Color(0xFFF4F5F8);
   static const Color surface = Colors.white;
   static const Color border = Color(0xFFE7E9EE);
 

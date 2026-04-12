@@ -4,12 +4,10 @@ final supabase = Supabase.instance.client;
 
 class AuthService {
   Future<void> signUp(String email, String password) async {
-    final res = await supabase.auth.signUp(
+    await supabase.auth.signUp(
       email: email,
       password: password,
     );
-
-    print('회원가입 결과: ${res.user}');
   }
 
   Future<Map<String, dynamic>?> signIn(String email, String password) async {
@@ -20,7 +18,6 @@ class AuthService {
 
     final user = res.user;
     if (user == null) {
-      print('로그인 실패');
       return null;
     }
 

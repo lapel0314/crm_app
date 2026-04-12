@@ -49,10 +49,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
         isLoading = false;
       });
 
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('감사로그 조회 실패: $e')),
-      );
+      debugPrint('audit log load failed: $e');
     }
   }
 

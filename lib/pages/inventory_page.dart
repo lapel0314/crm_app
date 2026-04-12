@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:crm_app/utils/store_utils.dart';
 
 final supabase = Supabase.instance.client;
 
 class InventoryPage extends StatefulWidget {
   final String role;
+  final String currentStore;
 
-  const InventoryPage({super.key, required this.role});
+  const InventoryPage({
+    super.key,
+    required this.role,
+    required this.currentStore,
+  });
 
   @override
   State<InventoryPage> createState() => _InventoryPageState();
@@ -30,6 +36,8 @@ class _InventoryPageState extends State<InventoryPage> {
   bool canDelete() {
     return ['대표', '개발자', '사장', '점장'].contains(widget.role);
   }
+
+  bool get canViewAllStores => isPrivilegedRole(widget.role);
 
   @override
   void initState() {
@@ -75,11 +83,17 @@ class _InventoryPageState extends State<InventoryPage> {
               )
               .order('created_at', ascending: false);
 
+      final inventoryItems =
+          data.map((e) => Map<String, dynamic>.from(e)).where((item) {
+        return canViewAllStores ||
+            isSameStore(item['store'], widget.currentStore);
+      }).toList();
+
       setState(() {
-        items = data.map((e) => Map<String, dynamic>.from(e)).toList();
+        items = inventoryItems;
       });
     } catch (e) {
-      showMessage('재고 조회 실패: $e');
+      debugPrint('inventory load failed: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -98,8 +112,13 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   Future<void> addInventory() async {
-    if (storeController.text.trim().isEmpty ||
-        serialController.text.trim().isEmpty) {
+    final normalizedStore = normalizeStoreName(
+      storeController.text.trim().isEmpty
+          ? widget.currentStore
+          : storeController.text.trim(),
+    );
+
+    if (normalizedStore.isEmpty || serialController.text.trim().isEmpty) {
       showMessage('매장과 일련번호는 필수입니다.');
       return;
     }
@@ -110,7 +129,7 @@ class _InventoryPageState extends State<InventoryPage> {
       final inserted = await supabase
           .from('device_inventory')
           .insert({
-            'store': storeController.text.trim(),
+            'store': normalizedStore,
             'model_name': modelController.text.trim(),
             'serial_number': serialController.text.trim(),
             'status': status,
@@ -124,7 +143,7 @@ class _InventoryPageState extends State<InventoryPage> {
         action: 'create_inventory',
         targetId: inserted['id'].toString(),
         detail: {
-          'store': storeController.text.trim(),
+          'store': normalizedStore,
           'model_name': modelController.text.trim(),
           'serial_number': serialController.text.trim(),
           'status': status,
@@ -146,10 +165,10 @@ class _InventoryPageState extends State<InventoryPage> {
       if (e.message.contains('device_inventory_store_serial_unique')) {
         showMessage('같은 매장에 동일한 일련번호가 이미 등록되어 있습니다.');
       } else {
-        showMessage('재고 등록 실패: ${e.message}');
+        debugPrint('inventory create failed: ${e.message}');
       }
     } catch (e) {
-      showMessage('재고 등록 실패: $e');
+      debugPrint('inventory create failed: $e');
     }
   }
 
@@ -161,9 +180,11 @@ class _InventoryPageState extends State<InventoryPage> {
     required String status,
     required String memo,
   }) async {
+    final normalizedStore = normalizeStoreName(store);
+
     try {
       await supabase.from('device_inventory').update({
-        'store': store,
+        'store': normalizedStore,
         'model_name': modelName,
         'serial_number': serialNumber,
         'status': status,
@@ -174,7 +195,7 @@ class _InventoryPageState extends State<InventoryPage> {
         action: 'update_inventory',
         targetId: id,
         detail: {
-          'store': store,
+          'store': normalizedStore,
           'model_name': modelName,
           'serial_number': serialNumber,
           'status': status,
@@ -191,10 +212,10 @@ class _InventoryPageState extends State<InventoryPage> {
       if (e.message.contains('device_inventory_store_serial_unique')) {
         showMessage('같은 매장에 동일한 일련번호가 이미 등록되어 있습니다.');
       } else {
-        showMessage('재고 수정 실패: ${e.message}');
+        debugPrint('inventory update failed: ${e.message}');
       }
     } catch (e) {
-      showMessage('재고 수정 실패: $e');
+      debugPrint('inventory update failed: $e');
     }
   }
 
@@ -220,12 +241,13 @@ class _InventoryPageState extends State<InventoryPage> {
       showMessage('재고 삭제 완료');
       await fetchInventory(keyword: searchController.text);
     } catch (e) {
-      showMessage('재고 삭제 실패: $e');
+      debugPrint('inventory delete failed: $e');
     }
   }
 
   void showCreateDialog() {
-    final createStoreController = TextEditingController();
+    final createStoreController =
+        TextEditingController(text: widget.currentStore);
     final createModelController = TextEditingController();
     final createSerialController = TextEditingController();
     final createMemoController = TextEditingController();
@@ -236,11 +258,22 @@ class _InventoryPageState extends State<InventoryPage> {
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            title: const Text('재고 등록'),
+            backgroundColor: Colors.white,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            title: const Text(
+              '재고 등록',
+              style: TextStyle(
+                color: Color(0xFF111827),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
             content: SizedBox(
-              width: 520,
+              width: 680,
               child: SingleChildScrollView(
-                child: Column(
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
                   children: [
                     _input('매장', createStoreController),
                     _input('모델명', createModelController),
@@ -257,7 +290,7 @@ class _InventoryPageState extends State<InventoryPage> {
                         }
                       },
                     ),
-                    _input('메모', createMemoController, maxLines: 3),
+                    _input('메모', createMemoController, maxLines: 3, width: 492),
                   ],
                 ),
               ),
@@ -268,6 +301,7 @@ class _InventoryPageState extends State<InventoryPage> {
                 child: const Text('취소'),
               ),
               ElevatedButton(
+                style: _primaryButtonStyle(),
                 onPressed: () async {
                   storeController.text = createStoreController.text;
                   modelController.text = createModelController.text;
@@ -306,11 +340,22 @@ class _InventoryPageState extends State<InventoryPage> {
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            title: const Text('재고 수정'),
+            backgroundColor: Colors.white,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            title: const Text(
+              '재고 수정',
+              style: TextStyle(
+                color: Color(0xFF111827),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
             content: SizedBox(
-              width: 520,
+              width: 680,
               child: SingleChildScrollView(
-                child: Column(
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
                   children: [
                     _input('매장', editStoreController),
                     _input('모델명', editModelController),
@@ -327,7 +372,7 @@ class _InventoryPageState extends State<InventoryPage> {
                         }
                       },
                     ),
-                    _input('메모', editMemoController, maxLines: 3),
+                    _input('메모', editMemoController, maxLines: 3, width: 492),
                   ],
                 ),
               ),
@@ -338,6 +383,7 @@ class _InventoryPageState extends State<InventoryPage> {
                 child: const Text('취소'),
               ),
               ElevatedButton(
+                style: _primaryButtonStyle(),
                 onPressed: () => updateInventory(
                   id: item['id'].toString(),
                   store: editStoreController.text.trim(),
@@ -379,14 +425,23 @@ class _InventoryPageState extends State<InventoryPage> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text(item['model_name']?.toString().isNotEmpty == true
-            ? item['model_name'].toString()
-            : '재고 상세'),
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        title: Text(
+          item['model_name']?.toString().isNotEmpty == true
+              ? item['model_name'].toString()
+              : '재고 상세',
+          style: const TextStyle(
+            color: Color(0xFF111827),
+            fontWeight: FontWeight.w900,
+          ),
+        ),
         content: SizedBox(
           width: 560,
           child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Wrap(
+              spacing: 18,
+              runSpacing: 0,
               children: [
                 _detail('매장', item['store']),
                 _detail('모델명', item['model_name']),
@@ -419,17 +474,19 @@ class _InventoryPageState extends State<InventoryPage> {
     String label,
     TextEditingController controller, {
     int maxLines = 1,
+    double width = 240,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+    return SizedBox(
+      width: width,
       child: TextField(
         controller: controller,
         maxLines: maxLines,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-          isDense: true,
+        style: const TextStyle(
+          color: Color(0xFF111827),
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
         ),
+        decoration: _inputDecoration(label),
       ),
     );
   }
@@ -440,15 +497,11 @@ class _InventoryPageState extends State<InventoryPage> {
     required List<T> items,
     required ValueChanged<T?> onChanged,
   }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+    return SizedBox(
+      width: 240,
       child: DropdownButtonFormField<T>(
-        value: value,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-          isDense: true,
-        ),
+        initialValue: value,
+        decoration: _inputDecoration(label),
         items: items
             .map(
               (e) => DropdownMenuItem<T>(
@@ -463,17 +516,45 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   Widget _detail(String title, dynamic value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Text('$title : ${value ?? ''}'),
-    );
-  }
-
-  DataColumn _column(String label) {
-    return DataColumn(
-      label: Text(
-        label,
-        style: const TextStyle(fontWeight: FontWeight.w700),
+    return SizedBox(
+      width: 250,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 9),
+        decoration: const BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: Color(0xFFF3F4F6)),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 86,
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: Color(0xFF8B95A1),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                value?.toString().trim().isNotEmpty == true
+                    ? value.toString()
+                    : '-',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF111827),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -488,14 +569,224 @@ class _InventoryPageState extends State<InventoryPage> {
       icon: Icon(icon, size: 18),
       label: Text(label),
       style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.white,
+        foregroundColor: const Color(0xFF374151),
+        elevation: 0,
+        side: const BorderSide(color: Color(0xFFE8E9EF)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         minimumSize: const Size(0, 44),
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       ),
     );
   }
 
+  ButtonStyle _primaryButtonStyle() {
+    return ElevatedButton.styleFrom(
+      backgroundColor: const Color(0xFFC94C6E),
+      foregroundColor: Colors.white,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    );
+  }
+
+  InputDecoration _inputDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      filled: true,
+      fillColor: const Color(0xFFFAFAFC),
+      isDense: true,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFFE8E9EF)),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFFE8E9EF)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFFC94C6E), width: 1.4),
+      ),
+    );
+  }
+
   String _value(dynamic value) =>
       value?.toString().isNotEmpty == true ? value.toString() : '-';
+
+  Widget _inventoryTable() {
+    const baseWidths = <double>[140, 180, 190, 110, 260, 120];
+    const headers = ['매장', '모델명', '일련번호', '상태', '메모', '작업'];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final baseWidth = baseWidths.reduce((a, b) => a + b);
+        final tableWidth =
+            constraints.maxWidth > baseWidth ? constraints.maxWidth : baseWidth;
+        final extraWidth = tableWidth - baseWidth;
+        final widths = [...baseWidths];
+        if (extraWidth > 0) {
+          widths[1] += extraWidth * 0.22;
+          widths[2] += extraWidth * 0.20;
+          widths[4] += extraWidth * 0.46;
+          widths[5] += extraWidth * 0.12;
+        }
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: tableWidth,
+            child: Column(
+              children: [
+                Container(
+                  height: 44,
+                  color: const Color(0xFFF9FAFB),
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < headers.length; i++)
+                        _tableHeader(headers[i], widths[i]),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: items.map((item) {
+                        return InkWell(
+                          onTap: () => showDetail(item),
+                          child: Container(
+                            height: 62,
+                            decoration: const BoxDecoration(
+                              border: Border(
+                                bottom: BorderSide(color: Color(0xFFF3F4F6)),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                _tableCell(
+                                    Text(_value(item['store'])), widths[0]),
+                                _tableCell(Text(_value(item['model_name'])),
+                                    widths[1]),
+                                _tableCell(Text(_value(item['serial_number'])),
+                                    widths[2]),
+                                _tableCell(_statusBadge(_value(item['status'])),
+                                    widths[3]),
+                                _tableCell(
+                                  Text(
+                                    _value(item['memo']),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  widths[4],
+                                ),
+                                _tableCell(
+                                  Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      _compactIconButton(
+                                        tooltip: '상세',
+                                        onPressed: () => showDetail(item),
+                                        icon: const Icon(
+                                            Icons.visibility_outlined,
+                                            size: 18),
+                                      ),
+                                      if (canEdit())
+                                        _compactIconButton(
+                                          tooltip: '수정',
+                                          onPressed: () => showEditDialog(item),
+                                          icon: const Icon(Icons.edit_outlined,
+                                              size: 18),
+                                        ),
+                                      if (canDelete())
+                                        _compactIconButton(
+                                          tooltip: '삭제',
+                                          onPressed: () =>
+                                              showDeleteDialog(item),
+                                          icon: const Icon(Icons.delete_outline,
+                                              size: 18),
+                                        ),
+                                    ],
+                                  ),
+                                  widths[5],
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _tableHeader(String label, double width) {
+    return SizedBox(
+      width: width,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Text(
+          label,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Color(0xFF9CA3AF),
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _tableCell(Widget child, double width) {
+    return SizedBox(
+      width: width,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        child: Align(alignment: Alignment.centerLeft, child: child),
+      ),
+    );
+  }
+
+  Widget _statusBadge(String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        value,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          color: Color(0xFF374151),
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  Widget _compactIconButton({
+    required String tooltip,
+    required VoidCallback onPressed,
+    required Widget icon,
+  }) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: icon,
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+    );
+  }
 
   @override
   void dispose() {
@@ -509,28 +800,48 @@ class _InventoryPageState extends State<InventoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('재고관리'),
-      ),
+      backgroundColor: const Color(0xFFF4F5F8),
       body: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(28),
         child: Column(
           children: [
             Row(
               children: [
-                Expanded(
+                SizedBox(
+                  width: 360,
+                  height: 38,
                   child: TextField(
                     controller: searchController,
-                    decoration: const InputDecoration(
+                    style: const TextStyle(fontSize: 13),
+                    decoration: InputDecoration(
                       hintText: '매장, 모델명, 일련번호, 상태 검색...',
-                      prefixIcon: Icon(Icons.search),
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        size: 17,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 12),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFFE8E9EF)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFFE8E9EF)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFF6B7280)),
+                      ),
                     ),
                     onChanged: (value) => fetchInventory(keyword: value),
                   ),
                 ),
+                const Spacer(),
                 const SizedBox(width: 12),
                 _headerActionButton(
                   icon: Icons.add,
@@ -551,90 +862,15 @@ class _InventoryPageState extends State<InventoryPage> {
                 decoration: BoxDecoration(
                   color: Colors.white,
                   border: Border.all(color: const Color(0xFFE7E9EE)),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : items.isEmpty
                         ? const Center(child: Text('등록된 재고가 없습니다'))
                         : ClipRRect(
-                            borderRadius: BorderRadius.circular(20),
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: SingleChildScrollView(
-                                child: DataTable(
-                                  headingRowColor: WidgetStateProperty.all(
-                                    const Color(0xFFF8FAFC),
-                                  ),
-                                  dataRowMinHeight: 64,
-                                  dataRowMaxHeight: 72,
-                                  columnSpacing: 28,
-                                  horizontalMargin: 18,
-                                  columns: [
-                                    _column('매장'),
-                                    _column('모델명'),
-                                    _column('일련번호'),
-                                    _column('상태'),
-                                    _column('메모'),
-                                    _column('작업'),
-                                  ],
-                                  rows: items.map((item) {
-                                    return DataRow(
-                                      cells: [
-                                        DataCell(Text(_value(item['store']))),
-                                        DataCell(
-                                            Text(_value(item['model_name']))),
-                                        DataCell(Text(
-                                            _value(item['serial_number']))),
-                                        DataCell(Text(_value(item['status']))),
-                                        DataCell(
-                                          SizedBox(
-                                            width: 200,
-                                            child: Text(
-                                              _value(item['memo']),
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                          ),
-                                        ),
-                                        DataCell(
-                                          Row(
-                                            children: [
-                                              IconButton(
-                                                tooltip: '상세',
-                                                onPressed: () =>
-                                                    showDetail(item),
-                                                icon: const Icon(
-                                                    Icons.visibility_outlined),
-                                              ),
-                                              if (canEdit())
-                                                IconButton(
-                                                  tooltip: '수정',
-                                                  onPressed: () =>
-                                                      showEditDialog(item),
-                                                  icon: const Icon(
-                                                      Icons.edit_outlined),
-                                                ),
-                                              if (canDelete())
-                                                IconButton(
-                                                  tooltip: '삭제',
-                                                  onPressed: () =>
-                                                      showDeleteDialog(item),
-                                                  icon: Icon(
-                                                    Icons.delete_outline,
-                                                    color:
-                                                        theme.colorScheme.error,
-                                                  ),
-                                                ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    );
-                                  }).toList(),
-                                ),
-                              ),
-                            ),
+                            borderRadius: BorderRadius.circular(8),
+                            child: _inventoryTable(),
                           ),
               ),
             ),

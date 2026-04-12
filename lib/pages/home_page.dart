@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:crm_app/utils/store_utils.dart';
 
 final supabase = Supabase.instance.client;
 
 class HomePage extends StatefulWidget {
   final String role;
+  final String currentStore;
 
-  const HomePage({super.key, required this.role});
+  const HomePage({super.key, required this.role, required this.currentStore});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -15,6 +17,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final managerController = TextEditingController();
+  final joinDateController = TextEditingController();
   final nameController = TextEditingController();
   final phoneController = TextEditingController();
 
@@ -54,9 +57,16 @@ class _HomePageState extends State<HomePage> {
   final NumberFormat moneyFormat = NumberFormat('#,###');
 
   @override
+  void initState() {
+    super.initState();
+    _setTodayJoinDate();
+  }
+
+  @override
   void dispose() {
     for (final c in [
       managerController,
+      joinDateController,
       nameController,
       phoneController,
       carrierController,
@@ -88,11 +98,26 @@ class _HomePageState extends State<HomePage> {
 
   String formatMonth(DateTime date) => DateFormat('yy-MM').format(date);
 
+  void _setTodayJoinDate() {
+    final today = DateTime.now();
+    joinDate = today;
+    joinDateController.text = DateFormat('yyyy-MM-dd').format(today);
+  }
+
+  DateTime? _formJoinDate() {
+    final text = joinDateController.text.trim();
+    if (text.isEmpty) return null;
+    final parsed = DateTime.tryParse(text);
+    if (parsed == null) return null;
+    return DateTime(parsed.year, parsed.month, parsed.day);
+  }
+
   String formatPhone(String input) {
     final digits = input.replaceAll(RegExp(r'[^0-9]'), '');
     if (digits.length <= 3) return digits;
-    if (digits.length <= 7)
+    if (digits.length <= 7) {
       return '${digits.substring(0, 3)}-${digits.substring(3)}';
+    }
     final cut = digits.length > 11 ? 11 : digits.length;
     return '${digits.substring(0, 3)}-${digits.substring(3, 7)}-${digits.substring(7, cut)}';
   }
@@ -140,14 +165,70 @@ class _HomePageState extends State<HomePage> {
 
   void showMessage(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text)),
-    );
+    var closed = false;
+    showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '알림',
+      barrierColor: Colors.black.withValues(alpha: 0.06),
+      transitionDuration: const Duration(milliseconds: 160),
+      pageBuilder: (dialogContext, _, __) => Center(
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 360),
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE8E9EF)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x22000000),
+                  blurRadius: 22,
+                  offset: Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.info_outline_rounded,
+                    color: Color(0xFFC94C6E), size: 20),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    text,
+                    style: const TextStyle(
+                      color: Color(0xFF111827),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ).then((_) => closed = true);
+
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (!closed && mounted) {
+        Navigator.of(context, rootNavigator: true).maybePop();
+      }
+    });
+  }
+
+  void logUiError(String text) {
+    debugPrint(text);
   }
 
   Future<void> save() async {
-    if (joinDate == null ||
+    final currentJoinDate = _formJoinDate();
+
+    if (currentJoinDate == null ||
         nameController.text.trim().isEmpty ||
         phoneController.text.trim().isEmpty) {
       showMessage('가입일 / 고객명 / 휴대폰번호는 필수입니다.');
@@ -183,9 +264,9 @@ class _HomePageState extends State<HomePage> {
 
     try {
       await supabase.from('customers').insert({
-        'join_date': joinDate!.toIso8601String(),
-        'm3': formatMonth(joinDate!.add(const Duration(days: 90))),
-        'm6': formatMonth(joinDate!.add(const Duration(days: 180))),
+        'join_date': currentJoinDate.toIso8601String(),
+        'm3': formatMonth(currentJoinDate.add(const Duration(days: 90))),
+        'm6': formatMonth(currentJoinDate.add(const Duration(days: 180))),
         'staff': managerController.text.trim().isEmpty
             ? (user.email ?? '')
             : managerController.text.trim(),
@@ -217,7 +298,9 @@ class _HomePageState extends State<HomePage> {
         'tax': tax,
         'margin': margin,
         'memo': memoController.text.trim(),
-        'store': storeController.text.trim(),
+        'store': normalizeStoreName(storeController.text.trim().isEmpty
+            ? widget.currentStore
+            : storeController.text.trim()),
         'mobile': mobileController.text.trim(),
         'second': secondController.text.trim(),
         'created_by': user.id,
@@ -226,7 +309,7 @@ class _HomePageState extends State<HomePage> {
       clearForm();
       showMessage('고객 등록 완료');
     } catch (e) {
-      showMessage('저장 실패: $e');
+      logUiError('저장 실패: $e');
     }
   }
 
@@ -261,7 +344,7 @@ class _HomePageState extends State<HomePage> {
     }
 
     setState(() {
-      joinDate = null;
+      _setTodayJoinDate();
       showMore = false;
       joinType = null;
       previousCarrier = null;
@@ -278,11 +361,18 @@ class _HomePageState extends State<HomePage> {
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE7E9EE)),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE8E9EF)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -290,8 +380,8 @@ class _HomePageState extends State<HomePage> {
           Text(
             title,
             style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w800,
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
               color: Color(0xFF111827),
             ),
           ),
@@ -304,7 +394,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ],
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           child,
         ],
       ),
@@ -312,19 +402,13 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget labelBox(String text) {
-    return Container(
-      height: 52,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8D7DD),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontWeight: FontWeight.w800,
-          color: Color(0xFF111827),
-        ),
+    return Text(
+      text,
+      overflow: TextOverflow.ellipsis,
+      style: const TextStyle(
+        color: Color(0xFF6B7280),
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
       ),
     );
   }
@@ -344,10 +428,21 @@ class _HomePageState extends State<HomePage> {
       onChanged: onChanged,
       decoration: InputDecoration(
         isDense: true,
+        filled: true,
+        fillColor: const Color(0xFFF9FAFB),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFFE8E9EF)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFFE8E9EF)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFFC94C6E)),
         ),
       ),
     );
@@ -365,10 +460,21 @@ class _HomePageState extends State<HomePage> {
       decoration: InputDecoration(
         hintText: hint,
         isDense: true,
+        filled: true,
+        fillColor: const Color(0xFFF9FAFB),
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFFE8E9EF)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFFE8E9EF)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFFC94C6E)),
         ),
       ),
       items: items
@@ -386,25 +492,35 @@ class _HomePageState extends State<HomePage> {
     required String label,
     required Widget field,
   }) {
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(flex: 3, child: labelBox(label)),
-        const SizedBox(width: 10),
-        Expanded(flex: 4, child: field),
+        labelBox(label),
+        const SizedBox(height: 6),
+        field,
       ],
     );
   }
 
   Widget summaryBox(String label, String value) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF3F8),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0xFFFFD3E5)),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE8E9EF)),
       ),
       child: Row(
         children: [
+          Container(
+            width: 4,
+            height: 28,
+            decoration: BoxDecoration(
+              color: const Color(0xFFC94C6E),
+              borderRadius: BorderRadius.circular(99),
+            ),
+          ),
+          const SizedBox(width: 12),
           Text(
             label,
             style: const TextStyle(
@@ -428,32 +544,27 @@ class _HomePageState extends State<HomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final m3 = joinDate == null
+    final currentJoinDate = _formJoinDate();
+    final m3 = currentJoinDate == null
         ? '-'
-        : formatMonth(joinDate!.add(const Duration(days: 90)));
-    final m6 = joinDate == null
+        : formatMonth(currentJoinDate.add(const Duration(days: 90)));
+    final m6 = currentJoinDate == null
         ? '-'
-        : formatMonth(joinDate!.add(const Duration(days: 180)));
+        : formatMonth(currentJoinDate.add(const Duration(days: 180)));
 
     final totalRebate = calcTotalRebate();
     final tax = calcTax();
     final margin = calcMargin();
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FA),
-      appBar: AppBar(
-        title: const Text('고객등록'),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF111827),
-        elevation: 0,
-      ),
+      backgroundColor: const Color(0xFFF4F5F8),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(22),
+        padding: const EdgeInsets.all(28),
         child: Column(
           children: [
             sectionCard(
               title: '고객 등록',
-              subtitle: '핵심 항목은 처음부터 보이고, 추가 항목은 버튼으로 펼칩니다.',
+              subtitle: '가입일, 고객명, 휴대폰번호만 필수입니다.',
               child: Column(
                 children: [
                   Row(
@@ -461,25 +572,14 @@ class _HomePageState extends State<HomePage> {
                       Expanded(
                         child: pair(
                           label: '가입일',
-                          field: ElevatedButton(
-                            onPressed: () async {
-                              final picked = await showDatePicker(
-                                context: context,
-                                initialDate: joinDate ?? DateTime.now(),
-                                firstDate: DateTime(2020),
-                                lastDate: DateTime(2100),
-                              );
-                              if (picked != null) {
-                                setState(() {
-                                  joinDate = picked;
-                                });
-                              }
+                          field: inputBox(
+                            joinDateController,
+                            keyboardType: TextInputType.datetime,
+                            onChanged: (value) {
+                              setState(() {
+                                joinDate = DateTime.tryParse(value);
+                              });
                             },
-                            child: Text(
-                              joinDate == null
-                                  ? '선택'
-                                  : DateFormat('MM월 dd일').format(joinDate!),
-                            ),
                           ),
                         ),
                       ),
@@ -727,11 +827,21 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                   const SizedBox(height: 18),
-                  summaryBox('총리베이트', moneyText(totalRebate)),
-                  const SizedBox(height: 10),
-                  summaryBox('세금', moneyText(tax)),
-                  const SizedBox(height: 10),
-                  summaryBox('마진', moneyText(margin)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: summaryBox('총리베이트', moneyText(totalRebate)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: summaryBox('세금', moneyText(tax)),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: summaryBox('마진', moneyText(margin)),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 18),
                   Align(
                     alignment: Alignment.centerLeft,
@@ -741,6 +851,13 @@ class _HomePageState extends State<HomePage> {
                           showMore = !showMore;
                         });
                       },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFC94C6E),
+                        side: const BorderSide(color: Color(0xFFC94C6E)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
                       icon: Icon(
                         showMore
                             ? Icons.expand_less_rounded
@@ -807,7 +924,7 @@ class _HomePageState extends State<HomePage> {
                                   const EdgeInsets.symmetric(horizontal: 14),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(8),
                                 border:
                                     Border.all(color: const Color(0xFFE7E9EE)),
                               ),
@@ -826,7 +943,7 @@ class _HomePageState extends State<HomePage> {
                                   const EdgeInsets.symmetric(horizontal: 14),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(14),
+                                borderRadius: BorderRadius.circular(8),
                                 border:
                                     Border.all(color: const Color(0xFFE7E9EE)),
                               ),
@@ -873,7 +990,7 @@ class _HomePageState extends State<HomePage> {
                             alignment: Alignment.center,
                             decoration: BoxDecoration(
                               color: const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(14),
+                              borderRadius: BorderRadius.circular(8),
                               border:
                                   Border.all(color: const Color(0xFFE7E9EE)),
                             ),
@@ -893,24 +1010,27 @@ class _HomePageState extends State<HomePage> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: ElevatedButton(
-                      onPressed: save,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFE85D75),
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: SizedBox(
+                      width: 168,
+                      height: 44,
+                      child: ElevatedButton(
+                        onPressed: save,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFC94C6E),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
-                      ),
-                      child: const Text(
-                        '고 객 등 록',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 2,
+                        child: const Text(
+                          '고객 등록',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
                       ),
                     ),

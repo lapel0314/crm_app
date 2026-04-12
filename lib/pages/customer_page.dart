@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:crm_app/utils/store_utils.dart';
 
 final supabase = Supabase.instance.client;
 
 class CustomerPage extends StatefulWidget {
   final String role;
+  final String currentStore;
 
-  const CustomerPage({super.key, required this.role});
+  const CustomerPage({
+    super.key,
+    required this.role,
+    required this.currentStore,
+  });
 
   @override
   State<CustomerPage> createState() => _CustomerPageState();
@@ -15,14 +21,21 @@ class CustomerPage extends StatefulWidget {
 
 class _CustomerPageState extends State<CustomerPage> {
   final searchController = TextEditingController();
+  final dateSearchController = TextEditingController();
+  final phoneSearchController = TextEditingController();
   final NumberFormat moneyFormat = NumberFormat('#,###');
 
   List<Map<String, dynamic>> customers = [];
   bool isLoading = true;
+  String selectedCarrierFilter = '전체';
+  String selectedJoinTypeFilter = '전체';
+  int currentPage = 0;
+  static const int pageSize = 20;
 
   bool get isPublicRole => widget.role == '공개용';
   bool get canEdit => !isPublicRole;
   bool get canDelete => !isPublicRole;
+  bool get canViewAllStores => isPrivilegedRole(widget.role);
 
   @override
   void initState() {
@@ -134,12 +147,130 @@ class _CustomerPageState extends State<CustomerPage> {
     return totalRebate - tax;
   }
 
-  void _showSnackBar(String message) {
+  void _showCenterMessage(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    var closed = false;
+    showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: '알림',
+      barrierColor: Colors.black.withValues(alpha: 0.06),
+      transitionDuration: const Duration(milliseconds: 160),
+      pageBuilder: (dialogContext, _, __) => Center(
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 360),
+            margin: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE8E9EF)),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x22000000),
+                  blurRadius: 22,
+                  offset: Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.info_outline_rounded,
+                    color: Color(0xFFC94C6E), size: 20),
+                const SizedBox(width: 10),
+                Flexible(
+                  child: Text(
+                    message,
+                    style: const TextStyle(
+                      color: Color(0xFF111827),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ).then((_) => closed = true);
+
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (!closed && mounted) {
+        Navigator.of(context, rootNavigator: true).maybePop();
+      }
+    });
+  }
+
+  void _logUiError(String message) {
+    debugPrint(message);
+  }
+
+  String _normalizeCarrier(String value) {
+    return value.toUpperCase().replaceAll(RegExp(r'[\s_-]'), '');
+  }
+
+  bool _matchesCarrierFilter(dynamic value) {
+    if (selectedCarrierFilter == '전체') return true;
+
+    final carrier = _normalizeCarrier(_text(value));
+    final filter = _normalizeCarrier(selectedCarrierFilter);
+
+    if (filter == 'SKT') {
+      return carrier.contains('SKT') || carrier.contains('SK');
+    }
+    if (filter == 'LGU+') {
+      return carrier.contains('LGU+') ||
+          carrier.contains('LGU') ||
+          carrier.contains('LG');
+    }
+
+    return carrier.contains(filter);
+  }
+
+  Color _carrierColor(dynamic value) {
+    final carrier = _normalizeCarrier(_text(value));
+    if (carrier.contains('SK')) return const Color(0xFF2563EB);
+    if (carrier.contains('KT')) return const Color(0xFFEF4444);
+    if (carrier.contains('LG')) return const Color(0xFFC94C6E);
+    return const Color(0xFF6B7280);
+  }
+
+  Color _joinTypeColor(dynamic value) {
+    final type = _text(value);
+    if (type.contains('신규')) return const Color(0xFF10B981);
+    if (type.contains('번호') || type.contains('이동')) {
+      return const Color(0xFF2563EB);
+    }
+    if (type.contains('기변') || type.contains('기기')) {
+      return const Color(0xFFF59E0B);
+    }
+    return const Color(0xFF6B7280);
+  }
+
+  Color _contractTypeColor(dynamic value) {
+    final type = _text(value);
+    if (type.contains('공시')) return const Color(0xFFF59E0B);
+    if (type.contains('선약')) return const Color(0xFF8B5CF6);
+    return const Color(0xFF6B7280);
+  }
+
+  Color _staffColor(dynamic value) {
+    final staff = _text(value);
+    const palette = [
+      Color(0xFF2563EB),
+      Color(0xFF10B981),
+      Color(0xFFF59E0B),
+      Color(0xFF8B5CF6),
+      Color(0xFFC94C6E),
+      Color(0xFFEF4444),
+      Color(0xFF14B8A6),
+    ];
+    final hash = staff.codeUnits.fold<int>(0, (sum, unit) => sum + unit);
+    return palette[hash % palette.length];
   }
 
   Future<void> fetchCustomers({String keyword = ''}) async {
@@ -148,26 +279,65 @@ class _CustomerPageState extends State<CustomerPage> {
     });
 
     try {
-      final List<dynamic> data = keyword.trim().isEmpty
-          ? await supabase
-              .from('customers')
-              .select()
-              .order('join_date', ascending: true)
-              .order('created_at', ascending: true)
-          : await supabase
-              .from('customers')
-              .select()
-              .or(
-                'name.ilike.%${keyword.trim()}%,phone.ilike.%${keyword.trim()}%,carrier.ilike.%${keyword.trim()}%,model.ilike.%${keyword.trim()}%,store.ilike.%${keyword.trim()}%,staff.ilike.%${keyword.trim()}%,memo.ilike.%${keyword.trim()}%',
-              )
-              .order('join_date', ascending: true)
-              .order('created_at', ascending: true);
+      final List<dynamic> data = await supabase
+          .from('customers')
+          .select()
+          .order('join_date', ascending: true)
+          .order('created_at', ascending: true);
+
+      final dateFilter = dateSearchController.text.trim();
+      final nameFilter = searchController.text.trim().toLowerCase();
+      final phoneFilter =
+          phoneSearchController.text.replaceAll(RegExp(r'[^0-9]'), '');
+      final legacyKeyword = keyword.trim().toLowerCase();
+
+      bool matches(Map<String, dynamic> item) {
+        final matchesStore =
+            canViewAllStores || isSameStore(item['store'], widget.currentStore);
+        final dateText = _date(item['join_date']);
+        final nameText = _text(item['name']).toLowerCase();
+        final phoneText = _text(item['phone']);
+        final phoneDigits = phoneText.replaceAll(RegExp(r'[^0-9]'), '');
+
+        final matchesDate = dateFilter.isEmpty || dateText.contains(dateFilter);
+        final matchesName = nameFilter.isEmpty || nameText.contains(nameFilter);
+        final matchesPhone =
+            phoneFilter.isEmpty || phoneDigits.contains(phoneFilter);
+        final joinTypeText = _text(item['join_type']);
+        final matchesCarrier = _matchesCarrierFilter(item['carrier']);
+        final matchesJoinType = selectedJoinTypeFilter == '전체' ||
+            joinTypeText.contains(selectedJoinTypeFilter) ||
+            (selectedJoinTypeFilter == '기기변경' && joinTypeText.contains('기변'));
+        final matchesLegacy = legacyKeyword.isEmpty ||
+            [
+              item['name'],
+              item['phone'],
+              item['carrier'],
+              item['model'],
+              item['store'],
+              item['staff'],
+              item['memo'],
+            ].any(
+                (value) => _text(value).toLowerCase().contains(legacyKeyword));
+
+        return matchesDate &&
+            matchesStore &&
+            matchesName &&
+            matchesPhone &&
+            matchesCarrier &&
+            matchesJoinType &&
+            matchesLegacy;
+      }
 
       setState(() {
-        customers = data.map((e) => Map<String, dynamic>.from(e)).toList();
+        customers = data
+            .map((e) => Map<String, dynamic>.from(e))
+            .where(matches)
+            .toList();
+        currentPage = 0;
       });
     } catch (e) {
-      _showSnackBar('고객 조회 실패: $e');
+      _logUiError('고객 조회 실패: $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -181,10 +351,10 @@ class _CustomerPageState extends State<CustomerPage> {
     try {
       await supabase.from('customers').delete().eq('id', id);
       if (mounted) Navigator.pop(context);
-      _showSnackBar('고객 삭제 완료');
+      _showCenterMessage('고객 삭제 완료');
       fetchCustomers(keyword: searchController.text);
     } catch (e) {
-      _showSnackBar('삭제 실패: $e');
+      _logUiError('삭제 실패: $e');
     }
   }
 
@@ -212,68 +382,54 @@ class _CustomerPageState extends State<CustomerPage> {
     );
   }
 
-  Widget _mainField(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 92,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                color: Color(0xFF6B7280),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: Color(0xFF111827),
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _detailRow(String label, dynamic value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 118,
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF6B7280),
-                fontWeight: FontWeight.w700,
+    return SizedBox(
+      width: 270,
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        decoration: const BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: Color(0xFFF3F4F6)),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 92,
+              child: Text(
+                label,
+                style: const TextStyle(
+                  color: Color(0xFF8B95A1),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: Text(
-              _text(value),
-              style: const TextStyle(
-                color: Color(0xFF111827),
-                fontWeight: FontWeight.w700,
+            Expanded(
+              child: Text(
+                _text(value),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF111827),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _detailMoneyRow(String label, dynamic value) {
-    return _detailRow(label, _money(value));
+  Widget _detailDivider() {
+    return Container(
+      height: 1,
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      color: const Color(0xFFE8E9EF),
+    );
   }
 
   Widget _sectionCard({
@@ -282,26 +438,56 @@ class _CustomerPageState extends State<CustomerPage> {
   }) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFFE7E9EE)),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE8E9EF)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w900,
-              color: Color(0xFF111827),
-            ),
-          ),
-          const SizedBox(height: 14),
-          ...children,
-        ],
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 4,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF6B7280),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 18,
+                runSpacing: 0,
+                children: [
+                  for (final child in children)
+                    if (child is Divider)
+                      SizedBox(
+                        width: constraints.maxWidth,
+                        child: _detailDivider(),
+                      )
+                    else
+                      child,
+                ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -328,6 +514,10 @@ class _CustomerPageState extends State<CustomerPage> {
         ),
       ),
     );
+  }
+
+  Widget _detailMoneyRow(String label, dynamic value) {
+    return _detailRow(label, _money(value));
   }
 
   Widget _dropdown<T>({
@@ -634,7 +824,7 @@ class _CustomerPageState extends State<CustomerPage> {
                       'bank_info': bankInfoController.text.trim(),
                       'trade_model': tradeModelController.text.trim(),
                       'memo': memoController.text.trim(),
-                      'store': storeController.text.trim(),
+                      'store': normalizeStoreName(storeController.text.trim()),
                       'mobile': mobileController.text.trim(),
                       'second': secondController.text.trim(),
                       'staff': staffController.text.trim(),
@@ -644,10 +834,10 @@ class _CustomerPageState extends State<CustomerPage> {
                     }).eq('id', customer['id']);
 
                     if (mounted) Navigator.pop(context);
-                    _showSnackBar('고객 수정 완료');
+                    _showCenterMessage('고객 수정 완료');
                     fetchCustomers(keyword: searchController.text);
                   } catch (e) {
-                    _showSnackBar('수정 실패: $e');
+                    _logUiError('수정 실패: $e');
                   }
                 },
                 child: const Text('저장'),
@@ -697,13 +887,13 @@ class _CustomerPageState extends State<CustomerPage> {
                         Container(
                           width: 54,
                           height: 54,
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFFFEEF5),
-                            shape: BoxShape.circle,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF3F4F6),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                           child: const Icon(
                             Icons.person_rounded,
-                            color: Color(0xFFFF2D8D),
+                            color: Color(0xFF6B7280),
                           ),
                         ),
                         const SizedBox(width: 14),
@@ -848,117 +1038,641 @@ class _CustomerPageState extends State<CustomerPage> {
     );
   }
 
+  Widget _summaryTile({
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Expanded(
+      child: Container(
+        height: 88,
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE8E9EF)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0A000000),
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 4,
+              height: 34,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF9CA3AF),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    value,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF111827),
+                      fontSize: 21,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _filterField({
+    required TextEditingController controller,
+    required String hint,
+    required IconData icon,
+    double width = 220,
+  }) {
+    return SizedBox(
+      width: width,
+      height: 38,
+      child: TextField(
+        controller: controller,
+        onChanged: (_) => fetchCustomers(),
+        style: const TextStyle(fontSize: 13),
+        decoration: InputDecoration(
+          hintText: hint,
+          prefixIcon: Icon(icon, size: 17, color: const Color(0xFF9CA3AF)),
+          filled: true,
+          fillColor: const Color(0xFFF9FAFB),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Color(0xFFE8E9EF)),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Color(0xFFE8E9EF)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Color(0xFFC94C6E)),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _segmentedFilter({
+    required List<String> options,
+    required String selected,
+    required ValueChanged<String> onSelected,
+  }) {
+    return Container(
+      height: 38,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE8E9EF)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: options.map((option) {
+          final active = option == selected;
+          return InkWell(
+            onTap: () => onSelected(option),
+            child: Container(
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: active ? const Color(0xFFC94C6E) : Colors.transparent,
+                borderRadius: BorderRadius.circular(7),
+              ),
+              child: Text(
+                option,
+                style: TextStyle(
+                  color: active ? Colors.white : const Color(0xFF6B7280),
+                  fontSize: 12,
+                  fontWeight: active ? FontWeight.w800 : FontWeight.w600,
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _customerTable(List<Map<String, dynamic>> visibleCustomers) {
+    const baseWidths = <double>[
+      104,
+      92,
+      108,
+      138,
+      92,
+      118,
+      110,
+      150,
+      170,
+      150,
+      92,
+      86,
+      126,
+    ];
+    const headers = [
+      '가입일',
+      '담당자',
+      '고객명',
+      '휴대폰번호',
+      '가입유형',
+      '통신사/거래처',
+      '기존통신사',
+      '모델명',
+      '요금제',
+      '부가서비스',
+      '공시/선약',
+      '할부개월',
+      '',
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final baseWidth = baseWidths.reduce((a, b) => a + b);
+        final tableWidth =
+            constraints.maxWidth > baseWidth ? constraints.maxWidth : baseWidth;
+        final extraWidth = tableWidth - baseWidth;
+        final widths = [...baseWidths];
+        widths[8] += extraWidth;
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: SizedBox(
+            width: tableWidth,
+            child: Column(
+              children: [
+                Container(
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFF9FAFB),
+                    border: Border(
+                      bottom: BorderSide(color: Color(0xFFF3F4F6)),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < headers.length; i++)
+                        _headerCell(headers[i], widths[i]),
+                    ],
+                  ),
+                ),
+                ...visibleCustomers.map((customer) {
+                  final phone =
+                      _displayPhone(customer['phone']?.toString() ?? '');
+                  return InkWell(
+                    onTap: () => showDetail(customer),
+                    child: Container(
+                      height: 58,
+                      decoration: const BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: Color(0xFFF9FAFB)),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          _tableCell(_tableText(_date(customer['join_date'])),
+                              widths[0]),
+                          _tableCell(
+                            _tableBadge(
+                              _text(customer['staff']),
+                              color: _staffColor(customer['staff']),
+                            ),
+                            widths[1],
+                          ),
+                          _tableCell(
+                            _tableText(
+                              _displayName(customer['name']?.toString() ?? ''),
+                              strong: true,
+                            ),
+                            widths[2],
+                          ),
+                          _tableCell(_tableText(phone), widths[3]),
+                          _tableCell(
+                            _tableBadge(
+                              _text(customer['join_type']),
+                              color: _joinTypeColor(customer['join_type']),
+                            ),
+                            widths[4],
+                          ),
+                          _tableCell(
+                            _tableBadge(
+                              _text(customer['carrier']),
+                              color: _carrierColor(customer['carrier']),
+                            ),
+                            widths[5],
+                          ),
+                          _tableCell(
+                            _tableText(_text(customer['previous_carrier'])),
+                            widths[6],
+                          ),
+                          _tableCell(
+                            _tableText(_text(customer['model']), strong: true),
+                            widths[7],
+                          ),
+                          _tableCell(
+                              _tableText(_text(customer['plan'])), widths[8]),
+                          _tableCell(
+                            _tableText(_text(customer['add_service'])),
+                            widths[9],
+                          ),
+                          _tableCell(
+                            _tableBadge(
+                              _text(customer['contract_type']),
+                              color:
+                                  _contractTypeColor(customer['contract_type']),
+                            ),
+                            widths[10],
+                          ),
+                          _tableCell(
+                            _tableText('${_text(customer['installment'])}개월'),
+                            widths[11],
+                          ),
+                          _tableCell(
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _compactIconButton(
+                                  tooltip: '상세',
+                                  onPressed: () => showDetail(customer),
+                                  icon: const Icon(Icons.visibility_outlined,
+                                      size: 18),
+                                ),
+                                if (canEdit)
+                                  _compactIconButton(
+                                    tooltip: '수정',
+                                    onPressed: () => showEditDialog(customer),
+                                    icon: const Icon(Icons.edit_outlined,
+                                        size: 18),
+                                  ),
+                                if (canDelete)
+                                  _compactIconButton(
+                                    tooltip: '삭제',
+                                    onPressed: () => showDeleteDialog(customer),
+                                    icon: const Icon(Icons.delete_outline,
+                                        size: 18),
+                                  ),
+                              ],
+                            ),
+                            widths[12],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _headerCell(String label, double width) {
+    return SizedBox(
+      width: width,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Text(
+          label,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Color(0xFF9CA3AF),
+            fontSize: 11,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _tableCell(Widget child, double width) {
+    return SizedBox(
+      width: width,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: child,
+        ),
+      ),
+    );
+  }
+
+  Widget _tableText(String value, {bool strong = false}) {
+    return Text(
+      value,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+      style: TextStyle(
+        color: strong ? const Color(0xFF111827) : const Color(0xFF374151),
+        fontSize: 12,
+        fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
+      ),
+    );
+  }
+
+  Widget _tableBadge(String value, {Color color = const Color(0xFFC94C6E)}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        value,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  Widget _compactIconButton({
+    required String tooltip,
+    required VoidCallback onPressed,
+    required Widget icon,
+  }) {
+    return IconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: icon,
+      visualDensity: VisualDensity.compact,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+    );
+  }
+
+  Widget _pagination({
+    required int totalItems,
+    required int safePage,
+    required int totalPages,
+  }) {
+    final start = totalItems == 0 ? 0 : safePage * pageSize + 1;
+    var end = (safePage + 1) * pageSize;
+    if (end > totalItems) end = totalItems;
+
+    return Container(
+      height: 46,
+      padding: const EdgeInsets.symmetric(horizontal: 18),
+      decoration: const BoxDecoration(
+        border: Border(
+          top: BorderSide(color: Color(0xFFF3F4F6)),
+        ),
+      ),
+      child: Row(
+        children: [
+          Text(
+            '$start-$end / 총 $totalItems건',
+            style: const TextStyle(
+              color: Color(0xFF9CA3AF),
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const Spacer(),
+          IconButton(
+            tooltip: '이전',
+            onPressed: safePage <= 0
+                ? null
+                : () => setState(() => currentPage = safePage - 1),
+            icon: const Icon(Icons.chevron_left, size: 20),
+          ),
+          Container(
+            height: 28,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: const Color(0xFFC94C6E).withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              '${safePage + 1} / $totalPages',
+              style: const TextStyle(
+                color: Color(0xFFC94C6E),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          IconButton(
+            tooltip: '다음',
+            onPressed: safePage >= totalPages - 1
+                ? null
+                : () => setState(() => currentPage = safePage + 1),
+            icon: const Icon(Icons.chevron_right, size: 20),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
     searchController.dispose();
+    dateSearchController.dispose();
+    phoneSearchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final totalCustomers = customers.length;
+    final newJoinCount =
+        customers.where((e) => _text(e['join_type']).contains('신규')).length;
+    final transferCount =
+        customers.where((e) => _text(e['join_type']).contains('이동')).length;
+    final deviceChangeCount = customers
+        .where((e) =>
+            _text(e['join_type']).contains('기기변경') ||
+            _text(e['join_type']).contains('기변'))
+        .length;
+    final totalPages =
+        customers.isEmpty ? 1 : ((customers.length + pageSize - 1) ~/ pageSize);
+    final safePage = currentPage >= totalPages ? totalPages - 1 : currentPage;
+    final pageStart = safePage * pageSize;
+    var pageEnd = pageStart + pageSize;
+    if (pageEnd > customers.length) pageEnd = customers.length;
+    final visibleCustomers = customers.sublist(pageStart, pageEnd);
+
     return Scaffold(
-      appBar: AppBar(
-        title: Text('고객 DB (${widget.role})'),
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
+      backgroundColor: const Color(0xFFF4F5F8),
+      body: Padding(
+        padding: const EdgeInsets.all(28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Expanded(
-                  child: TextField(
-                    controller: searchController,
-                    decoration: InputDecoration(
-                      hintText: '이름 / 전화번호 / 모델명 / 담당자 / 매장 검색',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    onChanged: (value) => fetchCustomers(keyword: value),
-                  ),
+                _summaryTile(
+                  label: '전체고객',
+                  value: '$totalCustomers명',
+                  color: const Color(0xFF6B7280),
                 ),
-                const SizedBox(width: 12),
-                ElevatedButton.icon(
-                  onPressed: () =>
-                      fetchCustomers(keyword: searchController.text),
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('새로고침'),
+                const SizedBox(width: 14),
+                _summaryTile(
+                  label: '신규개통',
+                  value: '$newJoinCount명',
+                  color: const Color(0xFF10B981),
+                ),
+                const SizedBox(width: 14),
+                _summaryTile(
+                  label: '번호이동',
+                  value: '$transferCount명',
+                  color: const Color(0xFF3B82F6),
+                ),
+                const SizedBox(width: 14),
+                _summaryTile(
+                  label: '기기변경',
+                  value: '$deviceChangeCount명',
+                  color: const Color(0xFFF59E0B),
                 ),
               ],
             ),
-          ),
-          Expanded(
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : customers.isEmpty
-                    ? const Center(child: Text('고객 정보가 없습니다'))
-                    : ListView.builder(
-                        itemCount: customers.length,
-                        itemBuilder: (context, index) {
-                          final customer = customers[index];
-                          return Card(
-                            margin: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 6,
-                            ),
-                            child: ListTile(
-                              onTap: () => showDetail(customer),
-                              title: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(height: 20),
+            Expanded(
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFE8E9EF)),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x0A000000),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
                                 children: [
-                                  _mainField(
-                                      '가입일', _date(customer['join_date'])),
-                                  _mainField('M+3', _text(customer['m3'])),
-                                  _mainField('M+6', _text(customer['m6'])),
-                                  _mainField(
-                                    '고객명',
-                                    _displayName(
-                                        customer['name']?.toString() ?? ''),
+                                  _filterField(
+                                    controller: dateSearchController,
+                                    hint: '가입일 검색',
+                                    icon: Icons.calendar_today_outlined,
+                                    width: 160,
                                   ),
-                                  _mainField(
-                                      '통신사/거래처', _text(customer['carrier'])),
-                                  _mainField(
-                                    '휴대폰번호',
-                                    _displayPhone(
-                                        customer['phone']?.toString() ?? ''),
+                                  const SizedBox(width: 8),
+                                  _filterField(
+                                    controller: searchController,
+                                    hint: '고객명 검색',
+                                    icon: Icons.person_search_outlined,
+                                    width: 190,
                                   ),
-                                  _mainField('모델명', _text(customer['model'])),
-                                  _mainField('메모', _text(customer['memo'])),
-                                  _mainField('개통매장', _text(customer['store'])),
-                                  _mainField('담당자', _text(customer['staff'])),
+                                  const SizedBox(width: 8),
+                                  _filterField(
+                                    controller: phoneSearchController,
+                                    hint: '연락처 검색',
+                                    icon: Icons.phone_iphone_outlined,
+                                    width: 190,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _segmentedFilter(
+                                    options: const ['전체', 'SKT', 'KT', 'LGU+'],
+                                    selected: selectedCarrierFilter,
+                                    onSelected: (value) {
+                                      setState(() {
+                                        selectedCarrierFilter = value;
+                                        currentPage = 0;
+                                      });
+                                      fetchCustomers();
+                                    },
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _segmentedFilter(
+                                    options: const ['전체', '신규', '번호이동', '기기변경'],
+                                    selected: selectedJoinTypeFilter,
+                                    onSelected: (value) {
+                                      setState(() {
+                                        selectedJoinTypeFilter = value;
+                                        currentPage = 0;
+                                      });
+                                      fetchCustomers();
+                                    },
+                                  ),
                                 ],
                               ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  IconButton(
-                                    tooltip: '상세',
-                                    onPressed: () => showDetail(customer),
-                                    icon: const Icon(Icons.visibility_outlined),
-                                  ),
-                                  if (canEdit)
-                                    IconButton(
-                                      tooltip: '수정',
-                                      onPressed: () => showEditDialog(customer),
-                                      icon: const Icon(Icons.edit_outlined),
-                                    ),
-                                  if (canDelete)
-                                    IconButton(
-                                      tooltip: '삭제',
-                                      onPressed: () =>
-                                          showDeleteDialog(customer),
-                                      icon: const Icon(Icons.delete_outline),
-                                    ),
-                                ],
-                              ),
                             ),
-                          );
-                        },
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton.icon(
+                            onPressed: () => fetchCustomers(),
+                            icon: const Icon(Icons.refresh, size: 17),
+                            label: const Text('새로고침'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: const Color(0xFF6B7280),
+                              elevation: 0,
+                              side: const BorderSide(color: Color(0xFFE8E9EF)),
+                            ),
+                          ),
+                        ],
                       ),
-          ),
-        ],
+                    ),
+                    const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                    Expanded(
+                      child: isLoading
+                          ? const Center(child: CircularProgressIndicator())
+                          : customers.isEmpty
+                              ? const Center(child: Text('고객 정보가 없습니다'))
+                              : Scrollbar(
+                                  thumbVisibility: true,
+                                  child: SingleChildScrollView(
+                                    child: _customerTable(visibleCustomers),
+                                  ),
+                                ),
+                    ),
+                    _pagination(
+                      totalItems: totalCustomers,
+                      safePage: safePage,
+                      totalPages: totalPages,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -1,13 +1,94 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/pages/login_page.dart';
+import 'package:crm_app/utils/store_utils.dart';
 
 final supabase = Supabase.instance.client;
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   final String role;
+  final String currentStore;
 
-  const SettingsPage({super.key, required this.role});
+  const SettingsPage({
+    super.key,
+    required this.role,
+    required this.currentStore,
+  });
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  bool isLoading = true;
+  Map<String, dynamic>? myProfile;
+  List<Map<String, dynamic>> members = [];
+
+  bool get canViewAllStores => isPrivilegedRole(widget.role);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    final user = supabase.auth.currentUser;
+    if (user == null) {
+      setState(() {
+        isLoading = false;
+      });
+      return;
+    }
+
+    try {
+      final results = await Future.wait<List<dynamic>>([
+        supabase.from('profiles').select().eq('id', user.id),
+        supabase
+            .from('profiles')
+            .select()
+            .eq('approval_status', 'approved')
+            .order('store')
+            .order('role')
+            .order('name'),
+      ]);
+
+      final profileRows =
+          results[0].map((row) => Map<String, dynamic>.from(row)).toList();
+      var memberRows =
+          results[1].map((row) => Map<String, dynamic>.from(row)).toList();
+
+      memberRows = memberRows
+          .where((row) => !isPrivilegedRole(row['role']))
+          .map((row) {
+            return {
+              ...row,
+              'store': normalizeStoreName(row['store']),
+            };
+          })
+          .where((row) =>
+              canViewAllStores ||
+              isSameStore(row['store'], widget.currentStore))
+          .toList();
+
+      if (!mounted) return;
+      setState(() {
+        myProfile = profileRows.isEmpty ? null : profileRows.first;
+        members = memberRows;
+        isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('settings load failed: $e');
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
 
   Future<void> logout(BuildContext context) async {
     try {
@@ -21,34 +102,230 @@ class SettingsPage extends StatelessWidget {
         (route) => false,
       );
     } catch (e) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('로그아웃 실패: $e')),
-      );
+      debugPrint('logout failed: $e');
     }
   }
 
-  Widget infoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
+  String _value(dynamic value) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? '-' : text;
+  }
+
+  String _displayStore(dynamic value) {
+    final store = normalizeStoreName(value);
+    return store.isEmpty ? '-' : store;
+  }
+
+  String _initials(Map<String, dynamic> row) {
+    final name = _value(row['name']);
+    if (name != '-') return name.characters.take(2).toString().toUpperCase();
+    final email = _value(row['email']);
+    return email.characters.take(2).toString().toUpperCase();
+  }
+
+  Map<String, List<Map<String, dynamic>>> _groupedMembers() {
+    final grouped = <String, List<Map<String, dynamic>>>{};
+    for (final member in members) {
+      final store = _displayStore(member['store']);
+      grouped.putIfAbsent(store, () => []).add(member);
+    }
+    return grouped;
+  }
+
+  Widget _tabRail() {
+    final tabs = [
+      (Icons.person_outline_rounded, '내 정보'),
+      (Icons.groups_2_outlined, '매장 그룹'),
+      (Icons.logout_rounded, '로그아웃'),
+    ];
+
+    return Container(
+      width: 200,
+      padding: const EdgeInsets.all(12),
+      decoration: _cardDecoration(),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          SizedBox(
-            width: 110,
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF6B7280),
+          for (final tab in tabs)
+            InkWell(
+              onTap: tab.$2 == '로그아웃' ? () => logout(context) : null,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                height: 42,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                decoration: BoxDecoration(
+                  color: tab.$2 == '내 정보'
+                      ? const Color(0xFFC94C6E).withValues(alpha: 0.10)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      tab.$1,
+                      size: 17,
+                      color: tab.$2 == '내 정보'
+                          ? const Color(0xFFC94C6E)
+                          : const Color(0xFF6B7280),
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      tab.$2,
+                      style: TextStyle(
+                        color: tab.$2 == '내 정보'
+                            ? const Color(0xFFC94C6E)
+                            : const Color(0xFF6B7280),
+                        fontSize: 13,
+                        fontWeight: tab.$2 == '내 정보'
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
+        ],
+      ),
+    );
+  }
+
+  BoxDecoration _cardDecoration() {
+    return BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(8),
+      border: Border.all(color: const Color(0xFFE8E9EF)),
+      boxShadow: const [
+        BoxShadow(
+          color: Color(0x0A000000),
+          blurRadius: 8,
+          offset: Offset(0, 2),
+        ),
+      ],
+    );
+  }
+
+  Widget _profileCard() {
+    final user = supabase.auth.currentUser;
+    final profile = myProfile ?? {};
+    final name = _value(profile['name']);
+    final email = user?.email ?? _value(profile['email']);
+    final store = _displayStore(profile['store'] ?? widget.currentStore);
+
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '내 정보',
+            style: TextStyle(
+              color: Color(0xFF111827),
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-          Expanded(
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Container(
+                width: 64,
+                height: 64,
+                alignment: Alignment.center,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFC94C6E),
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  _initials({'name': name, 'email': email}),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 18),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    name == '-' ? email : name,
+                    style: const TextStyle(
+                      color: Color(0xFF111827),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    '${_value(profile['role'] ?? widget.role)} · $store',
+                    style: const TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '내 정보는 관리자 승인 정보 기준으로 표시됩니다.',
+                    style: TextStyle(
+                      color: Color(0xFF9CA3AF),
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 22),
+          Wrap(
+            spacing: 14,
+            runSpacing: 14,
+            children: [
+              _readonlyField('이름', name),
+              _readonlyField('이메일', email),
+              _readonlyField('휴대폰번호', _value(profile['phone'])),
+              _readonlyField('권한', _value(profile['role'] ?? widget.role)),
+              _readonlyField('매장', store),
+              _readonlyField('계정 상태', _value(profile['approval_status'])),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _readonlyField(String label, String value) {
+    return SizedBox(
+      width: 260,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF374151),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFAFAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE8E9EF)),
+            ),
             child: Text(
               value,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(
-                fontWeight: FontWeight.w700,
                 color: Color(0xFF111827),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
@@ -57,70 +334,243 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final user = supabase.auth.currentUser;
+  Widget _teamGroups() {
+    final grouped = _groupedMembers();
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF7F8FC),
-      appBar: AppBar(
-        title: const Text('설정'),
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF111827),
-        elevation: 0,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(22),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 900),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Container(
+      decoration: _cardDecoration(),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(22, 18, 22, 12),
+            child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF4F8),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: const Color(0xFFFFD3E6)),
-                  ),
-                  child: Text(
-                    '설정 페이지 정상 출력 / role: $role / email: ${user?.email ?? '-'}',
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF111827),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(24),
-                    border: Border.all(color: const Color(0xFFE7E9EE)),
-                  ),
+                const Expanded(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      infoRow('이메일', user?.email ?? '-'),
-                      const Divider(height: 22),
-                      infoRow('권한', role),
-                      const Divider(height: 22),
-                      infoRow('세션 상태', user == null ? '로그아웃' : '로그인 중'),
+                      Text(
+                        '매장별 그룹',
+                        style: TextStyle(
+                          color: Color(0xFF111827),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        '같은 매장 직원만 볼 수 있습니다. 대표/개발자는 전체 매장을 조회합니다.',
+                        style: TextStyle(
+                          color: Color(0xFF9CA3AF),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ],
                   ),
                 ),
-                const SizedBox(height: 14),
-                ElevatedButton.icon(
-                  onPressed: () => logout(context),
-                  icon: const Icon(Icons.logout),
-                  label: const Text('로그아웃'),
+                _storeBadge(canViewAllStores ? '전체 매장' : widget.currentStore),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: Color(0xFFF3F4F6)),
+          if (grouped.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(28),
+              child: Center(child: Text('표시할 매장 구성원이 없습니다.')),
+            )
+          else
+            ...grouped.entries
+                .map((entry) => _storeGroup(entry.key, entry.value)),
+        ],
+      ),
+    );
+  }
+
+  Widget _storeGroup(String store, List<Map<String, dynamic>> rows) {
+    final managers =
+        rows.where((row) => _value(row['role']).contains('점장')).toList();
+    final staff =
+        rows.where((row) => !_value(row['role']).contains('점장')).toList();
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 18, 22, 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _storeBadge(store),
+              const SizedBox(width: 10),
+              Text(
+                '${rows.length}명',
+                style: const TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (managers.isNotEmpty) ...[
+            const Text(
+              '점장',
+              style: TextStyle(
+                color: Color(0xFF9CA3AF),
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...managers.map(_memberRow),
+            const SizedBox(height: 10),
+          ],
+          if (staff.isNotEmpty) ...[
+            const Text(
+              '직원',
+              style: TextStyle(
+                color: Color(0xFF9CA3AF),
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ...staff.map(_memberRow),
+          ],
+          const Divider(height: 22, color: Color(0xFFF3F4F6)),
+        ],
+      ),
+    );
+  }
+
+  Widget _memberRow(Map<String, dynamic> member) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFAFC),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE8E9EF)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            alignment: Alignment.center,
+            decoration: const BoxDecoration(
+              color: Color(0xFFC94C6E),
+              shape: BoxShape.circle,
+            ),
+            child: Text(
+              _initials(member),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w800,
+                fontSize: 12,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _value(member['name']),
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF111827),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _value(member['email']),
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF9CA3AF),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ],
             ),
           ),
+          _roleBadge(_value(member['role'])),
+        ],
+      ),
+    );
+  }
+
+  Widget _storeBadge(String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: const Color(0xFFC94C6E).withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        value.isEmpty ? '-' : value,
+        style: const TextStyle(
+          color: Color(0xFFC94C6E),
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
         ),
       ),
+    );
+  }
+
+  Widget _roleBadge(String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        value,
+        style: const TextStyle(
+          color: Color(0xFF6B7280),
+          fontSize: 11,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F5F8),
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(28),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 1120),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _tabRail(),
+                      const SizedBox(width: 22),
+                      Expanded(
+                        child: Column(
+                          children: [
+                            _profileCard(),
+                            const SizedBox(height: 18),
+                            _teamGroups(),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
     );
   }
 }

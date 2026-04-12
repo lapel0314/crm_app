@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:crm_app/utils/store_utils.dart';
 
 final supabase = Supabase.instance.client;
 
@@ -28,7 +29,7 @@ class _LoginPageState extends State<LoginPage>
   bool isLoading = false;
   bool obscureLoginPassword = true;
   bool obscureSignupPassword = true;
-  bool autoLogin = true;
+  bool agreedTerms = false;
 
   late final AnimationController _animationController;
   late final Animation<double> _fadeAnimation;
@@ -118,11 +119,10 @@ class _LoginPageState extends State<LoginPage>
         throw Exception('이메일 인증 후 관리자 승인 완료 시 로그인할 수 있습니다.');
       }
 
-      if (!autoLogin) {
-        showMessage('로그인되었습니다.');
-      }
+      showMessage('로그인되었습니다.');
     } catch (e) {
-      showMessage('로그인 실패: $e');
+      debugPrint('login failed: $e');
+      showMessage('로그인에 실패했습니다.');
     } finally {
       if (mounted) {
         setState(() {
@@ -139,6 +139,11 @@ class _LoginPageState extends State<LoginPage>
         signupPasswordController.text.trim().isEmpty ||
         signupRole == null) {
       showMessage('이름, 전화번호, 이메일, 비밀번호, 직급은 필수입니다.');
+      return;
+    }
+
+    if (!agreedTerms) {
+      showMessage('서비스약관에 동의해주세요.');
       return;
     }
 
@@ -159,7 +164,7 @@ class _LoginPageState extends State<LoginPage>
           'name': signupNameController.text.trim(),
           'phone': signupPhoneController.text.trim(),
           'role': signupRole,
-          'store': signupStoreController.text.trim(),
+          'store': normalizeStoreName(signupStoreController.text.trim()),
         },
       );
 
@@ -180,8 +185,10 @@ class _LoginPageState extends State<LoginPage>
       signupPasswordController.clear();
       signupStoreController.clear();
       signupRole = null;
+      agreedTerms = false;
     } catch (e) {
-      showMessage('회원가입 실패: $e');
+      debugPrint('signup failed: $e');
+      showMessage('회원가입에 실패했습니다.');
     } finally {
       if (mounted) {
         setState(() {
@@ -203,6 +210,44 @@ class _LoginPageState extends State<LoginPage>
     });
   }
 
+  void _showTermsDialog() {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('서비스약관'),
+        content: const SizedBox(
+          width: 520,
+          child: SingleChildScrollView(
+            child: Text(
+              'Pink Phone CRM은 매장 고객 관리, 개통 정보 관리, 정산 확인을 위한 내부 업무용 서비스입니다.\n\n'
+              '1. 계정은 본인만 사용해야 하며 타인에게 공유할 수 없습니다.\n'
+              '2. 고객 개인정보는 업무 목적 범위 안에서만 조회하고 사용할 수 있습니다.\n'
+              '3. 허위 정보 입력, 무단 삭제, 외부 유출은 금지됩니다.\n'
+              '4. 회원가입 후 이메일 인증과 관리자 승인이 완료되어야 로그인할 수 있습니다.\n'
+              '5. 서비스 운영을 위해 접속 및 업무 처리 기록이 보관될 수 있습니다.',
+              style: TextStyle(height: 1.6),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('닫기'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                agreedTerms = true;
+              });
+              Navigator.pop(context);
+            },
+            child: const Text('동의'),
+          ),
+        ],
+      ),
+    );
+  }
+
   InputDecoration _inputDecoration(
     String label, {
     IconData? prefixIcon,
@@ -218,16 +263,16 @@ class _LoginPageState extends State<LoginPage>
       fillColor: const Color(0xFFF9FAFB),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(8),
         borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFFFF4D9D), width: 1.6),
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Color(0xFFC94C6E), width: 1.6),
       ),
       labelStyle: const TextStyle(
         color: Color(0xFF6B7280),
@@ -241,7 +286,7 @@ class _LoginPageState extends State<LoginPage>
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: const Color(0xFFF3F4F6),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
@@ -253,7 +298,7 @@ class _LoginPageState extends State<LoginPage>
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   color: isLoginMode ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(8),
                   boxShadow: isLoginMode
                       ? [
                           BoxShadow(
@@ -285,7 +330,7 @@ class _LoginPageState extends State<LoginPage>
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 decoration: BoxDecoration(
                   color: !isLoginMode ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(8),
                   boxShadow: !isLoginMode
                       ? [
                           BoxShadow(
@@ -316,46 +361,24 @@ class _LoginPageState extends State<LoginPage>
 
   Widget _phoneFrame({required Widget child}) {
     return Container(
-      width: 370,
-      height: 680,
-      padding: const EdgeInsets.all(16),
+      width: 430,
+      constraints: const BoxConstraints(maxHeight: 720),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFF111827),
-        borderRadius: BorderRadius.circular(42),
-        boxShadow: [
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE8E9EF)),
+        boxShadow: const [
           BoxShadow(
-            blurRadius: 30,
-            offset: const Offset(0, 20),
-            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+            color: Color(0x14000000),
           ),
         ],
       ),
-      child: Container(
-        decoration: BoxDecoration(
-          color: const Color(0xFFFDFDFE),
-          borderRadius: BorderRadius.circular(32),
-        ),
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
-            Center(
-              child: Container(
-                width: 120,
-                height: 8,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE5E7EB),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
-                child: child,
-              ),
-            ),
-          ],
-        ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: child,
       ),
     );
   }
@@ -441,25 +464,6 @@ class _LoginPageState extends State<LoginPage>
           ),
         ),
         const SizedBox(height: 8),
-        Row(
-          children: [
-            Checkbox(
-              value: autoLogin,
-              onChanged: (value) {
-                setState(() {
-                  autoLogin = value ?? true;
-                });
-              },
-            ),
-            const Text(
-              '자동 로그인',
-              style: TextStyle(
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF374151),
-              ),
-            ),
-          ],
-        ),
         const SizedBox(height: 8),
         SizedBox(
           width: double.infinity,
@@ -467,10 +471,10 @@ class _LoginPageState extends State<LoginPage>
           child: ElevatedButton(
             onPressed: isLoading ? null : login,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF2D8D),
+              backgroundColor: const Color(0xFFC94C6E),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(8),
               ),
               elevation: 0,
               textStyle: const TextStyle(
@@ -542,14 +546,14 @@ class _LoginPageState extends State<LoginPage>
           width: double.infinity,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFFFFF3F8),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFFFD3E5)),
+            color: const Color(0xFFF9FAFB),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFE8E9EF)),
           ),
           child: const Text(
-            '입력한 이메일로 인증 메일이 발송됩니다. 이메일 인증을 완료해야 로그인할 수 있습니다.',
+            '가입 완료 버튼을 누르면 입력한 이메일로 인증 메일이 발송됩니다. 이메일 인증과 관리자 승인 완료 후 로그인할 수 있습니다.',
             style: TextStyle(
-              color: Color(0xFFBE185D),
+              color: Color(0xFF6B7280),
               fontWeight: FontWeight.w700,
               height: 1.5,
             ),
@@ -601,17 +605,57 @@ class _LoginPageState extends State<LoginPage>
             prefixIcon: Icons.storefront_outlined,
           ),
         ),
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color:
+                agreedTerms ? const Color(0xFFF0FDF4) : const Color(0xFFF9FAFB),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: agreedTerms
+                  ? const Color(0xFFBBF7D0)
+                  : const Color(0xFFE8E9EF),
+            ),
+          ),
+          child: Row(
+            children: [
+              Checkbox(
+                value: agreedTerms,
+                activeColor: const Color(0xFFC94C6E),
+                onChanged: (value) {
+                  setState(() {
+                    agreedTerms = value ?? false;
+                  });
+                },
+              ),
+              const Expanded(
+                child: Text(
+                  '서비스약관에 동의합니다.',
+                  style: TextStyle(
+                    color: Color(0xFF374151),
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: _showTermsDialog,
+                child: const Text('약관 보기'),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 16),
         SizedBox(
           width: double.infinity,
           height: 54,
           child: ElevatedButton(
-            onPressed: isLoading ? null : signup,
+            onPressed: isLoading || !agreedTerms ? null : signup,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF2D8D),
+              backgroundColor: const Color(0xFFC94C6E),
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(8),
               ),
               elevation: 0,
               textStyle: const TextStyle(
@@ -629,273 +673,113 @@ class _LoginPageState extends State<LoginPage>
   Widget _leftPanel() {
     return Container(
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFFFF1F7),
-            Color(0xFFFFD7E8),
-            Color(0xFFFFC3DD),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(34),
+        color: const Color(0xFF191B2A),
+        borderRadius: BorderRadius.circular(8),
       ),
       padding: const EdgeInsets.all(36),
-      child: Stack(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Positioned(
-            top: 20,
-            right: 10,
-            child: Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.20),
-              ),
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: const Color(0xFFC94C6E),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.phone_iphone_rounded,
+              size: 28,
+              color: Colors.white,
             ),
           ),
-          Positioned(
-            bottom: 110,
-            left: 10,
-            child: Container(
-              width: 90,
-              height: 90,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.18),
-              ),
+          const SizedBox(height: 30),
+          const Text(
+            'Pink Phone CRM',
+            style: TextStyle(
+              fontSize: 34,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+              height: 1.15,
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 76,
-                height: 76,
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      blurRadius: 16,
-                      offset: const Offset(0, 10),
-                      color: Colors.black.withValues(alpha: 0.06),
+          const SizedBox(height: 14),
+          const Text(
+            '공지사항',
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.8,
+              color: Color(0xFFD1D5DB),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 36),
+          _featureLine(Icons.people_alt_rounded, '고객 DB 통합 관리'),
+          const SizedBox(height: 14),
+          _featureLine(Icons.cable_rounded, '유선회원과 판매 내역 추적'),
+          const SizedBox(height: 14),
+          _featureLine(Icons.dashboard_rounded, '일별·월별 개통 현황 확인'),
+          const Spacer(),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFF252740)),
+            ),
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 90),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '계정 승인 안내',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 16,
                     ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.phone_iphone_rounded,
-                  size: 34,
-                  color: Color(0xFFFF2D8D),
-                ),
-              ),
-              const SizedBox(height: 28),
-              const Text(
-                'Pink Phone CRM',
-                style: TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF111827),
-                  height: 1.15,
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Text(
-                'PinkPhone CRM에 오신 걸 환영합니다',
-                style: TextStyle(
-                  fontSize: 15,
-                  height: 1.8,
-                  color: Color(0xFF4B5563),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const Spacer(),
-              Center(
-                child: SizedBox(
-                  width: 360,
-                  height: 360,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Container(
-                        width: 300,
-                        height: 300,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              Colors.white.withValues(alpha: 0.70),
-                              Colors.white.withValues(alpha: 0.10),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Transform.rotate(
-                        angle: -0.18,
-                        child: Container(
-                          width: 160,
-                          height: 290,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF2A2D34),
-                            borderRadius: BorderRadius.circular(32),
-                            boxShadow: [
-                              BoxShadow(
-                                blurRadius: 28,
-                                offset: const Offset(0, 16),
-                                color: Colors.black.withValues(alpha: 0.18),
-                              ),
-                            ],
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(10),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(24),
-                                gradient: const LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    Color(0xFFFFFAFC),
-                                    Color(0xFFFFE6F1),
-                                  ],
-                                ),
-                              ),
-                              child: Stack(
-                                children: [
-                                  Positioned(
-                                    top: 12,
-                                    left: 0,
-                                    right: 0,
-                                    child: Center(
-                                      child: Container(
-                                        width: 56,
-                                        height: 6,
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFFD1D5DB),
-                                          borderRadius:
-                                              BorderRadius.circular(999),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: 50,
-                                    left: 18,
-                                    right: 18,
-                                    child: Container(
-                                      height: 42,
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: 104,
-                                    left: 18,
-                                    right: 18,
-                                    child: Container(
-                                      height: 42,
-                                      decoration: BoxDecoration(
-                                        color: Colors.white,
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    top: 166,
-                                    left: 18,
-                                    right: 18,
-                                    child: Container(
-                                      height: 46,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFFF4D9D),
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        right: 32,
-                        top: 70,
-                        child: Transform.rotate(
-                          angle: 0.18,
-                          child: Container(
-                            width: 86,
-                            height: 86,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(22),
-                              boxShadow: [
-                                BoxShadow(
-                                  blurRadius: 18,
-                                  offset: const Offset(0, 8),
-                                  color: Colors.black.withValues(alpha: 0.08),
-                                ),
-                              ],
-                            ),
-                            child: const Icon(
-                              Icons.favorite_rounded,
-                              color: Color(0xFFFF4D9D),
-                              size: 38,
-                            ),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        left: 38,
-                        bottom: 52,
-                        child: Transform.rotate(
-                          angle: -0.12,
-                          child: Container(
-                            width: 104,
-                            height: 54,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(18),
-                              boxShadow: [
-                                BoxShadow(
-                                  blurRadius: 18,
-                                  offset: const Offset(0, 8),
-                                  color: Colors.black.withValues(alpha: 0.08),
-                                ),
-                              ],
-                            ),
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.phone_android_rounded,
-                                  color: Color(0xFFFF2D8D),
-                                ),
-                                SizedBox(width: 8),
-                                Text(
-                                  'Pink',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w900,
-                                    color: Color(0xFF111827),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
                   ),
-                ),
+                  SizedBox(height: 10),
+                  Text(
+                    '회원가입 후 이메일 인증을 완료하면 관리자 승인 대기 상태가 됩니다.',
+                    style: TextStyle(
+                      color: Color(0xFFA7ABBD),
+                      height: 1.6,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-            ],
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _featureLine(IconData icon, String text) {
+    return Row(
+      children: [
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: const Color(0xFFC94C6E).withValues(alpha: 0.16),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 17, color: const Color(0xFFC94C6E)),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          text,
+          style: const TextStyle(
+            color: Color(0xFFD1D5DB),
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ],
     );
   }
 
@@ -914,29 +798,47 @@ class _LoginPageState extends State<LoginPage>
 
   @override
   Widget build(BuildContext context) {
+    final narrow = MediaQuery.of(context).size.width < 900;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF6F7FB),
       body: SafeArea(
         child: Center(
-          child: Container(
-            constraints: const BoxConstraints(maxWidth: 1240, maxHeight: 780),
-            margin: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Expanded(
-                  flex: 11,
-                  child: _leftPanel(),
-                ),
-                const SizedBox(width: 24),
-                Expanded(
-                  flex: 9,
-                  child: Center(
-                    child: _phoneFrame(
-                      child: _phoneScreen(),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1240),
+              child: narrow
+                  ? Column(
+                      children: [
+                        SizedBox(
+                          height: 360,
+                          child: _leftPanel(),
+                        ),
+                        const SizedBox(height: 20),
+                        _phoneFrame(child: _phoneScreen()),
+                      ],
+                    )
+                  : SizedBox(
+                      height: 760,
+                      child: Row(
+                        children: [
+                          Expanded(
+                            flex: 11,
+                            child: _leftPanel(),
+                          ),
+                          const SizedBox(width: 24),
+                          Expanded(
+                            flex: 9,
+                            child: Center(
+                              child: _phoneFrame(
+                                child: _phoneScreen(),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
-              ],
             ),
           ),
         ),
