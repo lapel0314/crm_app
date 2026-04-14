@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:crm_app/services/kakao_talk_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/utils/store_utils.dart';
 
@@ -8,11 +10,13 @@ final supabase = Supabase.instance.client;
 class CustomerPage extends StatefulWidget {
   final String role;
   final String currentStore;
+  final bool openMode;
 
   const CustomerPage({
     super.key,
     required this.role,
     required this.currentStore,
+    this.openMode = false,
   });
 
   @override
@@ -24,17 +28,21 @@ class _CustomerPageState extends State<CustomerPage> {
   final dateSearchController = TextEditingController();
   final phoneSearchController = TextEditingController();
   final NumberFormat moneyFormat = NumberFormat('#,###');
+  final kakaoTalkService = KakaoTalkService();
 
   List<Map<String, dynamic>> customers = [];
+  final Set<String> selectedCustomerIds = {};
   bool isLoading = true;
+  bool isSendingKakao = false;
   String selectedCarrierFilter = '전체';
   String selectedJoinTypeFilter = '전체';
   int currentPage = 0;
   static const int pageSize = 20;
 
-  bool get isPublicRole => widget.role == '공개용';
-  bool get canEdit => !isPublicRole;
-  bool get canDelete => !isPublicRole;
+  bool get isOpenView =>
+      widget.openMode || widget.role == '조회용' || widget.role == '공개용';
+  bool get canEdit => !isOpenView;
+  bool get canDelete => !isOpenView;
   bool get canViewAllStores => isPrivilegedRole(widget.role);
 
   @override
@@ -113,11 +121,10 @@ class _CustomerPageState extends State<CustomerPage> {
     return '${value.substring(0, 2)}****${value.substring(value.length - 2)}';
   }
 
-  String _displayName(String name) => isPublicRole ? _maskName(name) : name;
-  String _displayPhone(String phone) =>
-      isPublicRole ? _maskPhone(phone) : phone;
+  String _displayName(String name) => isOpenView ? _maskName(name) : name;
+  String _displayPhone(String phone) => isOpenView ? _maskPhone(phone) : phone;
   String _displayBankInfo(String bankInfo) =>
-      isPublicRole ? _maskBankInfo(bankInfo) : bankInfo;
+      isOpenView ? _maskBankInfo(bankInfo) : bankInfo;
 
   int _calcTotalRebate({
     required int rebate,
@@ -334,6 +341,9 @@ class _CustomerPageState extends State<CustomerPage> {
             .map((e) => Map<String, dynamic>.from(e))
             .where(matches)
             .toList();
+        selectedCustomerIds.removeWhere(
+          (id) => !customers.any((customer) => customer['id'].toString() == id),
+        );
         currentPage = 0;
       });
     } catch (e) {
@@ -378,6 +388,578 @@ class _CustomerPageState extends State<CustomerPage> {
             child: const Text('삭제'),
           ),
         ],
+      ),
+    );
+  }
+
+  String _firstText(Map<String, dynamic> row, List<String> keys) {
+    for (final key in keys) {
+      final value = row[key]?.toString().trim() ?? '';
+      if (value.isNotEmpty) return value;
+    }
+    return '';
+  }
+
+  List<Map<String, dynamic>> _selectedCustomers() {
+    return customers
+        .where((customer) =>
+            selectedCustomerIds.contains(customer['id'].toString()))
+        .toList();
+  }
+
+  void _showKakaoSendingDialog(int total) {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          child: Container(
+            width: 420,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: CircularProgressIndicator(strokeWidth: 3),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  '카카오 발송 중 ($total명)',
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  '발송 중에는 마우스와 키보드를 조작하지 말아주세요.\n카카오톡 PC 창이 자동으로 전환됩니다.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.45,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showKakaoResultDialog(List<KakaoSendResult> results) {
+    final failures = results.where((result) => !result.success).toList();
+    final successCount = results.length - failures.length;
+
+    showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('카카오 발송 결과'),
+        content: SizedBox(
+          width: 520,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '성공 $successCount건 / 실패 ${failures.length}건',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF111827),
+                ),
+              ),
+              if (failures.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                const Text(
+                  '실패한 대상',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    color: Color(0xFFDC2626),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 260),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF9FAFB),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE8E9EF)),
+                  ),
+                  child: ListView.separated(
+                    shrinkWrap: true,
+                    itemCount: failures.length,
+                    separatorBuilder: (_, __) =>
+                        const Divider(height: 1, color: Color(0xFFE8E9EF)),
+                    itemBuilder: (context, index) {
+                      final failure = failures[index];
+                      final name = failure.target.customerName;
+                      final target = failure.target.searchName;
+                      return ListTile(
+                        dense: true,
+                        title: Text(
+                          '$name ($target)',
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        subtitle: Text(
+                          failure.errorMessage ?? '-',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _insertKakaoLog(KakaoSendResult result) async {
+    final user = supabase.auth.currentUser;
+    try {
+      await supabase.from('kakao_send_logs').insert({
+        'target_name': result.target.searchName,
+        'message': result.message,
+        'success': result.success,
+        'error_message': result.errorMessage,
+        'sent_at': DateTime.now().toIso8601String(),
+        'sent_by': user?.id,
+      });
+    } catch (e) {
+      _logUiError('카카오 발송 로그 저장 실패: $e');
+    }
+  }
+
+  Future<void> _sendKakaoMessage(String message) async {
+    final selected = _selectedCustomers();
+    if (selected.isEmpty) {
+      _showCenterMessage('발송할 고객을 선택해 주세요');
+      return;
+    }
+    if (selected.length > 50) {
+      _showCenterMessage('카카오 발송은 한 번에 최대 50명까지 가능합니다');
+      return;
+    }
+
+    final targets = selected.map((customer) {
+      final searchName = _firstText(
+        customer,
+        ['kakao_search_name', 'kakao_room_name', 'name'],
+      );
+      return KakaoSendTarget(
+        id: customer['id'].toString(),
+        customerName: _text(customer['name']),
+        searchName: searchName,
+        chatType: KakaoChatType.fromText(customer['kakao_chat_type']),
+      );
+    }).toList();
+
+    setState(() => isSendingKakao = true);
+    _showKakaoSendingDialog(targets.length);
+
+    try {
+      final results = await kakaoTalkService.sendBulkMessages(
+        targets: targets,
+        message: message,
+        delayBetweenMessages: const Duration(seconds: 2),
+      );
+      for (final result in results) {
+        await _insertKakaoLog(result);
+      }
+
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      setState(() => isSendingKakao = false);
+      _showKakaoResultDialog(results);
+    } catch (e) {
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop();
+      setState(() => isSendingKakao = false);
+      _showCenterMessage('카카오 발송 중 오류가 발생했습니다: $e');
+    }
+  }
+
+  Future<List<String>> _loadKakaoTemplates() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getStringList('kakao_message_templates') ?? [];
+  }
+
+  Future<void> _saveKakaoTemplates(List<String> templates) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList('kakao_message_templates', templates);
+  }
+
+  String _defaultKakaoGreeting(List<Map<String, dynamic>> selected) {
+    final staff = selected.isEmpty ? '' : _text(selected.first['staff']);
+    final manager = staff == '-' ? '담당자' : staff;
+    return '안녕하세요, 고객님 $manager 입니다.';
+  }
+
+  Future<void> _showTemplateEditor({
+    required BuildContext context,
+    required List<String> templates,
+    required void Function(List<String>) onChanged,
+    int? editIndex,
+  }) async {
+    final controller = TextEditingController(
+      text: editIndex == null ? '' : templates[editIndex],
+    );
+    final title = editIndex == null ? '템플릿 추가' : '템플릿 수정';
+
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Color(0xFF111827),
+            fontSize: 18,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: SizedBox(
+          width: 420,
+          child: TextField(
+            controller: controller,
+            maxLines: 5,
+            decoration: InputDecoration(
+              hintText: '자주 쓰는 안내 문구를 입력하세요',
+              filled: true,
+              fillColor: const Color(0xFFF9FAFB),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide:
+                    const BorderSide(color: Color(0xFF111827), width: 1.2),
+              ),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF111827),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            onPressed: () async {
+              final text = controller.text.trim();
+              if (text.isEmpty) return;
+              final next = [...templates];
+              if (editIndex == null) {
+                if (next.length >= 5) {
+                  _showCenterMessage('템플릿은 최대 5개까지 저장됩니다');
+                  return;
+                }
+                next.add(text);
+              } else {
+                next[editIndex] = text;
+              }
+              await _saveKakaoTemplates(next);
+              onChanged(next);
+              if (context.mounted) Navigator.pop(context);
+            },
+            child: const Text('저장'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> showKakaoSendDialog() async {
+    final selected = _selectedCustomers();
+    final messageController = TextEditingController(
+      text: _defaultKakaoGreeting(selected),
+    );
+    var templates = await _loadKakaoTemplates();
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          void applyTemplates(List<String> next) {
+            setDialogState(() => templates = next);
+          }
+
+          void appendTemplate(String template) {
+            final current = messageController.text.trimRight();
+            final next = current.isEmpty ? template : '$current\n\n$template';
+            messageController.value = TextEditingValue(
+              text: next,
+              selection: TextSelection.collapsed(offset: next.length),
+            );
+          }
+
+          return Dialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            child: Container(
+              width: 720,
+              padding: const EdgeInsets.all(22),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEE500),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.chat_bubble_outline,
+                            color: Color(0xFF111827), size: 19),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '카카오 발송 (${selected.length}명)',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w900,
+                                color: Color(0xFF111827),
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            const Text(
+                              '카카오톡 PC에서 검색되는 이름 또는 채팅방명 기준으로 발송합니다',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF8B95A1),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  TextField(
+                    controller: messageController,
+                    maxLines: 8,
+                    decoration: InputDecoration(
+                      labelText: '발송 메시지',
+                      alignLabelWithHint: true,
+                      filled: true,
+                      fillColor: const Color(0xFFF9FAFB),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: Color(0xFFE8E9EF)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      const Text(
+                        '템플릿',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFF111827),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${templates.length}/5',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF8B95A1),
+                        ),
+                      ),
+                      const Spacer(),
+                      OutlinedButton.icon(
+                        onPressed: templates.length >= 5
+                            ? null
+                            : () => _showTemplateEditor(
+                                  context: context,
+                                  templates: templates,
+                                  onChanged: applyTemplates,
+                                ),
+                        icon: const Icon(Icons.add_rounded, size: 17),
+                        label: const Text('템플릿 추가'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    constraints: const BoxConstraints(maxHeight: 180),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF9FAFB),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE8E9EF)),
+                    ),
+                    child: templates.isEmpty
+                        ? const Text(
+                            '저장된 템플릿이 없습니다',
+                            style: TextStyle(
+                              color: Color(0xFF8B95A1),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          )
+                        : SingleChildScrollView(
+                            child: Column(
+                              children: [
+                                for (var i = 0; i < templates.length; i++)
+                                  Container(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 12,
+                                      vertical: 10,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(
+                                        color: const Color(0xFFE8E9EF),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        Expanded(
+                                          child: InkWell(
+                                            onTap: () =>
+                                                appendTemplate(templates[i]),
+                                            child: Text(
+                                              templates[i],
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontSize: 13,
+                                                fontWeight: FontWeight.w700,
+                                                color: Color(0xFF111827),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        IconButton(
+                                          tooltip: '수정',
+                                          onPressed: () => _showTemplateEditor(
+                                            context: context,
+                                            templates: templates,
+                                            editIndex: i,
+                                            onChanged: applyTemplates,
+                                          ),
+                                          icon: const Icon(Icons.edit_outlined,
+                                              size: 18),
+                                        ),
+                                        IconButton(
+                                          tooltip: '삭제',
+                                          onPressed: () async {
+                                            final next = [...templates]
+                                              ..removeAt(i);
+                                            await _saveKakaoTemplates(next);
+                                            applyTemplates(next);
+                                          },
+                                          icon: const Icon(
+                                            Icons.delete_outline,
+                                            size: 18,
+                                            color: Color(0xFFDC2626),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('취소'),
+                      ),
+                      const Spacer(),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF111827),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 14,
+                          ),
+                        ),
+                        onPressed: () async {
+                          final message = messageController.text.trim();
+                          if (message.isEmpty) {
+                            _showCenterMessage('메시지를 입력해 주세요');
+                            return;
+                          }
+                          Navigator.pop(context);
+                          await _sendKakaoMessage(message);
+                        },
+                        icon: const Icon(Icons.send_rounded, size: 17),
+                        label: const Text('발송'),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -509,7 +1091,19 @@ class _CustomerPageState extends State<CustomerPage> {
         decoration: InputDecoration(
           labelText: label,
           alignLabelWithHint: maxLines > 1,
-          border: const OutlineInputBorder(),
+          filled: true,
+          fillColor: const Color(0xFFF9FAFB),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Color(0xFF111827), width: 1.2),
+          ),
           isDense: true,
         ),
       ),
@@ -532,7 +1126,19 @@ class _CustomerPageState extends State<CustomerPage> {
         initialValue: value,
         decoration: InputDecoration(
           labelText: label,
-          border: const OutlineInputBorder(),
+          filled: true,
+          fillColor: const Color(0xFFF9FAFB),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: Color(0xFF111827), width: 1.2),
+          ),
           isDense: true,
         ),
         items: items
@@ -644,11 +1250,32 @@ class _CustomerPageState extends State<CustomerPage> {
           }
 
           return AlertDialog(
-            title: const Text('고객 수정'),
+            backgroundColor: Colors.white,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            titlePadding: const EdgeInsets.fromLTRB(24, 22, 24, 12),
+            contentPadding: const EdgeInsets.fromLTRB(24, 0, 24, 10),
+            actionsPadding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+            title: const Row(
+              children: [
+                Icon(Icons.edit_note_rounded,
+                    color: Color(0xFF111827), size: 22),
+                SizedBox(width: 10),
+                Text(
+                  '고객 수정',
+                  style: TextStyle(
+                    color: Color(0xFF111827),
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ],
+            ),
             content: SizedBox(
-              width: 600,
+              width: 680,
               child: SingleChildScrollView(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _input('고객명', nameController),
                     _input(
@@ -758,9 +1385,9 @@ class _CustomerPageState extends State<CustomerPage> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFF3F8),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFFFD3E5)),
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -792,6 +1419,14 @@ class _CustomerPageState extends State<CustomerPage> {
                 child: const Text('취소'),
               ),
               ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF111827),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
                 onPressed: () async {
                   final totalRebate = currentTotalRebate();
                   final tax = currentTax();
@@ -1181,7 +1816,9 @@ class _CustomerPageState extends State<CustomerPage> {
   }
 
   Widget _customerTable(List<Map<String, dynamic>> visibleCustomers) {
-    const baseWidths = <double>[
+    final showSelection = !isOpenView;
+    final baseWidths = <double>[
+      if (showSelection) 54,
       104,
       92,
       108,
@@ -1196,7 +1833,8 @@ class _CustomerPageState extends State<CustomerPage> {
       86,
       126,
     ];
-    const headers = [
+    final headers = [
+      if (showSelection) '',
       '가입일',
       '담당자',
       '고객명',
@@ -1219,7 +1857,7 @@ class _CustomerPageState extends State<CustomerPage> {
             constraints.maxWidth > baseWidth ? constraints.maxWidth : baseWidth;
         final extraWidth = tableWidth - baseWidth;
         final widths = [...baseWidths];
-        widths[8] += extraWidth;
+        widths[showSelection ? 9 : 8] += extraWidth;
 
         return SingleChildScrollView(
           scrollDirection: Axis.horizontal,
@@ -1243,6 +1881,8 @@ class _CustomerPageState extends State<CustomerPage> {
                   ),
                 ),
                 ...visibleCustomers.map((customer) {
+                  final offset = showSelection ? 1 : 0;
+                  final customerId = customer['id'].toString();
                   final phone =
                       _displayPhone(customer['phone']?.toString() ?? '');
                   return InkWell(
@@ -1256,50 +1896,71 @@ class _CustomerPageState extends State<CustomerPage> {
                       ),
                       child: Row(
                         children: [
+                          if (showSelection)
+                            _tableCell(
+                              Checkbox(
+                                value: selectedCustomerIds.contains(customerId),
+                                onChanged: (value) {
+                                  setState(() {
+                                    if (value == true) {
+                                      if (selectedCustomerIds.length >= 50) {
+                                        _showCenterMessage(
+                                            '최대 50명까지 선택할 수 있습니다');
+                                        return;
+                                      }
+                                      selectedCustomerIds.add(customerId);
+                                    } else {
+                                      selectedCustomerIds.remove(customerId);
+                                    }
+                                  });
+                                },
+                              ),
+                              widths[0],
+                            ),
                           _tableCell(_tableText(_date(customer['join_date'])),
-                              widths[0]),
+                              widths[offset + 0]),
                           _tableCell(
                             _tableBadge(
                               _text(customer['staff']),
                               color: _staffColor(customer['staff']),
                             ),
-                            widths[1],
+                            widths[offset + 1],
                           ),
                           _tableCell(
                             _tableText(
                               _displayName(customer['name']?.toString() ?? ''),
                               strong: true,
                             ),
-                            widths[2],
+                            widths[offset + 2],
                           ),
-                          _tableCell(_tableText(phone), widths[3]),
+                          _tableCell(_tableText(phone), widths[offset + 3]),
                           _tableCell(
                             _tableBadge(
                               _text(customer['join_type']),
                               color: _joinTypeColor(customer['join_type']),
                             ),
-                            widths[4],
+                            widths[offset + 4],
                           ),
                           _tableCell(
                             _tableBadge(
                               _text(customer['carrier']),
                               color: _carrierColor(customer['carrier']),
                             ),
-                            widths[5],
+                            widths[offset + 5],
                           ),
                           _tableCell(
                             _tableText(_text(customer['previous_carrier'])),
-                            widths[6],
+                            widths[offset + 6],
                           ),
                           _tableCell(
                             _tableText(_text(customer['model']), strong: true),
-                            widths[7],
+                            widths[offset + 7],
                           ),
-                          _tableCell(
-                              _tableText(_text(customer['plan'])), widths[8]),
+                          _tableCell(_tableText(_text(customer['plan'])),
+                              widths[offset + 8]),
                           _tableCell(
                             _tableText(_text(customer['add_service'])),
-                            widths[9],
+                            widths[offset + 9],
                           ),
                           _tableCell(
                             _tableBadge(
@@ -1307,11 +1968,11 @@ class _CustomerPageState extends State<CustomerPage> {
                               color:
                                   _contractTypeColor(customer['contract_type']),
                             ),
-                            widths[10],
+                            widths[offset + 10],
                           ),
                           _tableCell(
                             _tableText('${_text(customer['installment'])}개월'),
-                            widths[11],
+                            widths[offset + 11],
                           ),
                           _tableCell(
                             Row(
@@ -1339,7 +2000,7 @@ class _CustomerPageState extends State<CustomerPage> {
                                   ),
                               ],
                             ),
-                            widths[12],
+                            widths[offset + 12],
                           ),
                         ],
                       ),
@@ -1635,6 +2296,25 @@ class _CustomerPageState extends State<CustomerPage> {
                             ),
                           ),
                           const SizedBox(width: 12),
+                          if (!isOpenView) ...[
+                            ElevatedButton.icon(
+                              onPressed:
+                                  selectedCustomerIds.isEmpty || isSendingKakao
+                                      ? null
+                                      : showKakaoSendDialog,
+                              icon: const Icon(Icons.chat_bubble_outline,
+                                  size: 17),
+                              label: Text(isSendingKakao
+                                  ? '발송 중'
+                                  : '카카오 발송 (${selectedCustomerIds.length})'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFFEE500),
+                                foregroundColor: const Color(0xFF111827),
+                                elevation: 0,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
                           ElevatedButton.icon(
                             onPressed: () => fetchCustomers(),
                             icon: const Icon(Icons.refresh, size: 17),

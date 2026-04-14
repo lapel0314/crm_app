@@ -47,6 +47,7 @@ class _HomePageState extends State<HomePage> {
 
   DateTime? joinDate;
   bool showMore = false;
+  String defaultManagerName = '';
 
   String? joinType;
   String? previousCarrier;
@@ -60,6 +61,7 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _setTodayJoinDate();
+    _loadDefaultManagerName();
   }
 
   @override
@@ -110,6 +112,31 @@ class _HomePageState extends State<HomePage> {
     final parsed = DateTime.tryParse(text);
     if (parsed == null) return null;
     return DateTime(parsed.year, parsed.month, parsed.day);
+  }
+
+  Future<void> _loadDefaultManagerName() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final profile = await supabase
+          .from('profiles')
+          .select('name')
+          .eq('id', user.id)
+          .maybeSingle();
+      final name = profile?['name']?.toString().trim() ?? '';
+      final managerName = name.isEmpty ? (user.email ?? '') : name;
+      if (!mounted || managerName.isEmpty) return;
+
+      setState(() {
+        defaultManagerName = managerName;
+        if (managerController.text.trim().isEmpty) {
+          managerController.text = managerName;
+        }
+      });
+    } catch (e) {
+      logUiError('manager profile load failed: $e');
+    }
   }
 
   String formatPhone(String input) {
@@ -268,7 +295,9 @@ class _HomePageState extends State<HomePage> {
         'm3': formatMonth(currentJoinDate.add(const Duration(days: 90))),
         'm6': formatMonth(currentJoinDate.add(const Duration(days: 180))),
         'staff': managerController.text.trim().isEmpty
-            ? (user.email ?? '')
+            ? (defaultManagerName.isEmpty
+                ? (user.email ?? '')
+                : defaultManagerName)
             : managerController.text.trim(),
         'name': nameController.text.trim(),
         'phone': phoneController.text.trim(),
@@ -345,6 +374,7 @@ class _HomePageState extends State<HomePage> {
 
     setState(() {
       _setTodayJoinDate();
+      managerController.text = defaultManagerName;
       showMore = false;
       joinType = null;
       previousCarrier = null;

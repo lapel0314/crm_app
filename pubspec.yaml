@@ -17,6 +17,8 @@ dependencies:
   intl: ^0.18.0
   fl_chart: ^0.66.0
   shared_preferences: ^2.2.3
+  win32: ^6.0.1
+  ffi: ^2.2.0
 
 dev_dependencies:
   flutter_test:

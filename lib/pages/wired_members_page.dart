@@ -169,6 +169,28 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
     debugPrint(text);
   }
 
+  Map<String, dynamic> withCalculatedSettlement(Map<String, dynamic> member) {
+    final rebate = parseInt(member['rebate']);
+    final extra = parseInt(member['extra_rebate']);
+    final prepaid = parseInt(member['prepaid_amount']);
+    final postpaid = parseInt(member['postpaid_amount']);
+    final tax = calcTax(rebate: rebate, extra: extra);
+    final margin = calcMargin(
+      rebate: rebate,
+      prepaid: prepaid,
+      postpaid: postpaid,
+      extra: extra,
+      tax: tax,
+    );
+
+    return {
+      ...member,
+      'tax': tax,
+      'margin': margin,
+      'incentive': calcIncentive(margin: margin),
+    };
+  }
+
   Future<void> fetchMembers({String keyword = ''}) async {
     setState(() {
       isLoading = true;
@@ -191,7 +213,9 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
               .order('created_at', ascending: true);
 
       setState(() {
-        members = data.map((e) => Map<String, dynamic>.from(e)).toList();
+        members = data
+            .map((e) => withCalculatedSettlement(Map<String, dynamic>.from(e)))
+            .toList();
         if (!canViewAllStores) {
           members = members
               .where(

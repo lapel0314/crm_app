@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/pages/admin_page.dart';
+import 'package:crm_app/pages/customer_open_page.dart';
 import 'package:crm_app/pages/customer_page.dart';
 import 'package:crm_app/pages/dashboard_page.dart';
 import 'package:crm_app/pages/global_search_page.dart';
@@ -32,26 +33,33 @@ class _AppLayoutState extends State<AppLayout> {
   String globalPhoneQuery = '';
 
   bool get isAdminRole => widget.role == '대표' || widget.role == '개발자';
-  bool get isPublicRole => widget.role == '공개용';
+  bool get isPublicRole => widget.role == '조회용' || widget.role == '공개용';
 
   List<_NavItem> get items {
     if (isPublicRole) {
       return [
         _NavItem(
-          title: '고객DB',
-          icon: Icons.people_alt_rounded,
-          page: CustomerPage(role: widget.role, currentStore: widget.store),
+          title: '고객등록',
+          icon: Icons.edit_note_rounded,
+          page: HomePage(role: widget.role, currentStore: widget.store),
         ),
         _NavItem(
-          title: '통합검색',
-          icon: Icons.search_rounded,
-          page: GlobalSearchPage(
-            key: ValueKey('$globalNameQuery|$globalPhoneQuery'),
-            nameQuery: globalNameQuery,
-            phoneQuery: globalPhoneQuery,
+          title: '고객DBS',
+          icon: Icons.people_alt_rounded,
+          page: CustomerOpenPage(
             role: widget.role,
             currentStore: widget.store,
           ),
+        ),
+        _NavItem(
+          title: '재고관리',
+          icon: Icons.inventory_2_rounded,
+          page: InventoryPage(role: widget.role, currentStore: widget.store),
+        ),
+        _NavItem(
+          title: '설정',
+          icon: Icons.settings_rounded,
+          page: SettingsPage(role: widget.role, currentStore: widget.store),
         ),
       ];
     }
@@ -117,6 +125,9 @@ class _AppLayoutState extends State<AppLayout> {
   void _runGlobalSearch() {
     final name = globalNameSearchController.text.trim();
     final phone = globalPhoneSearchController.text.trim();
+    final searchIndex = searchPageIndex;
+    if (searchIndex < 0) return;
+
     if (name.isEmpty && phone.isEmpty) {
       ScaffoldMessenger.of(context).clearSnackBars();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -128,7 +139,7 @@ class _AppLayoutState extends State<AppLayout> {
     setState(() {
       globalNameQuery = name;
       globalPhoneQuery = phone;
-      selectedIndex = searchPageIndex;
+      selectedIndex = searchIndex;
       globalNameSearchController.clear();
       globalPhoneSearchController.clear();
     });
@@ -297,9 +308,9 @@ class _AppLayoutState extends State<AppLayout> {
                 ),
               ),
               const SizedBox(height: 3),
-              const Text(
-                '고객명 또는 핸드폰번호로 전체 데이터 검색',
-                style: TextStyle(
+              Text(
+                isPublicRole ? '조회용 권한' : '고객명 또는 핸드폰번호로 전체 데이터 검색',
+                style: const TextStyle(
                   color: Color(0xFF9CA3AF),
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
@@ -308,37 +319,39 @@ class _AppLayoutState extends State<AppLayout> {
             ],
           ),
           const Spacer(),
-          _topSearchField(
-            controller: globalNameSearchController,
-            hint: '고객명 검색',
-            icon: Icons.person_search_outlined,
-            width: 180,
-          ),
-          const SizedBox(width: 8),
-          _topSearchField(
-            controller: globalPhoneSearchController,
-            hint: '핸드폰번호 검색',
-            icon: Icons.phone_iphone_outlined,
-            width: 200,
-          ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 36,
-            height: 36,
-            child: ElevatedButton(
-              onPressed: _runGlobalSearch,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFC94C6E),
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: EdgeInsets.zero,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Icon(Icons.search_rounded, size: 18),
+          if (!isPublicRole) ...[
+            _topSearchField(
+              controller: globalNameSearchController,
+              hint: '고객명 검색',
+              icon: Icons.person_search_outlined,
+              width: 180,
             ),
-          ),
+            const SizedBox(width: 8),
+            _topSearchField(
+              controller: globalPhoneSearchController,
+              hint: '핸드폰번호 검색',
+              icon: Icons.phone_iphone_outlined,
+              width: 200,
+            ),
+            const SizedBox(width: 8),
+            SizedBox(
+              width: 36,
+              height: 36,
+              child: ElevatedButton(
+                onPressed: _runGlobalSearch,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFC94C6E),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Icon(Icons.search_rounded, size: 18),
+              ),
+            ),
+          ],
         ],
       ),
     );

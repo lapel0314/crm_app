@@ -183,7 +183,7 @@ class _AdminPageState extends State<AdminPage> {
                         DropdownMenuItem(value: '사장', child: Text('사장')),
                         DropdownMenuItem(value: '점장', child: Text('점장')),
                         DropdownMenuItem(value: '사원', child: Text('사원')),
-                        DropdownMenuItem(value: '공개용', child: Text('공개용')),
+                        DropdownMenuItem(value: '조회용', child: Text('조회용')),
                       ],
                       onChanged: (value) {
                         if (value != null) {
