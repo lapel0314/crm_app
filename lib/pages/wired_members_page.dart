@@ -98,7 +98,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
     required int extra,
     required int tax,
   }) {
-    return rebate - prepaid - postpaid + extra + tax;
+    return rebate + extra - prepaid - postpaid - tax;
   }
 
   int calcIncentive({
