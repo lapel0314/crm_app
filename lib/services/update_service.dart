@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-const String appVersion = '1.0.1';
+const String appVersion = '1.0.2';
 
 class AppUpdateInfo {
   final String version;

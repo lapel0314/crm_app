@@ -28,7 +28,7 @@ using (is_active = true);
 -- insert into public.app_updates (platform, version, installer_url, notes)
 -- values (
 --   'windows',
---   '1.0.1',
+--   '1.0.2',
 --   'https://ysafjyubntkeorriywmu.supabase.co/storage/v1/object/public/installers/%ED%95%91%ED%81%AC%ED%8F%B0%20%EC%84%A4%EC%B9%98.exe',
 --   '업데이트 내용'
 -- );

@@ -100,6 +100,29 @@ class _DashboardPageState extends State<DashboardPage> {
         _parseDate(customer['created_at']);
   }
 
+  int _customerTotalRebate(Map<String, dynamic> customer) {
+    return _toInt(customer['rebate']) +
+        _toInt(customer['hidden_rebate']) +
+        _toInt(customer['add_rebate']);
+  }
+
+  int _customerTax(Map<String, dynamic> customer) {
+    final taxableRebate =
+        _customerTotalRebate(customer) - _toInt(customer['support_money']);
+    if (taxableRebate <= 0) return 0;
+    return (taxableRebate * 0.133).round();
+  }
+
+  int _customerMargin(Map<String, dynamic> customer) {
+    return _customerTotalRebate(customer) -
+        _customerTax(customer) -
+        _toInt(customer['support_money']) -
+        _toInt(customer['deduction']) -
+        _toInt(customer['payment']) -
+        _toInt(customer['deposit']) -
+        _toInt(customer['trade_price']);
+  }
+
   List<Map<String, dynamic>> get todaySales {
     final now = DateTime.now();
     return customers.where((customer) {
@@ -139,13 +162,17 @@ class _DashboardPageState extends State<DashboardPage> {
       ]);
 
       final customerList = _filterStoreRows(
-          result[0].map((e) => Map<String, dynamic>.from(e)).toList());
+        result[0].map((e) => Map<String, dynamic>.from(e)).toList(),
+      );
       final inventoryList = _filterStoreRows(
-          result[1].map((e) => Map<String, dynamic>.from(e)).toList());
+        result[1].map((e) => Map<String, dynamic>.from(e)).toList(),
+      );
       final wiredList = _filterStoreRows(
-          result[2].map((e) => Map<String, dynamic>.from(e)).toList());
+        result[2].map((e) => Map<String, dynamic>.from(e)).toList(),
+      );
       final leadList = _filterStoreRows(
-          result[3].map((e) => Map<String, dynamic>.from(e)).toList());
+        result[3].map((e) => Map<String, dynamic>.from(e)).toList(),
+      );
 
       final now = DateTime.now();
       var rebateSum = 0;
@@ -159,9 +186,9 @@ class _DashboardPageState extends State<DashboardPage> {
       var monthlyMarginSum = 0;
 
       for (final customer in customerList) {
-        final rebate = _toInt(customer['total_rebate']);
-        final tax = _toInt(customer['tax']);
-        final margin = _toInt(customer['margin']);
+        final rebate = _customerTotalRebate(customer);
+        final tax = _customerTax(customer);
+        final margin = _customerMargin(customer);
         final date = _customerDate(customer);
 
         rebateSum += rebate;
@@ -510,13 +537,13 @@ class _DashboardPageState extends State<DashboardPage> {
       subtitle: '고객 DB 기준 리베이트·세금·마진',
       child: Column(
         children: [
-          _settlementRow('오늘 리베이트', todayRebate, const Color(0xFF3B82F6)),
-          _settlementRow('오늘 세금', todayTax, const Color(0xFFF59E0B)),
-          _settlementRow('오늘 마진', todayMargin, const Color(0xFF10B981)),
+          _settlementRow('오늘 총 리베이트', todayRebate, const Color(0xFF3B82F6)),
+          _settlementRow('오늘 총 세금', todayTax, const Color(0xFFF59E0B)),
+          _settlementRow('오늘 총 마진', todayMargin, const Color(0xFF10B981)),
           const Divider(height: 24),
-          _settlementRow('이번달 리베이트', monthRebate, const Color(0xFF3B82F6)),
-          _settlementRow('이번달 세금', monthTax, const Color(0xFFF59E0B)),
-          _settlementRow('이번달 마진', monthMargin, const Color(0xFF10B981)),
+          _settlementRow('이번달 총 리베이트', monthRebate, const Color(0xFF3B82F6)),
+          _settlementRow('이번달 총 세금', monthTax, const Color(0xFFF59E0B)),
+          _settlementRow('이번달 총 마진', monthMargin, const Color(0xFF10B981)),
           const Divider(height: 24),
           _settlementRow('누적 총리베이트', totalRebate, const Color(0xFFC94C6E)),
           _settlementRow('누적 세금', totalTax, const Color(0xFF6B7280)),
@@ -627,9 +654,7 @@ class _DashboardPageState extends State<DashboardPage> {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Color(0xFFF3F4F6)),
-        ),
+        border: Border(bottom: BorderSide(color: Color(0xFFF3F4F6))),
       ),
       child: Wrap(
         spacing: 16,
@@ -642,7 +667,7 @@ class _DashboardPageState extends State<DashboardPage> {
           _popupField('통신사', customer['carrier']),
           _popupField('모델명', customer['model']),
           _popupField('담당자', customer['staff']),
-          _popupField('마진', _money(customer['margin']), strong: true),
+          _popupField('마진', _money(_customerMargin(customer)), strong: true),
         ],
       ),
     );
@@ -683,12 +708,16 @@ class _DashboardPageState extends State<DashboardPage> {
   }) {
     final rebate = rows.fold<int>(
       0,
-      (sum, customer) => sum + _toInt(customer['total_rebate']),
+      (sum, customer) => sum + _customerTotalRebate(customer),
     );
-    final tax =
-        rows.fold<int>(0, (sum, customer) => sum + _toInt(customer['tax']));
-    final margin =
-        rows.fold<int>(0, (sum, customer) => sum + _toInt(customer['margin']));
+    final tax = rows.fold<int>(
+      0,
+      (sum, customer) => sum + _customerTax(customer),
+    );
+    final margin = rows.fold<int>(
+      0,
+      (sum, customer) => sum + _customerMargin(customer),
+    );
 
     showDialog(
       context: context,

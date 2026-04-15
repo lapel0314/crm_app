@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:crm_app/services/notice_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
 
 final supabase = Supabase.instance.client;
@@ -30,6 +31,8 @@ class _LoginPageState extends State<LoginPage>
   bool obscureLoginPassword = true;
   bool obscureSignupPassword = true;
   bool agreedTerms = false;
+  final noticeService = NoticeService(supabase);
+  Notice? latestNotice;
 
   late final AnimationController _animationController;
   late final Animation<double> _fadeAnimation;
@@ -49,6 +52,15 @@ class _LoginPageState extends State<LoginPage>
     );
 
     _animationController.forward();
+    _loadLatestNotice();
+  }
+
+  Future<void> _loadLatestNotice() async {
+    final notice = await noticeService.fetchLatestNotice();
+    if (!mounted) return;
+    setState(() {
+      latestNotice = notice;
+    });
   }
 
   String _formatPhone(String input) {
@@ -76,9 +88,7 @@ class _LoginPageState extends State<LoginPage>
   void showMessage(String text) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text)),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
   Future<void> login() async {
@@ -376,10 +386,7 @@ class _LoginPageState extends State<LoginPage>
           ),
         ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: child,
-      ),
+      child: Padding(padding: const EdgeInsets.all(12), child: child),
     );
   }
 
@@ -522,13 +529,8 @@ class _LoginPageState extends State<LoginPage>
         TextField(
           controller: signupPhoneController,
           keyboardType: TextInputType.phone,
-          inputFormatters: [
-            LengthLimitingTextInputFormatter(13),
-          ],
-          decoration: _inputDecoration(
-            '전화번호',
-            prefixIcon: Icons.call_outlined,
-          ),
+          inputFormatters: [LengthLimitingTextInputFormatter(13)],
+          decoration: _inputDecoration('전화번호', prefixIcon: Icons.call_outlined),
           onChanged: (value) {
             _applyPhoneFormat(signupPhoneController, value);
           },
@@ -583,10 +585,7 @@ class _LoginPageState extends State<LoginPage>
         const SizedBox(height: 14),
         DropdownButtonFormField<String>(
           initialValue: signupRole,
-          decoration: _inputDecoration(
-            '직급',
-            prefixIcon: Icons.badge_outlined,
-          ),
+          decoration: _inputDecoration('직급', prefixIcon: Icons.badge_outlined),
           items: const [
             DropdownMenuItem(value: '점장', child: Text('점장')),
             DropdownMenuItem(value: '사원', child: Text('사원')),
@@ -609,8 +608,9 @@ class _LoginPageState extends State<LoginPage>
         Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color:
-                agreedTerms ? const Color(0xFFF0FDF4) : const Color(0xFFF9FAFB),
+            color: agreedTerms
+                ? const Color(0xFFF0FDF4)
+                : const Color(0xFFF9FAFB),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: agreedTerms
@@ -704,21 +704,25 @@ class _LoginPageState extends State<LoginPage>
             ),
           ),
           const SizedBox(height: 14),
-          const Text(
-            '공지사항',
-            style: TextStyle(
+          Text(
+            latestNotice?.title ?? '공지사항',
+            style: const TextStyle(
               fontSize: 15,
               height: 1.8,
               color: Color(0xFFD1D5DB),
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 36),
-          _featureLine(Icons.people_alt_rounded, '고객 DB 통합 관리'),
-          const SizedBox(height: 14),
-          _featureLine(Icons.cable_rounded, '유선회원과 판매 내역 추적'),
-          const SizedBox(height: 14),
-          _featureLine(Icons.dashboard_rounded, '일별·월별 개통 현황 확인'),
+          const SizedBox(height: 12),
+          Text(
+            latestNotice?.content ?? '등록된 공지사항이 없습니다.',
+            style: const TextStyle(
+              fontSize: 14,
+              height: 1.7,
+              color: Color(0xFFA7ABBD),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const Spacer(),
           Container(
             width: double.infinity,
@@ -759,30 +763,6 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 
-  Widget _featureLine(IconData icon, String text) {
-    return Row(
-      children: [
-        Container(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: const Color(0xFFC94C6E).withValues(alpha: 0.16),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, size: 17, color: const Color(0xFFC94C6E)),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          text,
-          style: const TextStyle(
-            color: Color(0xFFD1D5DB),
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ],
-    );
-  }
-
   @override
   void dispose() {
     emailController.dispose();
@@ -811,10 +791,7 @@ class _LoginPageState extends State<LoginPage>
               child: narrow
                   ? Column(
                       children: [
-                        SizedBox(
-                          height: 360,
-                          child: _leftPanel(),
-                        ),
+                        SizedBox(height: 360, child: _leftPanel()),
                         const SizedBox(height: 20),
                         _phoneFrame(child: _phoneScreen()),
                       ],
@@ -823,17 +800,12 @@ class _LoginPageState extends State<LoginPage>
                       height: 760,
                       child: Row(
                         children: [
-                          Expanded(
-                            flex: 11,
-                            child: _leftPanel(),
-                          ),
+                          Expanded(flex: 11, child: _leftPanel()),
                           const SizedBox(width: 24),
                           Expanded(
                             flex: 9,
                             child: Center(
-                              child: _phoneFrame(
-                                child: _phoneScreen(),
-                              ),
+                              child: _phoneFrame(child: _phoneScreen()),
                             ),
                           ),
                         ],

@@ -14,6 +14,7 @@ import 'package:crm_app/pages/inventory_page.dart';
 import 'package:crm_app/pages/leads_page.dart';
 import 'package:crm_app/pages/settings_page.dart';
 import 'package:crm_app/pages/wired_members_page.dart';
+import 'package:crm_app/services/notice_service.dart';
 
 class AppLayout extends StatefulWidget {
   final String role;
@@ -34,6 +35,9 @@ class _AppLayoutState extends State<AppLayout> {
   String pageSearchNameQuery = '';
   String pageSearchPhoneQuery = '';
   String pageSearchKeyword = '';
+  final noticeService = NoticeService(Supabase.instance.client);
+  Notice? latestNotice;
+  bool isNoticeLoading = false;
 
   bool get isAdminRole => widget.role == '대표' || widget.role == '개발자';
   bool get isPublicRole => widget.role == '조회용' || widget.role == '공개용';
@@ -49,10 +53,7 @@ class _AppLayoutState extends State<AppLayout> {
         _NavItem(
           title: '고객DBS',
           icon: Icons.people_alt_rounded,
-          page: CustomerOpenPage(
-            role: widget.role,
-            currentStore: widget.store,
-          ),
+          page: CustomerOpenPage(role: widget.role, currentStore: widget.store),
         ),
         _NavItem(
           title: '재고관리',
@@ -139,6 +140,25 @@ class _AppLayoutState extends State<AppLayout> {
 
   int get searchPageIndex => items.indexWhere((item) => item.title == '통합검색');
 
+  @override
+  void initState() {
+    super.initState();
+    _loadLatestNotice();
+  }
+
+  Future<void> _loadLatestNotice() async {
+    setState(() {
+      isNoticeLoading = true;
+    });
+
+    final notice = await noticeService.fetchLatestNotice();
+    if (!mounted) return;
+    setState(() {
+      latestNotice = notice;
+      isNoticeLoading = false;
+    });
+  }
+
   void _selectPageByTitle(String title) {
     final index = items.indexWhere((item) => item.title == title);
     if (index < 0) return;
@@ -164,9 +184,9 @@ class _AppLayoutState extends State<AppLayout> {
 
     if (name.isEmpty && phone.isEmpty) {
       ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('고객명 또는 핸드폰번호를 입력해 주세요')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('고객명 또는 핸드폰번호를 입력해 주세요')));
       return;
     }
 
@@ -180,12 +200,14 @@ class _AppLayoutState extends State<AppLayout> {
   }
 
   Future<void> _confirmLogout() async {
-    final shouldLogout = await showDialog<bool>(
+    final shouldLogout =
+        await showDialog<bool>(
           context: context,
           builder: (_) => AlertDialog(
             backgroundColor: Colors.white,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             title: const Text(
               '로그아웃',
               style: TextStyle(
@@ -231,12 +253,14 @@ class _AppLayoutState extends State<AppLayout> {
   }
 
   Future<void> _confirmExit() async {
-    final shouldExit = await showDialog<bool>(
+    final shouldExit =
+        await showDialog<bool>(
           context: context,
           builder: (_) => AlertDialog(
             backgroundColor: Colors.white,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
             title: const Text('프로그램 종료'),
             content: const Text('CRM을 종료하시겠습니까?'),
             actions: [
@@ -281,6 +305,43 @@ class _AppLayoutState extends State<AppLayout> {
     }
   }
 
+  Future<void> _showNoticePopup() async {
+    await _loadLatestNotice();
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        title: Text(
+          latestNotice?.title ?? '공지사항',
+          style: const TextStyle(
+            color: Color(0xFF111827),
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        content: SizedBox(
+          width: 360,
+          child: Text(
+            latestNotice?.content ?? '등록된 공지사항이 없습니다.',
+            style: const TextStyle(
+              color: Color(0xFF4B5563),
+              height: 1.6,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _topSearchField({
     required TextEditingController controller,
     required String hint,
@@ -323,9 +384,7 @@ class _AppLayoutState extends State<AppLayout> {
       padding: const EdgeInsets.symmetric(horizontal: 28),
       decoration: const BoxDecoration(
         color: Colors.white,
-        border: Border(
-          bottom: BorderSide(color: Color(0xFFE8E9EF)),
-        ),
+        border: Border(bottom: BorderSide(color: Color(0xFFE8E9EF))),
       ),
       child: Row(
         children: [
@@ -420,9 +479,7 @@ class _AppLayoutState extends State<AppLayout> {
               width: 232,
               decoration: const BoxDecoration(
                 color: Color(0xFF191B2A),
-                border: Border(
-                  right: BorderSide(color: Color(0xFF252740)),
-                ),
+                border: Border(right: BorderSide(color: Color(0xFF252740))),
               ),
               child: Column(
                 children: [
@@ -437,8 +494,11 @@ class _AppLayoutState extends State<AppLayout> {
                             color: const Color(0xFFC94C6E),
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Icon(Icons.phone_rounded,
-                              size: 16, color: Colors.white),
+                          child: const Icon(
+                            Icons.phone_rounded,
+                            size: 16,
+                            color: Colors.white,
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Column(
@@ -480,8 +540,9 @@ class _AppLayoutState extends State<AppLayout> {
                             width: 22,
                             height: 22,
                             decoration: BoxDecoration(
-                              color: const Color(0xFFC94C6E)
-                                  .withValues(alpha: 0.14),
+                              color: const Color(
+                                0xFFC94C6E,
+                              ).withValues(alpha: 0.14),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: const Icon(
@@ -536,8 +597,9 @@ class _AppLayoutState extends State<AppLayout> {
                             ),
                             decoration: BoxDecoration(
                               color: selected
-                                  ? const Color(0xFFC94C6E)
-                                      .withValues(alpha: 0.14)
+                                  ? const Color(
+                                      0xFFC94C6E,
+                                    ).withValues(alpha: 0.14)
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -587,6 +649,43 @@ class _AppLayoutState extends State<AppLayout> {
                         if (settingsIndex >= 0) ...[
                           InkWell(
                             borderRadius: BorderRadius.circular(16),
+                            onTap: isNoticeLoading ? null : _showNoticePopup,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 14,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.05),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: const Color(0xFF252740),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    Icons.notifications_active_outlined,
+                                    color: Color(0xFF8A8DA6),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Text(
+                                      isNoticeLoading ? '불러오는 중' : '공지사항 알림',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFFD1D3E0),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(16),
                             onTap: () {
                               setState(() {
                                 selectedIndex = settingsIndex;
@@ -599,8 +698,9 @@ class _AppLayoutState extends State<AppLayout> {
                               ),
                               decoration: BoxDecoration(
                                 color: selectedIndex == settingsIndex
-                                    ? const Color(0xFFC94C6E)
-                                        .withValues(alpha: 0.14)
+                                    ? const Color(
+                                        0xFFC94C6E,
+                                      ).withValues(alpha: 0.14)
                                     : Colors.white.withValues(alpha: 0.05),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
@@ -682,8 +782,9 @@ class _AppLayoutState extends State<AppLayout> {
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(8),
-                              border:
-                                  Border.all(color: const Color(0xFF252740)),
+                              border: Border.all(
+                                color: const Color(0xFF252740),
+                              ),
                             ),
                             child: const Row(
                               children: [
@@ -737,9 +838,5 @@ class _NavItem {
   final IconData icon;
   final Widget page;
 
-  _NavItem({
-    required this.title,
-    required this.icon,
-    required this.page,
-  });
+  _NavItem({required this.title, required this.icon, required this.page});
 }
