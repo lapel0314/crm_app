@@ -1,9 +1,10 @@
 #define MyAppName "핑크폰 CRM"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "Pink Phone"
 #define MyAppExeName "핑크폰 CRM.exe"
 #define MyBuildExeName "crm_app.exe"
 #define MyBuildDir "build\windows\x64\runner\Release"
+#define InstallerPassword "123456"
 
 [Setup]
 AppId={{A1B2C3D4-E5F6-47A8-9B10-112233445566}
@@ -25,7 +26,9 @@ UsePreviousAppDir=yes
 CloseApplications=yes
 RestartApplications=no
 CloseApplicationsFilter=*.exe,*.dll
-SetupIconFile=windows\runner\resources\app_icon.ico
+Password={#InstallerPassword}
+Encryption=yes
+SetupIconFile=windows\runner\resources\installer_icon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
 [Languages]

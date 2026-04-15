@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:crm_app/services/kakao_talk_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/utils/store_utils.dart';
+import 'package:crm_app/widgets/compact_date_range_picker.dart';
 
 final supabase = Supabase.instance.client;
 
@@ -11,12 +12,16 @@ class CustomerPage extends StatefulWidget {
   final String role;
   final String currentStore;
   final bool openMode;
+  final String initialNameQuery;
+  final String initialPhoneQuery;
 
   const CustomerPage({
     super.key,
     required this.role,
     required this.currentStore,
     this.openMode = false,
+    this.initialNameQuery = '',
+    this.initialPhoneQuery = '',
   });
 
   @override
@@ -48,7 +53,20 @@ class _CustomerPageState extends State<CustomerPage> {
   @override
   void initState() {
     super.initState();
+    searchController.text = widget.initialNameQuery;
+    phoneSearchController.text = widget.initialPhoneQuery;
     fetchCustomers();
+  }
+
+  @override
+  void didUpdateWidget(covariant CustomerPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialNameQuery != widget.initialNameQuery ||
+        oldWidget.initialPhoneQuery != widget.initialPhoneQuery) {
+      searchController.text = widget.initialNameQuery;
+      phoneSearchController.text = widget.initialPhoneQuery;
+      fetchCustomers();
+    }
   }
 
   int _toInt(dynamic value) {
@@ -81,6 +99,103 @@ class _CustomerPageState extends State<CustomerPage> {
     if (value is DateTime) return DateFormat('yyyy-MM-dd').format(value);
     final text = value.toString();
     return text.length >= 10 ? text.substring(0, 10) : text;
+  }
+
+  DateTime? _parseSearchDate(String value) {
+    final text = value.trim();
+    final digits = text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length == 6) {
+      final year = 2000 + (int.tryParse(digits.substring(0, 2)) ?? -1);
+      final month = int.tryParse(digits.substring(2, 4));
+      final day = int.tryParse(digits.substring(4, 6));
+      if (month != null && day != null) {
+        return DateTime.tryParse(
+          '${year.toString().padLeft(4, '0')}-'
+          '${month.toString().padLeft(2, '0')}-'
+          '${day.toString().padLeft(2, '0')}',
+        );
+      }
+    }
+    if (digits.length == 8) {
+      return DateTime.tryParse(
+        '${digits.substring(0, 4)}-${digits.substring(4, 6)}-${digits.substring(6, 8)}',
+      );
+    }
+    return DateTime.tryParse(text.replaceAll('.', '-').replaceAll('/', '-'));
+  }
+
+  DateTime? _dateOnly(dynamic value) {
+    final parsed = value is DateTime ? value : _parseSearchDate(_date(value));
+    if (parsed == null) return null;
+    return DateTime(parsed.year, parsed.month, parsed.day);
+  }
+
+  DateTimeRange? _dateRangeFromText(String text) {
+    final matches = RegExp(
+      r'\d{6}|\d{8}|\d{2,4}[./-]\d{1,2}[./-]\d{1,2}',
+    ).allMatches(text).map((match) => match.group(0)!).toList();
+    final parts = matches.length >= 2
+        ? matches.take(2).toList()
+        : text.split('~').map((part) => part.trim()).toList();
+    if (parts.length != 2) return null;
+
+    final start = _dateOnly(parts[0]);
+    final end = _dateOnly(parts[1]);
+    if (start == null || end == null) return null;
+
+    return start.isAfter(end)
+        ? DateTimeRange(start: end, end: start)
+        : DateTimeRange(start: start, end: end);
+  }
+
+  String _formatDateRange(DateTimeRange range) {
+    final formatter = DateFormat('yyyy-MM-dd');
+    final start = formatter.format(range.start);
+    final end = formatter.format(range.end);
+    return start == end ? start : '$start ~ $end';
+  }
+
+  bool _matchesDateSearch(dynamic value, String filter) {
+    if (filter.isEmpty) return true;
+
+    final range = _dateRangeFromText(filter);
+    if (range == null) {
+      final date = _dateOnly(value);
+      final searchDate = _dateOnly(filter);
+      if (date != null && searchDate != null) return date == searchDate;
+      return _date(value).contains(filter);
+    }
+
+    final target = _dateOnly(value);
+    if (target == null) return false;
+    return !target.isBefore(range.start) && !target.isAfter(range.end);
+  }
+
+  void _handleDateSearchChanged(String value) {
+    final trimmed = value.trim();
+    final compactDigits = trimmed.replaceAll(RegExp(r'[^0-9]'), '');
+    final range = _dateRangeFromText(trimmed);
+    final shouldNormalizeSingle = !trimmed.contains('~') &&
+        (compactDigits.length == 6 || compactDigits.length == 8);
+
+    if (range != null) {
+      final formatted = _formatDateRange(range);
+      dateSearchController.value = TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+    } else if (shouldNormalizeSingle) {
+      final date = _dateOnly(trimmed);
+      if (date != null) {
+        final formatted = DateFormat('yyyy-MM-dd').format(date);
+        dateSearchController.value = TextEditingValue(
+          text: formatted,
+          selection: TextSelection.collapsed(offset: formatted.length),
+        );
+      }
+    }
+
+    fetchCustomers();
   }
 
   String _text(dynamic value) {
@@ -125,6 +240,30 @@ class _CustomerPageState extends State<CustomerPage> {
   String _displayPhone(String phone) => isOpenView ? _maskPhone(phone) : phone;
   String _displayBankInfo(String bankInfo) =>
       isOpenView ? _maskBankInfo(bankInfo) : bankInfo;
+
+  Future<void> _pickSearchDate() async {
+    final currentText = dateSearchController.text.trim();
+    final initialRange = _dateRangeFromText(currentText);
+    final initialDate = _dateOnly(currentText) ?? DateTime.now();
+    final picked = await showCompactDateRangePicker(
+      context: context,
+      initialDateRange:
+          initialRange ?? DateTimeRange(start: initialDate, end: initialDate),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      title: '가입일 기간 선택',
+    );
+    if (picked == null) return;
+
+    dateSearchController.text = _formatDateRange(picked);
+    await fetchCustomers();
+  }
+
+  void _clearSearchDate() {
+    if (dateSearchController.text.isEmpty) return;
+    dateSearchController.clear();
+    fetchCustomers();
+  }
 
   int _calcTotalRebate({
     required int rebate,
@@ -301,12 +440,11 @@ class _CustomerPageState extends State<CustomerPage> {
       bool matches(Map<String, dynamic> item) {
         final matchesStore =
             canViewAllStores || isSameStore(item['store'], widget.currentStore);
-        final dateText = _date(item['join_date']);
         final nameText = _text(item['name']).toLowerCase();
         final phoneText = _text(item['phone']);
         final phoneDigits = phoneText.replaceAll(RegExp(r'[^0-9]'), '');
 
-        final matchesDate = dateFilter.isEmpty || dateText.contains(dateFilter);
+        final matchesDate = _matchesDateSearch(item['join_date'], dateFilter);
         final matchesName = nameFilter.isEmpty || nameText.contains(nameFilter);
         final matchesPhone =
             phoneFilter.isEmpty || phoneDigits.contains(phoneFilter);
@@ -1743,17 +1881,48 @@ class _CustomerPageState extends State<CustomerPage> {
     required String hint,
     required IconData icon,
     double width = 220,
+    VoidCallback? onIconPressed,
+    VoidCallback? onClear,
+    ValueChanged<String>? onChanged,
   }) {
+    final hasText = controller.text.trim().isNotEmpty;
     return SizedBox(
       width: width,
       height: 38,
       child: TextField(
         controller: controller,
-        onChanged: (_) => fetchCustomers(),
+        onChanged: onChanged ?? (_) => fetchCustomers(),
         style: const TextStyle(fontSize: 13),
         decoration: InputDecoration(
           hintText: hint,
-          prefixIcon: Icon(icon, size: 17, color: const Color(0xFF9CA3AF)),
+          prefixIcon: onIconPressed == null
+              ? Icon(icon, size: 17, color: const Color(0xFF9CA3AF))
+              : IconButton(
+                  tooltip: '달력 열기',
+                  onPressed: onIconPressed,
+                  icon: Icon(icon, size: 17),
+                  color: hasText
+                      ? const Color(0xFFC94C6E)
+                      : const Color(0xFF9CA3AF),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 34,
+                    minHeight: 34,
+                  ),
+                ),
+          suffixIcon: onClear != null && hasText
+              ? IconButton(
+                  tooltip: '날짜 검색 지우기',
+                  onPressed: onClear,
+                  icon: const Icon(Icons.close_rounded, size: 16),
+                  color: const Color(0xFF9CA3AF),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                )
+              : null,
           filled: true,
           fillColor: const Color(0xFFF9FAFB),
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
@@ -2252,6 +2421,9 @@ class _CustomerPageState extends State<CustomerPage> {
                                     hint: '가입일 검색',
                                     icon: Icons.calendar_today_outlined,
                                     width: 160,
+                                    onIconPressed: _pickSearchDate,
+                                    onClear: _clearSearchDate,
+                                    onChanged: _handleDateSearchChanged,
                                   ),
                                   const SizedBox(width: 8),
                                   _filterField(

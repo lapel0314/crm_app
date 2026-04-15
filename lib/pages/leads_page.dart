@@ -2,14 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/utils/store_utils.dart';
+import 'package:crm_app/widgets/compact_date_range_picker.dart';
 
 final supabase = Supabase.instance.client;
 
 class LeadsPage extends StatefulWidget {
   final String role;
   final String currentStore;
+  final String initialSearchQuery;
 
-  const LeadsPage({super.key, required this.role, required this.currentStore});
+  const LeadsPage({
+    super.key,
+    required this.role,
+    required this.currentStore,
+    this.initialSearchQuery = '',
+  });
 
   @override
   State<LeadsPage> createState() => _LeadsPageState();
@@ -17,6 +24,7 @@ class LeadsPage extends StatefulWidget {
 
 class _LeadsPageState extends State<LeadsPage> {
   final searchController = TextEditingController();
+  final dateSearchController = TextEditingController();
 
   bool isLoading = true;
   List<Map<String, dynamic>> leads = [];
@@ -31,10 +39,22 @@ class _LeadsPageState extends State<LeadsPage> {
   @override
   void initState() {
     super.initState();
+    searchController.text = widget.initialSearchQuery;
     if (canView) {
-      fetchLeads(silent: true);
+      fetchLeads(keyword: searchController.text, silent: true);
     } else {
       isLoading = false;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant LeadsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialSearchQuery != widget.initialSearchQuery) {
+      searchController.text = widget.initialSearchQuery;
+      if (canView) {
+        fetchLeads(keyword: searchController.text, silent: true);
+      }
     }
   }
 
@@ -59,6 +79,128 @@ class _LeadsPageState extends State<LeadsPage> {
     }
     final text = value.toString();
     return text.length >= 10 ? text.substring(0, 10) : text;
+  }
+
+  DateTime? parseSearchDate(String value) {
+    final text = value.trim();
+    final digits = text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length == 6) {
+      final year = 2000 + (int.tryParse(digits.substring(0, 2)) ?? -1);
+      final month = int.tryParse(digits.substring(2, 4));
+      final day = int.tryParse(digits.substring(4, 6));
+      if (month != null && day != null) {
+        return DateTime.tryParse(
+          '${year.toString().padLeft(4, '0')}-'
+          '${month.toString().padLeft(2, '0')}-'
+          '${day.toString().padLeft(2, '0')}',
+        );
+      }
+    }
+    if (digits.length == 8) {
+      return DateTime.tryParse(
+        '${digits.substring(0, 4)}-${digits.substring(4, 6)}-${digits.substring(6, 8)}',
+      );
+    }
+    return DateTime.tryParse(text.replaceAll('.', '-').replaceAll('/', '-'));
+  }
+
+  DateTime? dateOnly(dynamic value) {
+    final parsed =
+        value is DateTime ? value : parseSearchDate(shortDate(value));
+    if (parsed == null) return null;
+    return DateTime(parsed.year, parsed.month, parsed.day);
+  }
+
+  DateTimeRange? dateRangeFromText(String text) {
+    final matches = RegExp(
+      r'\d{6}|\d{8}|\d{2,4}[./-]\d{1,2}[./-]\d{1,2}',
+    ).allMatches(text).map((match) => match.group(0)!).toList();
+    final parts = matches.length >= 2
+        ? matches.take(2).toList()
+        : text.split('~').map((part) => part.trim()).toList();
+    if (parts.length != 2) return null;
+
+    final start = dateOnly(parts[0]);
+    final end = dateOnly(parts[1]);
+    if (start == null || end == null) return null;
+
+    return start.isAfter(end)
+        ? DateTimeRange(start: end, end: start)
+        : DateTimeRange(start: start, end: end);
+  }
+
+  String formatDateRange(DateTimeRange range) {
+    final formatter = DateFormat('yyyy-MM-dd');
+    final start = formatter.format(range.start);
+    final end = formatter.format(range.end);
+    return start == end ? start : '$start ~ $end';
+  }
+
+  bool matchesDateSearch(dynamic value, String filter) {
+    if (filter.isEmpty) return true;
+
+    final range = dateRangeFromText(filter);
+    if (range == null) {
+      final date = dateOnly(value);
+      final searchDate = dateOnly(filter);
+      if (date != null && searchDate != null) return date == searchDate;
+      return shortDate(value).contains(filter);
+    }
+
+    final target = dateOnly(value);
+    if (target == null) return false;
+    return !target.isBefore(range.start) && !target.isAfter(range.end);
+  }
+
+  void handleDateSearchChanged(String value) {
+    final trimmed = value.trim();
+    final compactDigits = trimmed.replaceAll(RegExp(r'[^0-9]'), '');
+    final range = dateRangeFromText(trimmed);
+    final shouldNormalizeSingle = !trimmed.contains('~') &&
+        (compactDigits.length == 6 || compactDigits.length == 8);
+
+    if (range != null) {
+      final formatted = formatDateRange(range);
+      dateSearchController.value = TextEditingValue(
+        text: formatted,
+        selection: TextSelection.collapsed(offset: formatted.length),
+      );
+    } else if (shouldNormalizeSingle) {
+      final date = dateOnly(trimmed);
+      if (date != null) {
+        final formatted = DateFormat('yyyy-MM-dd').format(date);
+        dateSearchController.value = TextEditingValue(
+          text: formatted,
+          selection: TextSelection.collapsed(offset: formatted.length),
+        );
+      }
+    }
+
+    fetchLeads(keyword: searchController.text, silent: true);
+  }
+
+  Future<void> pickSearchDate() async {
+    final currentText = dateSearchController.text.trim();
+    final initialRange = dateRangeFromText(currentText);
+    final initialDate = dateOnly(currentText) ?? DateTime.now();
+    final picked = await showCompactDateRangePicker(
+      context: context,
+      initialDateRange:
+          initialRange ?? DateTimeRange(start: initialDate, end: initialDate),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      title: '가망고객 기간 선택',
+    );
+    if (picked == null) return;
+
+    dateSearchController.text = formatDateRange(picked);
+    await fetchLeads(keyword: searchController.text, silent: true);
+  }
+
+  void clearSearchDate() {
+    if (dateSearchController.text.isEmpty) return;
+    dateSearchController.clear();
+    fetchLeads(keyword: searchController.text, silent: true);
   }
 
   void showMessage(String text) {
@@ -194,6 +336,12 @@ class _LeadsPageState extends State<LeadsPage> {
         if (!canViewAllStores) {
           leads = leads
               .where((lead) => isSameStore(lead['store'], widget.currentStore))
+              .toList();
+        }
+        final dateFilter = dateSearchController.text.trim();
+        if (dateFilter.isNotEmpty) {
+          leads = leads
+              .where((lead) => matchesDateSearch(lead['lead_date'], dateFilter))
               .toList();
         }
         currentPage = 0;
@@ -689,6 +837,78 @@ class _LeadsPageState extends State<LeadsPage> {
     );
   }
 
+  Widget _dateSearchButton() {
+    final selectedDate = dateSearchController.text.trim();
+    final hasDate = selectedDate.isNotEmpty;
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 38,
+          height: 38,
+          child: IconButton(
+            tooltip: hasDate ? '날짜 검색: $selectedDate' : '달력 열기',
+            onPressed: pickSearchDate,
+            icon: const Icon(Icons.calendar_month_outlined, size: 18),
+            style: IconButton.styleFrom(
+              backgroundColor:
+                  hasDate ? const Color(0xFFFFEEF4) : const Color(0xFFF9FAFB),
+              foregroundColor:
+                  hasDate ? const Color(0xFFC94C6E) : const Color(0xFF6B7280),
+              side: const BorderSide(color: Color(0xFFE8E9EF)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 6),
+        SizedBox(
+          width: hasDate ? 210 : 104,
+          height: 38,
+          child: TextField(
+            controller: dateSearchController,
+            onChanged: handleDateSearchChanged,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+            decoration: InputDecoration(
+              hintText: '260401',
+              suffixIcon: hasDate
+                  ? IconButton(
+                      tooltip: '날짜 검색 지우기',
+                      onPressed: clearSearchDate,
+                      icon: const Icon(Icons.close_rounded, size: 15),
+                      color: const Color(0xFF9CA3AF),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 30,
+                        minHeight: 30,
+                      ),
+                    )
+                  : null,
+              filled: true,
+              fillColor: const Color(0xFFF9FAFB),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE8E9EF)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(color: Color(0xFFE8E9EF)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8),
+                borderSide: const BorderSide(
+                  color: Color(0xFFC94C6E),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _segmentedFilter({
     required List<String> options,
     required String selected,
@@ -998,6 +1218,7 @@ class _LeadsPageState extends State<LeadsPage> {
   @override
   void dispose() {
     searchController.dispose();
+    dateSearchController.dispose();
     super.dispose();
   }
 
@@ -1097,6 +1318,8 @@ class _LeadsPageState extends State<LeadsPage> {
                               scrollDirection: Axis.horizontal,
                               child: Row(
                                 children: [
+                                  _dateSearchButton(),
+                                  const SizedBox(width: 8),
                                   SizedBox(
                                     width: 300,
                                     height: 38,

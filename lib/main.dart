@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' show exit;
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/pages/login_page.dart';
 import 'package:crm_app/services/update_service.dart';
@@ -34,6 +35,16 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: '핑크폰 CRM',
       debugShowCheckedModeBanner: false,
+      locale: const Locale('ko', 'KR'),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('ko', 'KR'),
+        Locale('en', 'US'),
+      ],
       theme: ThemeData(
         useMaterial3: true,
         fontFamily: 'Pretendard',

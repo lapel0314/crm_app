@@ -31,6 +31,9 @@ class _AppLayoutState extends State<AppLayout> {
   final globalPhoneSearchController = TextEditingController();
   String globalNameQuery = '';
   String globalPhoneQuery = '';
+  String pageSearchNameQuery = '';
+  String pageSearchPhoneQuery = '';
+  String pageSearchKeyword = '';
 
   bool get isAdminRole => widget.role == '대표' || widget.role == '개발자';
   bool get isPublicRole => widget.role == '조회용' || widget.role == '공개용';
@@ -73,17 +76,30 @@ class _AppLayoutState extends State<AppLayout> {
       _NavItem(
         title: '고객DB',
         icon: Icons.people_alt_rounded,
-        page: CustomerPage(role: widget.role, currentStore: widget.store),
+        page: CustomerPage(
+          role: widget.role,
+          currentStore: widget.store,
+          initialNameQuery: pageSearchNameQuery,
+          initialPhoneQuery: pageSearchPhoneQuery,
+        ),
       ),
       _NavItem(
         title: '가망고객',
         icon: Icons.person_search_rounded,
-        page: LeadsPage(role: widget.role, currentStore: widget.store),
+        page: LeadsPage(
+          role: widget.role,
+          currentStore: widget.store,
+          initialSearchQuery: pageSearchKeyword,
+        ),
       ),
       _NavItem(
         title: '유선회원',
         icon: Icons.cable_rounded,
-        page: WiredMembersPage(role: widget.role, currentStore: widget.store),
+        page: WiredMembersPage(
+          role: widget.role,
+          currentStore: widget.store,
+          initialSearchQuery: pageSearchKeyword,
+        ),
       ),
       _NavItem(
         title: '대시보드',
@@ -115,12 +131,30 @@ class _AppLayoutState extends State<AppLayout> {
           phoneQuery: globalPhoneQuery,
           role: widget.role,
           currentStore: widget.store,
+          onNavigateToPage: _selectPageByTitle,
         ),
       ),
     ];
   }
 
   int get searchPageIndex => items.indexWhere((item) => item.title == '통합검색');
+
+  void _selectPageByTitle(String title) {
+    final index = items.indexWhere((item) => item.title == title);
+    if (index < 0) return;
+    final keyword = globalPhoneQuery.trim().isNotEmpty
+        ? globalPhoneQuery.trim()
+        : globalNameQuery.trim();
+    setState(() {
+      if (title == '고객DB') {
+        pageSearchNameQuery = globalNameQuery;
+        pageSearchPhoneQuery = globalPhoneQuery;
+      } else if (title == '가망고객' || title == '유선회원') {
+        pageSearchKeyword = keyword;
+      }
+      selectedIndex = index;
+    });
+  }
 
   void _runGlobalSearch() {
     final name = globalNameSearchController.text.trim();

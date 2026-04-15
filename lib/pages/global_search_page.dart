@@ -10,6 +10,7 @@ class GlobalSearchPage extends StatefulWidget {
   final String phoneQuery;
   final String role;
   final String currentStore;
+  final ValueChanged<String>? onNavigateToPage;
 
   const GlobalSearchPage({
     super.key,
@@ -17,6 +18,7 @@ class GlobalSearchPage extends StatefulWidget {
     required this.phoneQuery,
     required this.role,
     required this.currentStore,
+    this.onNavigateToPage,
   });
 
   @override
@@ -325,6 +327,7 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
     required List<double> widths,
     required List<Widget> Function(Map<String, dynamic> row) cells,
     required ValueChanged<Map<String, dynamic>> onTap,
+    required String pageTitle,
   }) {
     final tableWidth = widths.fold<double>(0, (sum, width) => sum + width) + 36;
 
@@ -353,6 +356,28 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
+                const SizedBox(width: 12),
+                if (widget.onNavigateToPage != null)
+                  SizedBox(
+                    height: 32,
+                    child: OutlinedButton.icon(
+                      onPressed: () => widget.onNavigateToPage!(pageTitle),
+                      icon: const Icon(Icons.open_in_new_rounded, size: 15),
+                      label: Text('$pageTitle로 이동'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFC94C6E),
+                        side: const BorderSide(color: Color(0xFFFFCAD8)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        textStyle: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -709,6 +734,7 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
                                     _section(
                                       title: '고객DB',
                                       icon: Icons.people_alt_rounded,
+                                      pageTitle: '고객DB',
                                       rows: customers,
                                       headers: const [
                                         '가입일',
@@ -748,6 +774,7 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
                                     _section(
                                       title: '유선회원',
                                       icon: Icons.cable_rounded,
+                                      pageTitle: '유선회원',
                                       rows: wiredMembers,
                                       headers: const [
                                         '청약일',
@@ -789,6 +816,7 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
                                     _section(
                                       title: '가망고객',
                                       icon: Icons.person_search_rounded,
+                                      pageTitle: '가망고객',
                                       rows: leads,
                                       headers: const [
                                         '등록일',
