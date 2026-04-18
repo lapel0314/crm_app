@@ -6,6 +6,12 @@ build/
 .flutter-plugins-dependencies
 .idea/
 .vscode/
+.env
+.env.*
+*.jks
+*.keystore
+*.p8
+*.p12
 ios/Flutter/Flutter.podspec
 macos/Flutter/ephemeral/
 windows/flutter/ephemeral/
@@ -14,3 +20,6 @@ android/.gradle/
 android/app/debug
 android/app/profile
 android/app/release
+web_server.log
+web_server.err.log
+output/*.tmp

@@ -21,6 +21,58 @@ bool isPrivilegedRole(dynamic role) {
   return text == '대표' || text == '개발자';
 }
 
+bool isManagerRole(dynamic role) {
+  return role?.toString().trim() == '점장';
+}
+
+bool isStaffRole(dynamic role) {
+  return role?.toString().trim() == '사원';
+}
+
+bool isReadOnlyRole(dynamic role) {
+  return role?.toString().trim() == '조회용';
+}
+
+bool canUseCustomerDb(dynamic role) {
+  return isPrivilegedRole(role) || isManagerRole(role);
+}
+
+bool canUseOpenCustomerDb(dynamic role) {
+  return isReadOnlyRole(role);
+}
+
+bool canUseLeads(dynamic role) {
+  return isPrivilegedRole(role) || isManagerRole(role);
+}
+
+bool canUseWiredMembers(dynamic role) {
+  return isPrivilegedRole(role) || isManagerRole(role);
+}
+
+bool canUseDashboard(dynamic role) {
+  return isPrivilegedRole(role) || isManagerRole(role);
+}
+
+bool canUseInventory(dynamic role) {
+  return isPrivilegedRole(role) || isManagerRole(role) || isReadOnlyRole(role);
+}
+
+bool canManageInventory(dynamic role) {
+  return isPrivilegedRole(role) || isManagerRole(role);
+}
+
+bool canUseGlobalSearch(dynamic role) {
+  return isPrivilegedRole(role) || isManagerRole(role);
+}
+
+bool canViewRebate(dynamic role) {
+  return isPrivilegedRole(role) || isManagerRole(role) || isStaffRole(role);
+}
+
+bool canManageRateCards(dynamic role) {
+  return isPrivilegedRole(role);
+}
+
 bool isSameStore(dynamic a, dynamic b) {
   final left = normalizeStoreName(a);
   final right = normalizeStoreName(b);

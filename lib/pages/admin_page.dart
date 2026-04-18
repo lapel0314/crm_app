@@ -1,3 +1,6 @@
+import 'dart:typed_data';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/services/notice_service.dart';
@@ -23,7 +26,7 @@ class _AdminPageState extends State<AdminPage> {
   bool isLoading = true;
 
   bool isAdmin() {
-    return widget.role == '대표' || widget.role == '개발자';
+    return isPrivilegedRole(widget.role);
   }
 
   @override
@@ -47,16 +50,16 @@ class _AdminPageState extends State<AdminPage> {
     try {
       final data = keyword.trim().isEmpty
           ? await supabase
-                .from('profiles')
-                .select()
-                .order('created_at', ascending: true)
+              .from('profiles')
+              .select()
+              .order('created_at', ascending: true)
           : await supabase
-                .from('profiles')
-                .select()
-                .or(
-                  'name.ilike.%${keyword.trim()}%,email.ilike.%${keyword.trim()}%,phone.ilike.%${keyword.trim()}%,role.ilike.%${keyword.trim()}%,store.ilike.%${keyword.trim()}%',
-                )
-                .order('created_at', ascending: true);
+              .from('profiles')
+              .select()
+              .or(
+                'name.ilike.%${keyword.trim()}%,email.ilike.%${keyword.trim()}%,phone.ilike.%${keyword.trim()}%,role.ilike.%${keyword.trim()}%,store.ilike.%${keyword.trim()}%',
+              )
+              .order('created_at', ascending: true);
 
       setState(() {
         users = List<Map<String, dynamic>>.from(data);
@@ -75,8 +78,8 @@ class _AdminPageState extends State<AdminPage> {
     try {
       await supabase
           .from('profiles')
-          .update({'approval_status': 'approved', 'rejection_reason': null})
-          .eq('id', id);
+          .update({'approval_status': 'approved', 'rejection_reason': null}).eq(
+              'id', id);
 
       fetchUsers(keyword: searchController.text);
     } catch (e) {
@@ -97,65 +100,112 @@ class _AdminPageState extends State<AdminPage> {
   void showNoticeDialog() {
     final titleController = TextEditingController(text: '공지사항');
     final contentController = TextEditingController();
+    Uint8List? imageBytes;
+    String? imageName;
+    String? imageContentType;
 
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        title: const Text(
-          '공지사항 작성',
-          style: TextStyle(
-            color: Color(0xFF111827),
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        content: SizedBox(
-          width: 520,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: titleController,
-                decoration: _inputDecoration('제목'),
+      builder: (_) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            title: const Text(
+              '공지사항 작성',
+              style: TextStyle(
+                color: Color(0xFF111827),
+                fontWeight: FontWeight.w900,
               ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: contentController,
-                minLines: 6,
-                maxLines: 8,
-                decoration: _inputDecoration('내용'),
+            ),
+            content: SizedBox(
+              width: 520,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: titleController,
+                    decoration: _inputDecoration('제목'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: contentController,
+                    minLines: 6,
+                    maxLines: 8,
+                    decoration: _inputDecoration('내용'),
+                  ),
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final result = await FilePicker.platform.pickFiles(
+                        type: FileType.custom,
+                        allowedExtensions: const [
+                          'jpg',
+                          'jpeg',
+                          'png',
+                          'webp',
+                          'gif'
+                        ],
+                        withData: true,
+                      );
+                      if (result == null || result.files.isEmpty) return;
+                      final file = result.files.single;
+                      setDialogState(() {
+                        imageBytes = file.bytes;
+                        imageName = file.name;
+                        imageContentType =
+                            switch ((file.extension ?? '').toLowerCase()) {
+                          'png' => 'image/png',
+                          'webp' => 'image/webp',
+                          'gif' => 'image/gif',
+                          _ => 'image/jpeg',
+                        };
+                      });
+                    },
+                    icon: const Icon(Icons.image_outlined),
+                    label: Text(imageName == null ? '이미지 첨부' : imageName!),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('취소'),
+              ),
+              ElevatedButton(
+                style: _primaryButtonStyle(),
+                onPressed: () async {
+                  if (contentController.text.trim().isEmpty) return;
+                  try {
+                    await noticeService.createNotice(
+                      title: titleController.text,
+                      content: contentController.text,
+                      imageBytes: imageBytes,
+                      imageName: imageName,
+                      contentType: imageContentType,
+                    );
+                    if (!mounted) return;
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).clearSnackBars();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('공지사항이 등록되었습니다.')),
+                    );
+                  } catch (e) {
+                    debugPrint('notice create failed: $e');
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).clearSnackBars();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('공지사항 등록 실패: $e')),
+                    );
+                  }
+                },
+                child: const Text('등록'),
               ),
             ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
-          ),
-          ElevatedButton(
-            style: _primaryButtonStyle(),
-            onPressed: () async {
-              if (contentController.text.trim().isEmpty) return;
-              try {
-                await noticeService.createNotice(
-                  title: titleController.text,
-                  content: contentController.text,
-                );
-                if (!mounted) return;
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).clearSnackBars();
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('공지사항이 등록되었습니다.')));
-              } catch (e) {
-                debugPrint('notice create failed: $e');
-              }
-            },
-            child: const Text('등록'),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -278,17 +328,14 @@ class _AdminPageState extends State<AdminPage> {
                 style: _primaryButtonStyle(),
                 onPressed: () async {
                   try {
-                    await supabase
-                        .from('profiles')
-                        .update({
-                          'name': nameController.text.trim(),
-                          'phone': phoneController.text.trim(),
-                          'store': normalizeStoreName(
-                            storeController.text.trim(),
-                          ),
-                          'role': role,
-                        })
-                        .eq('id', user['id']);
+                    await supabase.from('profiles').update({
+                      'name': nameController.text.trim(),
+                      'phone': phoneController.text.trim(),
+                      'store': normalizeStoreName(
+                        storeController.text.trim(),
+                      ),
+                      'role': role,
+                    }).eq('id', user['id']);
 
                     if (mounted) Navigator.pop(context);
                     fetchUsers(keyword: searchController.text);
@@ -334,9 +381,8 @@ class _AdminPageState extends State<AdminPage> {
 
   ButtonStyle _primaryButtonStyle({bool danger = false}) {
     return ElevatedButton.styleFrom(
-      backgroundColor: danger
-          ? const Color(0xFFDC2626)
-          : const Color(0xFFC94C6E),
+      backgroundColor:
+          danger ? const Color(0xFFDC2626) : const Color(0xFFC94C6E),
       foregroundColor: Colors.white,
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -461,95 +507,100 @@ class _AdminPageState extends State<AdminPage> {
                 child: isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : users.isEmpty
-                    ? const Center(child: Text('직원 정보가 없습니다'))
-                    : ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: LayoutBuilder(
-                          builder: (context, constraints) {
-                            return SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: ConstrainedBox(
-                                constraints: BoxConstraints(
-                                  minWidth: constraints.maxWidth,
-                                ),
-                                child: SingleChildScrollView(
-                                  child: DataTable(
-                                    headingRowColor: WidgetStateProperty.all(
-                                      const Color(0xFFF8FAFC),
+                        ? const Center(child: Text('직원 정보가 없습니다'))
+                        : ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: LayoutBuilder(
+                              builder: (context, constraints) {
+                                return SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(
+                                      minWidth: constraints.maxWidth,
                                     ),
-                                    dataRowMinHeight: 62,
-                                    dataRowMaxHeight: 68,
-                                    columnSpacing: 32,
-                                    horizontalMargin: 18,
-                                    columns: [
-                                      _column('이름'),
-                                      _column('이메일'),
-                                      _column('전화'),
-                                      _column('직급'),
-                                      _column('매장'),
-                                      _column('상태'),
-                                      _column('거절사유'),
-                                      _column('작업'),
-                                    ],
-                                    rows: users.map((u) {
-                                      final status = _value(
-                                        u['approval_status'],
-                                      );
-                                      return DataRow(
-                                        cells: [
-                                          DataCell(Text(_value(u['name']))),
-                                          DataCell(Text(_value(u['email']))),
-                                          DataCell(Text(_value(u['phone']))),
-                                          DataCell(Text(_value(u['role']))),
-                                          DataCell(Text(_value(u['store']))),
-                                          DataCell(Text(status)),
-                                          DataCell(
-                                            Text(_value(u['rejection_reason'])),
-                                          ),
-                                          DataCell(
-                                            Row(
-                                              children: [
-                                                IconButton(
-                                                  tooltip: '수정',
-                                                  onPressed: () =>
-                                                      showEditDialog(u),
-                                                  icon: const Icon(
-                                                    Icons.edit_outlined,
-                                                  ),
-                                                ),
-                                                if (status != 'approved')
-                                                  IconButton(
-                                                    tooltip: '승인',
-                                                    onPressed: () =>
-                                                        approveUser(
+                                    child: SingleChildScrollView(
+                                      child: DataTable(
+                                        headingRowColor:
+                                            WidgetStateProperty.all(
+                                          const Color(0xFFF8FAFC),
+                                        ),
+                                        dataRowMinHeight: 62,
+                                        dataRowMaxHeight: 68,
+                                        columnSpacing: 32,
+                                        horizontalMargin: 18,
+                                        columns: [
+                                          _column('이름'),
+                                          _column('이메일'),
+                                          _column('전화'),
+                                          _column('직급'),
+                                          _column('매장'),
+                                          _column('상태'),
+                                          _column('거절사유'),
+                                          _column('작업'),
+                                        ],
+                                        rows: users.map((u) {
+                                          final status = _value(
+                                            u['approval_status'],
+                                          );
+                                          return DataRow(
+                                            cells: [
+                                              DataCell(Text(_value(u['name']))),
+                                              DataCell(
+                                                  Text(_value(u['email']))),
+                                              DataCell(
+                                                  Text(_value(u['phone']))),
+                                              DataCell(Text(_value(u['role']))),
+                                              DataCell(
+                                                  Text(_value(u['store']))),
+                                              DataCell(Text(status)),
+                                              DataCell(
+                                                Text(_value(
+                                                    u['rejection_reason'])),
+                                              ),
+                                              DataCell(
+                                                Row(
+                                                  children: [
+                                                    IconButton(
+                                                      tooltip: '수정',
+                                                      onPressed: () =>
+                                                          showEditDialog(u),
+                                                      icon: const Icon(
+                                                        Icons.edit_outlined,
+                                                      ),
+                                                    ),
+                                                    if (status != 'approved')
+                                                      IconButton(
+                                                        tooltip: '승인',
+                                                        onPressed: () =>
+                                                            approveUser(
                                                           u['id'].toString(),
                                                         ),
-                                                    icon: const Icon(
-                                                      Icons
-                                                          .check_circle_outline,
+                                                        icon: const Icon(
+                                                          Icons
+                                                              .check_circle_outline,
+                                                        ),
+                                                      ),
+                                                    IconButton(
+                                                      tooltip: '삭제',
+                                                      onPressed: () =>
+                                                          showDeleteDialog(u),
+                                                      icon: const Icon(
+                                                        Icons.delete_outline,
+                                                      ),
                                                     ),
-                                                  ),
-                                                IconButton(
-                                                  tooltip: '삭제',
-                                                  onPressed: () =>
-                                                      showDeleteDialog(u),
-                                                  icon: const Icon(
-                                                    Icons.delete_outline,
-                                                  ),
+                                                  ],
                                                 ),
-                                              ],
-                                            ),
-                                          ),
-                                        ],
-                                      );
-                                    }).toList(),
+                                              ),
+                                            ],
+                                          );
+                                        }).toList(),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
+                                );
+                              },
+                            ),
+                          ),
               ),
             ),
           ],

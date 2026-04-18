@@ -33,8 +33,8 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
   int currentPage = 0;
   static const int pageSize = 20;
 
-  bool get canEdit => ['대표', '개발자', '사장', '점장', '사원'].contains(widget.role);
-  bool get canDelete => ['대표', '개발자', '사장', '점장'].contains(widget.role);
+  bool get canEdit => canUseWiredMembers(widget.role);
+  bool get canDelete => canUseWiredMembers(widget.role);
   bool get canViewAllStores => isPrivilegedRole(widget.role);
 
   @override

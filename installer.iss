@@ -1,9 +1,10 @@
 #define MyAppName "핑크폰 CRM"
-#define MyAppVersion "1.0.2"
+#define MyAppVersion "1.0.3"
 #define MyAppPublisher "Pink Phone"
 #define MyAppExeName "핑크폰 CRM.exe"
 #define MyBuildExeName "crm_app.exe"
 #define MyBuildDir "build\windows\x64\runner\Release"
+#define InstallerPassword "123456"
 
 [Setup]
 AppId={{A1B2C3D4-E5F6-47A8-9B10-112233445566}
@@ -13,7 +14,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 OutputDir=output
-OutputBaseFilename=핑크폰 설치
+OutputBaseFilename=핑크폰 설치 {#MyAppVersion}
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern
@@ -25,6 +26,8 @@ UsePreviousAppDir=yes
 CloseApplications=yes
 RestartApplications=no
 CloseApplicationsFilter=*.exe,*.dll
+Password={#InstallerPassword}
+Encryption=yes
 SetupIconFile=windows\runner\resources\app_icon.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 

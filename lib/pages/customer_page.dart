@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:crm_app/services/kakao_talk_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -44,10 +44,9 @@ class _CustomerPageState extends State<CustomerPage> {
   int currentPage = 0;
   static const int pageSize = 20;
 
-  bool get isOpenView =>
-      widget.openMode || widget.role == '조회용' || widget.role == '공개용';
-  bool get canEdit => !isOpenView;
-  bool get canDelete => !isOpenView;
+  bool get isOpenView => widget.openMode || canUseOpenCustomerDb(widget.role);
+  bool get canEdit => !isOpenView && canUseCustomerDb(widget.role);
+  bool get canDelete => !isOpenView && canUseCustomerDb(widget.role);
   bool get canViewAllStores => isPrivilegedRole(widget.role);
 
   @override
@@ -425,11 +424,13 @@ class _CustomerPageState extends State<CustomerPage> {
     });
 
     try {
-      final List<dynamic> data = await supabase
-          .from('customers')
-          .select()
-          .order('join_date', ascending: true)
-          .order('created_at', ascending: true);
+      final List<dynamic> data = isOpenView
+          ? await supabase.rpc('customer_open_rows')
+          : await supabase
+              .from('customers')
+              .select()
+              .order('join_date', ascending: true)
+              .order('created_at', ascending: true);
 
       final dateFilter = dateSearchController.text.trim();
       final nameFilter = searchController.text.trim().toLowerCase();

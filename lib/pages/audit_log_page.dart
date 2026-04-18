@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:crm_app/utils/store_utils.dart';
 
 final supabase = Supabase.instance.client;
 
@@ -21,7 +22,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
   List<Map<String, dynamic>> logs = [];
   bool isLoading = true;
 
-  bool isAdmin() => widget.role == '대표' || widget.role == '개발자';
+  bool isAdmin() => isPrivilegedRole(widget.role);
 
   @override
   void initState() {

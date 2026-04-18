@@ -1,5 +1,5 @@
 #define MyAppName "핑크폰 CRM"
-#define MyAppVersion "1.0.2"
+#define MyAppVersion "1.0.3"
 #define MyAppPublisher "Pink Phone"
 #define MyAppExeName "핑크폰 CRM.exe"
 #define MyBuildExeName "crm_app.exe"
@@ -14,7 +14,7 @@ AppPublisher={#MyAppPublisher}
 DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 OutputDir=output
-OutputBaseFilename=핑크폰 설치
+OutputBaseFilename=핑크폰 설치 {#MyAppVersion}
 Compression=lzma
 SolidCompression=yes
 WizardStyle=modern

@@ -30,11 +30,11 @@ class _InventoryPageState extends State<InventoryPage> {
   List<Map<String, dynamic>> items = [];
 
   bool canEdit() {
-    return ['대표', '개발자', '사장', '점장', '사원'].contains(widget.role);
+    return canManageInventory(widget.role);
   }
 
   bool canDelete() {
-    return ['대표', '개발자', '사장', '점장'].contains(widget.role);
+    return canManageInventory(widget.role);
   }
 
   bool get canViewAllStores => isPrivilegedRole(widget.role);
@@ -843,12 +843,14 @@ class _InventoryPageState extends State<InventoryPage> {
                 ),
                 const Spacer(),
                 const SizedBox(width: 12),
-                _headerActionButton(
-                  icon: Icons.add,
-                  label: '재고 등록',
-                  onTap: showCreateDialog,
-                ),
-                const SizedBox(width: 12),
+                if (canEdit()) ...[
+                  _headerActionButton(
+                    icon: Icons.add,
+                    label: '재고 등록',
+                    onTap: showCreateDialog,
+                  ),
+                  const SizedBox(width: 12),
+                ],
                 _headerActionButton(
                   icon: Icons.refresh,
                   label: '새로고침',

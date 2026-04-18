@@ -1,17 +1,16 @@
 # crm_app
 
-A new Flutter project.
+## Runtime configuration
 
-## Getting Started
+Supabase connection values are not stored in source code. Pass them at run or
+build time with Dart defines:
 
-This project is a starting point for a Flutter application.
+```powershell
+flutter run `
+  --dart-define=SUPABASE_URL=https://your-project.supabase.co `
+  --dart-define=SUPABASE_ANON_KEY=your-publishable-or-anon-key
+```
 
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Use the same defines for release builds. Never put service-role keys in this
+app; server-only keys must stay in Supabase Edge Functions or other backend
+infrastructure.

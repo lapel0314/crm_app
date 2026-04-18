@@ -32,8 +32,8 @@ class _LeadsPageState extends State<LeadsPage> {
   int currentPage = 0;
   static const int pageSize = 20;
 
-  bool get canView => widget.role != '조회용' && widget.role != '공개용';
-  bool get canEdit => widget.role != '조회용' && widget.role != '공개용';
+  bool get canView => canUseLeads(widget.role);
+  bool get canEdit => canUseLeads(widget.role);
   bool get canViewAllStores => isPrivilegedRole(widget.role);
 
   @override

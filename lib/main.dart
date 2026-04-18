@@ -11,9 +11,20 @@ import 'package:crm_app/widgets/app_layout.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+
+  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+    runApp(const ConfigErrorApp());
+    return;
+  }
+
   await Supabase.initialize(
-    url: 'https://ysafjyubntkeorriywmu.supabase.co',
-    anonKey: 'sb_publishable_LLt7Nx5xNWoROgTKD82YkA_eKtp-HLy',
+    url: supabaseUrl,
+    anonKey: supabaseAnonKey,
+    authOptions: const FlutterAuthClientOptions(
+      localStorage: EmptyLocalStorage(),
+    ),
   );
 
   try {
@@ -26,6 +37,28 @@ Future<void> main() async {
 }
 
 final supabase = Supabase.instance.client;
+
+class ConfigErrorApp extends StatelessWidget {
+  const ConfigErrorApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        body: Center(
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Text(
+              'Supabase 설정이 없습니다. SUPABASE_URL / SUPABASE_ANON_KEY를 dart-define으로 전달해주세요.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -70,8 +103,9 @@ class UpdateGate extends StatefulWidget {
 
 class _UpdateGateState extends State<UpdateGate> {
   bool _checked = false;
-  bool _updating = false;
-  String _updateStatus = '';
+  bool _ready = false;
+  bool _failed = false;
+  String _updateStatus = '업데이트 버전을 확인하고 있습니다.';
 
   @override
   void initState() {
@@ -84,10 +118,26 @@ class _UpdateGateState extends State<UpdateGate> {
     _checked = true;
 
     final updateService = UpdateService(supabase);
-    final update = await updateService.checkForUpdate();
-    if (update == null || !mounted) return;
+    try {
+      final update = await updateService.checkForUpdate();
+      if (!mounted) return;
 
-    await _installUpdate(updateService, update);
+      if (update == null) {
+        setState(() {
+          _ready = true;
+        });
+        return;
+      }
+
+      await _installUpdate(updateService, update);
+    } catch (e) {
+      debugPrint('forced update check failed: $e');
+      if (!mounted) return;
+      setState(() {
+        _failed = true;
+        _updateStatus = '업데이트 확인에 실패했습니다. 인터넷 연결 후 다시 시도해 주세요.';
+      });
+    }
   }
 
   Future<void> _installUpdate(
@@ -95,7 +145,7 @@ class _UpdateGateState extends State<UpdateGate> {
     AppUpdateInfo update,
   ) async {
     setState(() {
-      _updating = true;
+      _failed = false;
       _updateStatus = '새 버전 ${update.version} 업데이트를 준비하고 있습니다.';
     });
 
@@ -113,14 +163,15 @@ class _UpdateGateState extends State<UpdateGate> {
       debugPrint('update install failed: $e');
       if (!mounted) return;
       setState(() {
-        _updating = false;
+        _failed = true;
+        _updateStatus = '업데이트 설치를 시작하지 못했습니다. 다시 시도해 주세요.';
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_updating) return widget.child;
+    if (_ready) return widget.child;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F8),
@@ -145,7 +196,7 @@ class _UpdateGateState extends State<UpdateGate> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                '업데이트 중',
+                '업데이트 확인',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
@@ -163,10 +214,34 @@ class _UpdateGateState extends State<UpdateGate> {
                 ),
               ),
               const SizedBox(height: 18),
-              const LinearProgressIndicator(
-                color: Color(0xFFC94C6E),
-                backgroundColor: Color(0xFFF3F4F6),
-              ),
+              if (_failed)
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        _checked = false;
+                        _failed = false;
+                        _updateStatus = '업데이트 버전을 확인하고 있습니다.';
+                      });
+                      _checkUpdate();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFC94C6E),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text('다시 시도'),
+                  ),
+                )
+              else
+                const LinearProgressIndicator(
+                  color: Color(0xFFC94C6E),
+                  backgroundColor: Color(0xFFF3F4F6),
+                ),
             ],
           ),
         ),

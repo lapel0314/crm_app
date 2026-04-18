@@ -3,7 +3,11 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-const String appVersion = '1.0.2';
+const String appVersion = '1.0.3';
+const String installerPassword = String.fromEnvironment(
+  'INSTALLER_PASSWORD',
+  defaultValue: '123456',
+);
 
 class AppUpdateInfo {
   final String version;
@@ -44,17 +48,15 @@ class UpdateService {
       if (version.isEmpty || installerUrl.isEmpty) return null;
 
       if (_compareVersions(version, appVersion) <= 0) return null;
-      if (data['auto_install'] != true) return null;
-
       return AppUpdateInfo(
         version: version,
         installerUrl: installerUrl,
         notes: data['notes']?.toString().trim() ?? '',
-        autoInstall: true,
+        autoInstall: data['auto_install'] == true,
       );
     } catch (e) {
       debugPrint('update check failed: $e');
-      return null;
+      rethrow;
     }
   }
 
@@ -93,7 +95,13 @@ class UpdateService {
   Future<void> runInstaller(File installer) async {
     await Process.start(
       installer.path,
-      const ['/SP-', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'],
+      const [
+        '/SP-',
+        '/VERYSILENT',
+        '/SUPPRESSMSGBOXES',
+        '/NORESTART',
+        '/PASSWORD=$installerPassword',
+      ],
       mode: ProcessStartMode.detached,
     );
   }

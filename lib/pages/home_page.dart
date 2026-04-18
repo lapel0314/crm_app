@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:crm_app/services/rate_card_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
 
 final supabase = Supabase.instance.client;
@@ -48,6 +51,9 @@ class _HomePageState extends State<HomePage> {
   DateTime? joinDate;
   bool showMore = false;
   String defaultManagerName = '';
+  String rateCardMessage = '';
+  Timer? rateCardDebounce;
+  bool isApplyingRateCard = false;
 
   String? joinType;
   String? previousCarrier;
@@ -56,10 +62,12 @@ class _HomePageState extends State<HomePage> {
   String? tradeIn;
 
   final NumberFormat moneyFormat = NumberFormat('#,###');
+  late final RateCardService rateCardService;
 
   @override
   void initState() {
     super.initState();
+    rateCardService = RateCardService(supabase);
     _setTodayJoinDate();
     _loadDefaultManagerName();
   }
@@ -95,6 +103,7 @@ class _HomePageState extends State<HomePage> {
     ]) {
       c.dispose();
     }
+    rateCardDebounce?.cancel();
     super.dispose();
   }
 
@@ -167,6 +176,58 @@ class _HomePageState extends State<HomePage> {
       selection: TextSelection.collapsed(offset: formatted.length),
     );
     setState(() {});
+  }
+
+  void scheduleRateCardLookup() {
+    if (isApplyingRateCard) return;
+    rateCardDebounce?.cancel();
+    rateCardDebounce = Timer(
+      const Duration(milliseconds: 350),
+      applyRateCardIfMatched,
+    );
+  }
+
+  Future<void> applyRateCardIfMatched() async {
+    final modelName = modelController.text.trim();
+    final planName = planController.text.trim();
+    if (modelName.isEmpty || planName.isEmpty) {
+      if (mounted && rateCardMessage.isNotEmpty) {
+        setState(() => rateCardMessage = '');
+      }
+      return;
+    }
+
+    try {
+      final rule = await rateCardService.findBestMatch(
+        carrier: carrierController.text.trim(),
+        modelName: modelName,
+        planName: planName,
+        addServiceName: addServiceController.text.trim(),
+        joinType: joinType,
+        contractType: contractType,
+      );
+      if (!mounted) return;
+
+      if (rule == null) {
+        setState(() {
+          rateCardMessage = '단가표에서 일치하는 항목을 찾지 못했습니다.';
+        });
+        return;
+      }
+
+      isApplyingRateCard = true;
+      rebateController.text = moneyFormat.format(rule.baseRebate);
+      addRebateController.text = moneyFormat.format(rule.addRebate);
+      deductionController.text = moneyFormat.format(rule.deduction);
+      isApplyingRateCard = false;
+
+      setState(() {
+        rateCardMessage =
+            '단가표 적용: ${rule.carrier} / ${rule.modelName} / ${rule.planName}';
+      });
+    } catch (e) {
+      debugPrint('rate card lookup failed: $e');
+    }
   }
 
   int calcTotalRebate() {
@@ -662,6 +723,7 @@ class _HomePageState extends State<HomePage> {
                               setState(() {
                                 joinType = value;
                               });
+                              scheduleRateCardLookup();
                             },
                           ),
                         ),
@@ -670,7 +732,10 @@ class _HomePageState extends State<HomePage> {
                       Expanded(
                         child: pair(
                           label: '통신사/거래처',
-                          field: inputBox(carrierController),
+                          field: inputBox(
+                            carrierController,
+                            onChanged: (_) => scheduleRateCardLookup(),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -693,7 +758,10 @@ class _HomePageState extends State<HomePage> {
                       Expanded(
                         child: pair(
                           label: '모델명',
-                          field: inputBox(modelController),
+                          field: inputBox(
+                            modelController,
+                            onChanged: (_) => scheduleRateCardLookup(),
+                          ),
                         ),
                       ),
                     ],
@@ -704,14 +772,20 @@ class _HomePageState extends State<HomePage> {
                       Expanded(
                         child: pair(
                           label: '요금제',
-                          field: inputBox(planController),
+                          field: inputBox(
+                            planController,
+                            onChanged: (_) => scheduleRateCardLookup(),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: pair(
                           label: '부가서비스',
-                          field: inputBox(addServiceController),
+                          field: inputBox(
+                            addServiceController,
+                            onChanged: (_) => scheduleRateCardLookup(),
+                          ),
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -726,6 +800,7 @@ class _HomePageState extends State<HomePage> {
                               setState(() {
                                 contractType = value;
                               });
+                              scheduleRateCardLookup();
                             },
                           ),
                         ),
@@ -749,6 +824,20 @@ class _HomePageState extends State<HomePage> {
                     ],
                   ),
                   const SizedBox(height: 12),
+                  if (rateCardMessage.isNotEmpty) ...[
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        rateCardMessage,
+                        style: const TextStyle(
+                          color: Color(0xFFC94C6E),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   Row(
                     children: [
                       Expanded(

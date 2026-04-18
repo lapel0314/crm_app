@@ -29,10 +29,16 @@ drop policy if exists kakao_send_logs_insert on public.kakao_send_logs;
 create policy kakao_send_logs_insert on public.kakao_send_logs
 for insert
 to authenticated
-with check (sent_by = auth.uid());
+with check (
+  sent_by = auth.uid()
+  and public.current_profile_has_role(array['대표', '개발자', '점장'])
+);
 
 drop policy if exists kakao_send_logs_select_own on public.kakao_send_logs;
 create policy kakao_send_logs_select_own on public.kakao_send_logs
 for select
 to authenticated
-using (sent_by = auth.uid());
+using (
+  public.current_profile_is_privileged()
+  or sent_by = auth.uid()
+);
