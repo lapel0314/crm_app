@@ -422,75 +422,91 @@ class _AdminPageState extends State<AdminPage> {
       return const Scaffold(body: Center(child: Text('접근 권한 없음')));
     }
 
+    final mobile = MediaQuery.of(context).size.width < 900;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F8),
       body: Padding(
-        padding: const EdgeInsets.all(28),
+        padding: EdgeInsets.all(mobile ? 14 : 28),
         child: Column(
           children: [
-            Row(
-              children: [
-                SizedBox(
-                  width: 360,
-                  height: 38,
-                  child: TextField(
-                    controller: searchController,
-                    style: const TextStyle(fontSize: 13),
-                    decoration: InputDecoration(
-                      hintText: '이름, 이메일, 전화, 직급, 매장 검색',
-                      prefixIcon: const Icon(
-                        Icons.search,
-                        size: 17,
-                        color: Color(0xFF9CA3AF),
-                      ),
-                      filled: true,
-                      fillColor: Colors.white,
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFFE8E9EF)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFFE8E9EF)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(color: Color(0xFF6B7280)),
-                      ),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: mobile ? 900 : constraints.maxWidth,
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 360,
+                          height: 38,
+                          child: TextField(
+                            controller: searchController,
+                            style: const TextStyle(fontSize: 13),
+                            decoration: InputDecoration(
+                              hintText: '이름, 이메일, 전화, 직급, 매장 검색',
+                              prefixIcon: const Icon(
+                                Icons.search,
+                                size: 17,
+                                color: Color(0xFF9CA3AF),
+                              ),
+                              filled: true,
+                              fillColor: Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide:
+                                    const BorderSide(color: Color(0xFFE8E9EF)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide:
+                                    const BorderSide(color: Color(0xFFE8E9EF)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide:
+                                    const BorderSide(color: Color(0xFF6B7280)),
+                              ),
+                            ),
+                            onChanged: (value) => fetchUsers(keyword: value),
+                          ),
+                        ),
+                        const Spacer(),
+                        const SizedBox(width: 12),
+                        _headerActionButton(
+                          icon: Icons.campaign_outlined,
+                          label: '공지사항 작성',
+                          onTap: showNoticeDialog,
+                        ),
+                        const SizedBox(width: 12),
+                        _headerActionButton(
+                          icon: Icons.receipt_long_outlined,
+                          label: '감사로그',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => AuditLogPage(role: widget.role),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(width: 12),
+                        _headerActionButton(
+                          icon: Icons.refresh,
+                          label: '새로고침',
+                          onTap: () =>
+                              fetchUsers(keyword: searchController.text),
+                        ),
+                      ],
                     ),
-                    onChanged: (value) => fetchUsers(keyword: value),
                   ),
-                ),
-                const Spacer(),
-                const SizedBox(width: 12),
-                _headerActionButton(
-                  icon: Icons.campaign_outlined,
-                  label: '공지사항 작성',
-                  onTap: showNoticeDialog,
-                ),
-                const SizedBox(width: 12),
-                _headerActionButton(
-                  icon: Icons.receipt_long_outlined,
-                  label: '감사로그',
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => AuditLogPage(role: widget.role),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(width: 12),
-                _headerActionButton(
-                  icon: Icons.refresh,
-                  label: '새로고침',
-                  onTap: () => fetchUsers(keyword: searchController.text),
-                ),
-              ],
+                );
+              },
             ),
             const SizedBox(height: 18),
             Expanded(

@@ -615,7 +615,7 @@ class _InventoryPageState extends State<InventoryPage> {
       value?.toString().isNotEmpty == true ? value.toString() : '-';
 
   Widget _inventoryTable() {
-    const baseWidths = <double>[140, 180, 190, 110, 260, 120];
+    const baseWidths = <double>[140, 180, 190, 110, 260, 150];
     const headers = ['매장', '모델명', '일련번호', '상태', '메모', '작업'];
 
     return LayoutBuilder(
@@ -784,7 +784,7 @@ class _InventoryPageState extends State<InventoryPage> {
       icon: icon,
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
-      constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+      constraints: const BoxConstraints.tightFor(width: 30, height: 30),
     );
   }
 

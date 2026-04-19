@@ -633,8 +633,34 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  Widget formRow(
+    List<Widget> children, {
+    required bool mobile,
+  }) {
+    if (mobile) {
+      return Column(
+        children: [
+          for (var i = 0; i < children.length; i++) ...[
+            children[i],
+            if (i < children.length - 1) const SizedBox(height: 12),
+          ],
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          Expanded(child: children[i]),
+          if (i < children.length - 1) const SizedBox(width: 12),
+        ],
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final mobile = MediaQuery.of(context).size.width < 900;
     final currentJoinDate = _formJoinDate();
     final m3 = currentJoinDate == null
         ? '-'
@@ -650,7 +676,7 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F8),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(28),
+        padding: EdgeInsets.all(mobile ? 14 : 28),
         child: Column(
           children: [
             sectionCard(
@@ -658,171 +684,132 @@ class _HomePageState extends State<HomePage> {
               subtitle: '가입일, 고객명, 휴대폰번호만 필수입니다.',
               child: Column(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: pair(
-                          label: '가입일',
-                          field: inputBox(
-                            joinDateController,
-                            keyboardType: TextInputType.datetime,
-                            onChanged: (value) {
-                              setState(() {
-                                joinDate = DateTime.tryParse(value);
-                              });
-                            },
-                          ),
-                        ),
+                  formRow([
+                    pair(
+                      label: '가입일',
+                      field: inputBox(
+                        joinDateController,
+                        keyboardType: TextInputType.datetime,
+                        onChanged: (value) {
+                          setState(() {
+                            joinDate = DateTime.tryParse(value);
+                          });
+                        },
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: pair(
-                          label: '담당자',
-                          field: inputBox(managerController),
-                        ),
+                    ),
+                    pair(
+                      label: '담당자',
+                      field: inputBox(managerController),
+                    ),
+                    pair(
+                      label: '고객명',
+                      field: inputBox(nameController),
+                    ),
+                    pair(
+                      label: '휴대폰번호',
+                      field: inputBox(
+                        phoneController,
+                        keyboardType: TextInputType.phone,
+                        onChanged: (value) {
+                          final formatted = formatPhone(value);
+                          phoneController.value = TextEditingValue(
+                            text: formatted,
+                            selection: TextSelection.collapsed(
+                              offset: formatted.length,
+                            ),
+                          );
+                        },
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: pair(
-                          label: '고객명',
-                          field: inputBox(nameController),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: pair(
-                          label: '휴대폰번호',
-                          field: inputBox(
-                            phoneController,
-                            keyboardType: TextInputType.phone,
-                            onChanged: (value) {
-                              final formatted = formatPhone(value);
-                              phoneController.value = TextEditingValue(
-                                text: formatted,
-                                selection: TextSelection.collapsed(
-                                  offset: formatted.length,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ], mobile: mobile),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: pair(
-                          label: '가입유형',
-                          field: dropdownBox<String>(
-                            value: joinType,
-                            hint: '선택',
-                            items: const ['신규', '번호이동', '기변'],
-                            onChanged: (value) {
-                              setState(() {
-                                joinType = value;
-                              });
-                              scheduleRateCardLookup();
-                            },
-                          ),
-                        ),
+                  formRow([
+                    pair(
+                      label: '가입유형',
+                      field: dropdownBox<String>(
+                        value: joinType,
+                        hint: '선택',
+                        items: const ['신규', '번호이동', '기변'],
+                        onChanged: (value) {
+                          setState(() {
+                            joinType = value;
+                          });
+                          scheduleRateCardLookup();
+                        },
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: pair(
-                          label: '통신사/거래처',
-                          field: inputBox(
-                            carrierController,
-                            onChanged: (_) => scheduleRateCardLookup(),
-                          ),
-                        ),
+                    ),
+                    pair(
+                      label: '통신사/거래처',
+                      field: inputBox(
+                        carrierController,
+                        onChanged: (_) => scheduleRateCardLookup(),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: pair(
-                          label: '기존통신사',
-                          field: dropdownBox<String>(
-                            value: previousCarrier,
-                            hint: '선택',
-                            items: const ['SK', 'KT', 'LG'],
-                            onChanged: (value) {
-                              setState(() {
-                                previousCarrier = value;
-                              });
-                            },
-                          ),
-                        ),
+                    ),
+                    pair(
+                      label: '기존통신사',
+                      field: dropdownBox<String>(
+                        value: previousCarrier,
+                        hint: '선택',
+                        items: const ['SK', 'KT', 'LG'],
+                        onChanged: (value) {
+                          setState(() {
+                            previousCarrier = value;
+                          });
+                        },
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: pair(
-                          label: '모델명',
-                          field: inputBox(
-                            modelController,
-                            onChanged: (_) => scheduleRateCardLookup(),
-                          ),
-                        ),
+                    ),
+                    pair(
+                      label: '모델명',
+                      field: inputBox(
+                        modelController,
+                        onChanged: (_) => scheduleRateCardLookup(),
                       ),
-                    ],
-                  ),
+                    ),
+                  ], mobile: mobile),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: pair(
-                          label: '요금제',
-                          field: inputBox(
-                            planController,
-                            onChanged: (_) => scheduleRateCardLookup(),
-                          ),
-                        ),
+                  formRow([
+                    pair(
+                      label: '요금제',
+                      field: inputBox(
+                        planController,
+                        onChanged: (_) => scheduleRateCardLookup(),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: pair(
-                          label: '부가서비스',
-                          field: inputBox(
-                            addServiceController,
-                            onChanged: (_) => scheduleRateCardLookup(),
-                          ),
-                        ),
+                    ),
+                    pair(
+                      label: '부가서비스',
+                      field: inputBox(
+                        addServiceController,
+                        onChanged: (_) => scheduleRateCardLookup(),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: pair(
-                          label: '공시/선약',
-                          field: dropdownBox<String>(
-                            value: contractType,
-                            hint: '선택',
-                            items: const ['공시', '선약'],
-                            onChanged: (value) {
-                              setState(() {
-                                contractType = value;
-                              });
-                              scheduleRateCardLookup();
-                            },
-                          ),
-                        ),
+                    ),
+                    pair(
+                      label: '공시/선약',
+                      field: dropdownBox<String>(
+                        value: contractType,
+                        hint: '선택',
+                        items: const ['공시', '선약'],
+                        onChanged: (value) {
+                          setState(() {
+                            contractType = value;
+                          });
+                          scheduleRateCardLookup();
+                        },
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: pair(
-                          label: '할부개월',
-                          field: dropdownBox<int>(
-                            value: installment,
-                            hint: '선택',
-                            items: const [0, 12, 24, 36, 48],
-                            onChanged: (value) {
-                              setState(() {
-                                installment = value;
-                              });
-                            },
-                          ),
-                        ),
+                    ),
+                    pair(
+                      label: '할부개월',
+                      field: dropdownBox<int>(
+                        value: installment,
+                        hint: '선택',
+                        items: const [0, 12, 24, 36, 48],
+                        onChanged: (value) {
+                          setState(() {
+                            installment = value;
+                          });
+                        },
                       ),
-                    ],
-                  ),
+                    ),
+                  ], mobile: mobile),
                   const SizedBox(height: 12),
                   if (rateCardMessage.isNotEmpty) ...[
                     Align(
@@ -838,129 +825,93 @@ class _HomePageState extends State<HomePage> {
                     ),
                     const SizedBox(height: 12),
                   ],
-                  Row(
-                    children: [
-                      Expanded(
-                        child: pair(
-                          label: '리베이트',
-                          field: inputBox(
-                            rebateController,
-                            keyboardType: TextInputType.number,
-                            onChanged: (value) =>
-                                applyMoneyFormat(rebateController, value),
-                          ),
-                        ),
+                  formRow([
+                    pair(
+                      label: '리베이트',
+                      field: inputBox(
+                        rebateController,
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) =>
+                            applyMoneyFormat(rebateController, value),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: pair(
-                          label: '부가리베이트',
-                          field: inputBox(
-                            addRebateController,
-                            keyboardType: TextInputType.number,
-                            onChanged: (value) =>
-                                applyMoneyFormat(addRebateController, value),
-                          ),
-                        ),
+                    ),
+                    pair(
+                      label: '부가리베이트',
+                      field: inputBox(
+                        addRebateController,
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) =>
+                            applyMoneyFormat(addRebateController, value),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: pair(
-                          label: '히든리베이트',
-                          field: inputBox(
-                            hiddenRebateController,
-                            keyboardType: TextInputType.number,
-                            onChanged: (value) =>
-                                applyMoneyFormat(hiddenRebateController, value),
-                          ),
-                        ),
+                    ),
+                    pair(
+                      label: '히든리베이트',
+                      field: inputBox(
+                        hiddenRebateController,
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) =>
+                            applyMoneyFormat(hiddenRebateController, value),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: pair(
-                          label: '차감항목',
-                          field: inputBox(
-                            deductionController,
-                            keyboardType: TextInputType.number,
-                            onChanged: (value) =>
-                                applyMoneyFormat(deductionController, value),
-                          ),
-                        ),
+                    ),
+                    pair(
+                      label: '차감항목',
+                      field: inputBox(
+                        deductionController,
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) =>
+                            applyMoneyFormat(deductionController, value),
                       ),
-                    ],
-                  ),
+                    ),
+                  ], mobile: mobile),
                   const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: pair(
-                          label: '유통망지원금',
-                          field: inputBox(
-                            supportMoneyController,
-                            keyboardType: TextInputType.number,
-                            onChanged: (value) =>
-                                applyMoneyFormat(supportMoneyController, value),
-                          ),
-                        ),
+                  formRow([
+                    pair(
+                      label: '유통망지원금',
+                      field: inputBox(
+                        supportMoneyController,
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) =>
+                            applyMoneyFormat(supportMoneyController, value),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: pair(
-                          label: '결제',
-                          field: inputBox(
-                            paymentController,
-                            keyboardType: TextInputType.number,
-                            onChanged: (value) =>
-                                applyMoneyFormat(paymentController, value),
-                          ),
-                        ),
+                    ),
+                    pair(
+                      label: '결제',
+                      field: inputBox(
+                        paymentController,
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) =>
+                            applyMoneyFormat(paymentController, value),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: pair(
-                          label: '입금',
-                          field: inputBox(
-                            depositController,
-                            keyboardType: TextInputType.number,
-                            onChanged: (value) =>
-                                applyMoneyFormat(depositController, value),
-                          ),
-                        ),
+                    ),
+                    pair(
+                      label: '입금',
+                      field: inputBox(
+                        depositController,
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) =>
+                            applyMoneyFormat(depositController, value),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: pair(
-                          label: '중고폰반납',
-                          field: dropdownBox<String>(
-                            value: tradeIn,
-                            hint: '선택',
-                            items: const ['O', 'X'],
-                            onChanged: (value) {
-                              setState(() {
-                                tradeIn = value;
-                              });
-                            },
-                          ),
-                        ),
+                    ),
+                    pair(
+                      label: '중고폰반납',
+                      field: dropdownBox<String>(
+                        value: tradeIn,
+                        hint: '선택',
+                        items: const ['O', 'X'],
+                        onChanged: (value) {
+                          setState(() {
+                            tradeIn = value;
+                          });
+                        },
                       ),
-                    ],
-                  ),
+                    ),
+                  ], mobile: mobile),
                   const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: summaryBox('총리베이트', moneyText(totalRebate)),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: summaryBox('세금', moneyText(tax)),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: summaryBox('마진', moneyText(margin)),
-                      ),
-                    ],
-                  ),
+                  formRow([
+                    summaryBox('총리베이트', moneyText(totalRebate)),
+                    summaryBox('세금', moneyText(tax)),
+                    summaryBox('마진', moneyText(margin)),
+                  ], mobile: mobile),
                   const SizedBox(height: 18),
                   Align(
                     alignment: Alignment.centerLeft,
@@ -987,137 +938,96 @@ class _HomePageState extends State<HomePage> {
                   ),
                   if (showMore) ...[
                     const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: pair(
-                            label: '히든내용',
-                            field: inputBox(hiddenNoteController),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: pair(
-                            label: '차감내용',
-                            field: inputBox(deductionNoteController),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: pair(
-                            label: '결제내용',
-                            field: inputBox(paymentNoteController),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: pair(
-                            label: '은행/계좌/예금주',
-                            field: inputBox(bankController),
-                          ),
-                        ),
-                      ],
-                    ),
+                    formRow([
+                      pair(
+                        label: '히든내용',
+                        field: inputBox(hiddenNoteController),
+                      ),
+                      pair(
+                        label: '차감내용',
+                        field: inputBox(deductionNoteController),
+                      ),
+                      pair(
+                        label: '결제내용',
+                        field: inputBox(paymentNoteController),
+                      ),
+                      pair(
+                        label: '은행/계좌/예금주',
+                        field: inputBox(bankController),
+                      ),
+                    ], mobile: mobile),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: pair(
-                            label: '매입금액',
-                            field: inputBox(
-                              tradePriceController,
-                              keyboardType: TextInputType.number,
-                              onChanged: (value) =>
-                                  applyMoneyFormat(tradePriceController, value),
-                            ),
-                          ),
+                    formRow([
+                      pair(
+                        label: '매입금액',
+                        field: inputBox(
+                          tradePriceController,
+                          keyboardType: TextInputType.number,
+                          onChanged: (value) =>
+                              applyMoneyFormat(tradePriceController, value),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: pair(
-                            label: '세금(자동)',
-                            field: Container(
-                              height: 52,
-                              alignment: Alignment.centerLeft,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 14),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(8),
-                                border:
-                                    Border.all(color: const Color(0xFFE7E9EE)),
-                              ),
-                              child: Text(moneyText(tax)),
-                            ),
+                      ),
+                      pair(
+                        label: '세금(자동)',
+                        field: Container(
+                          height: 52,
+                          alignment: Alignment.centerLeft,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFE7E9EE)),
                           ),
+                          child: Text(moneyText(tax)),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: pair(
-                            label: '마진(자동)',
-                            field: Container(
-                              height: 52,
-                              alignment: Alignment.centerLeft,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 14),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(8),
-                                border:
-                                    Border.all(color: const Color(0xFFE7E9EE)),
-                              ),
-                              child: Text(moneyText(margin)),
-                            ),
+                      ),
+                      pair(
+                        label: '마진(자동)',
+                        field: Container(
+                          height: 52,
+                          alignment: Alignment.centerLeft,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFE7E9EE)),
                           ),
+                          child: Text(moneyText(margin)),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: pair(
-                            label: '반납모델',
-                            field: inputBox(tradeModelController),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                      pair(
+                        label: '반납모델',
+                        field: inputBox(tradeModelController),
+                      ),
+                    ], mobile: mobile),
                     const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: pair(
-                            label: '개통매장',
-                            field: inputBox(storeController),
+                    formRow([
+                      pair(
+                        label: '개통매장',
+                        field: inputBox(storeController),
+                      ),
+                      pair(
+                        label: '모바일',
+                        field: inputBox(mobileController),
+                      ),
+                      pair(
+                        label: '2nd',
+                        field: inputBox(secondController),
+                      ),
+                      pair(
+                        label: '회차',
+                        field: Container(
+                          height: 52,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFE7E9EE)),
                           ),
+                          child: Text('M+3: $m3 / M+6: $m6'),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: pair(
-                            label: '모바일',
-                            field: inputBox(mobileController),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: pair(
-                            label: '2nd',
-                            field: inputBox(secondController),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Container(
-                            height: 52,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
-                              borderRadius: BorderRadius.circular(8),
-                              border:
-                                  Border.all(color: const Color(0xFFE7E9EE)),
-                            ),
-                            child: Text('M+3: $m3 / M+6: $m6'),
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ], mobile: mobile),
                   ],
                   const SizedBox(height: 12),
                   pair(
@@ -1132,7 +1042,7 @@ class _HomePageState extends State<HomePage> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: SizedBox(
-                      width: 168,
+                      width: mobile ? double.infinity : 168,
                       height: 44,
                       child: ElevatedButton(
                         onPressed: save,

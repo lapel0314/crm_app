@@ -118,7 +118,7 @@ class _AppLayoutState extends State<AppLayout> {
           icon: Icons.admin_panel_settings_rounded,
           page: AdminPage(role: widget.role),
         ),
-      if (isAdminRole)
+      if (canUseSettings(widget.role))
         _NavItem(
           title: '설정',
           icon: Icons.settings_rounded,

@@ -241,12 +241,13 @@ class _DashboardPageState extends State<DashboardPage> {
     required Color color,
     VoidCallback? onTap,
   }) {
+    final mobile = MediaQuery.of(context).size.width < 900;
     return Expanded(
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(
-          height: 146,
+          height: mobile ? 156 : 146,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -297,10 +298,11 @@ class _DashboardPageState extends State<DashboardPage> {
               const SizedBox(height: 10),
               Text(
                 caption,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: color,
-                  fontSize: 12,
+                  fontSize: mobile ? 11 : 12,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -651,14 +653,15 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _salesPopupRow(Map<String, dynamic> customer) {
+    final mobile = MediaQuery.of(context).size.width < 900;
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      padding: EdgeInsets.symmetric(vertical: mobile ? 10 : 12),
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: Color(0xFFF3F4F6))),
       ),
       child: Wrap(
-        spacing: 16,
-        runSpacing: 8,
+        spacing: mobile ? 10 : 16,
+        runSpacing: mobile ? 10 : 8,
         children: [
           _popupField('가입일', _shortDate(customer['join_date'])),
           _popupField('고객명', customer['name'], strong: true),
@@ -674,8 +677,9 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _popupField(String label, dynamic value, {bool strong = false}) {
+    final mobile = MediaQuery.of(context).size.width < 900;
     return SizedBox(
-      width: 150,
+      width: mobile ? 122 : 150,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -693,8 +697,44 @@ class _DashboardPageState extends State<DashboardPage> {
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: strong ? const Color(0xFF10B981) : const Color(0xFF111827),
-              fontSize: 13,
+              fontSize: mobile ? 12 : 13,
               fontWeight: strong ? FontWeight.w900 : FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _mobileDialogSummary(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE8E9EF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFF9CA3AF),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF111827),
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
             ),
           ),
         ],
@@ -718,6 +758,72 @@ class _DashboardPageState extends State<DashboardPage> {
       0,
       (sum, customer) => sum + _customerMargin(customer),
     );
+
+    final mobile = MediaQuery.of(context).size.width < 900;
+    if (mobile) {
+      showDialog(
+        context: context,
+        builder: (_) => AlertDialog(
+          insetPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 18,
+          ),
+          backgroundColor: Colors.white,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          titlePadding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+          contentPadding: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+          actionsPadding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          title: Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF111827),
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 560,
+            child: Column(
+              children: [
+                GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 1.7,
+                  children: [
+                    _mobileDialogSummary('개통건', '${rows.length}건'),
+                    _mobileDialogSummary('리베이트', _money(rebate)),
+                    _mobileDialogSummary('세금', _money(tax)),
+                    _mobileDialogSummary('마진', _money(margin)),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Expanded(
+                  child: rows.isEmpty
+                      ? const Center(child: Text('해당 기간 개통건이 없습니다'))
+                      : SingleChildScrollView(
+                          child: Column(
+                            children: rows.map(_salesPopupRow).toList(),
+                          ),
+                        ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('닫기'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
 
     showDialog(
       context: context,
@@ -811,6 +917,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final todayCount = todaySales.length;
     final monthCount = monthSales.length;
     final modelRankCount = _monthlyModelRanking().length;
+    final mobile = MediaQuery.of(context).size.width < 900;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F8),
@@ -820,83 +927,108 @@ class _DashboardPageState extends State<DashboardPage> {
               onRefresh: loadDashboard,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(28),
+                padding: EdgeInsets.all(mobile ? 14 : 28),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        _metricCard(
-                          title: '오늘 개통',
-                          value: '$todayCount건',
-                          caption: '클릭해서 오늘 판매건 확인',
-                          icon: Icons.phone_iphone_rounded,
-                          color: const Color(0xFF3B82F6),
-                          onTap: () => _showSalesDialog(
-                            title: '오늘 개통 판매건',
-                            rows: todaySales,
-                          ),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SizedBox(
+                        width: mobile
+                            ? 980
+                            : MediaQuery.of(context).size.width - 96,
+                        child: Row(
+                          children: [
+                            _metricCard(
+                              title: '오늘 개통',
+                              value: '$todayCount건',
+                              caption: '클릭해서 오늘 판매건 확인',
+                              icon: Icons.phone_iphone_rounded,
+                              color: const Color(0xFF3B82F6),
+                              onTap: () => _showSalesDialog(
+                                title: '오늘 개통 판매건',
+                                rows: todaySales,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            _metricCard(
+                              title: '이번달 개통',
+                              value: '$monthCount건',
+                              caption: '클릭해서 이번달 판매건 확인',
+                              icon: Icons.trending_up_rounded,
+                              color: const Color(0xFF10B981),
+                              onTap: () => _showSalesDialog(
+                                title: '이번달 개통 판매건',
+                                rows: monthSales,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            _metricCard(
+                              title: '판매 모델',
+                              value: '$modelRankCount종',
+                              caption: '이번달 판매 모델 수',
+                              icon: Icons.leaderboard_rounded,
+                              color: const Color(0xFFF59E0B),
+                            ),
+                            const SizedBox(width: 16),
+                            _metricCard(
+                              title: '이번달 마진',
+                              value: _money(monthMargin),
+                              caption: '고객 DB 기준',
+                              icon: Icons.payments_outlined,
+                              color: const Color(0xFFC94C6E),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 16),
-                        _metricCard(
-                          title: '이번달 개통',
-                          value: '$monthCount건',
-                          caption: '클릭해서 이번달 판매건 확인',
-                          icon: Icons.trending_up_rounded,
-                          color: const Color(0xFF10B981),
-                          onTap: () => _showSalesDialog(
-                            title: '이번달 개통 판매건',
-                            rows: monthSales,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        _metricCard(
-                          title: '판매 모델',
-                          value: '$modelRankCount종',
-                          caption: '이번달 판매 모델 수',
-                          icon: Icons.leaderboard_rounded,
-                          color: const Color(0xFFF59E0B),
-                        ),
-                        const SizedBox(width: 16),
-                        _metricCard(
-                          title: '이번달 마진',
-                          value: _money(monthMargin),
-                          caption: '고객 DB 기준',
-                          icon: Icons.payments_outlined,
-                          color: const Color(0xFFC94C6E),
-                        ),
-                      ],
+                      ),
                     ),
                     const SizedBox(height: 24),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          flex: 2,
-                          child: _panel(
-                            title: '월별 개통 추이',
-                            subtitle: '${DateTime.now().year}년 월별 고객 DB 개통 현황',
-                            child: _monthlyTrend(),
-                          ),
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SizedBox(
+                        width: mobile
+                            ? 980
+                            : MediaQuery.of(context).size.width - 96,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 2,
+                              child: _panel(
+                                title: '월별 개통 추이',
+                                subtitle:
+                                    '${DateTime.now().year}년 월별 고객 DB 개통 현황',
+                                child: _monthlyTrend(),
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: _panel(
+                                title: '통신사 비중',
+                                subtitle: '전체 개통 현황',
+                                child: _carrierShare(),
+                              ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _panel(
-                            title: '통신사 비중',
-                            subtitle: '전체 개통 현황',
-                            child: _carrierShare(),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                     const SizedBox(height: 24),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(child: _modelRankingPanel()),
-                        const SizedBox(width: 16),
-                        Expanded(child: _settlementPanel()),
-                      ],
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: SizedBox(
+                        width: mobile
+                            ? 980
+                            : MediaQuery.of(context).size.width - 96,
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: _modelRankingPanel()),
+                            const SizedBox(width: 16),
+                            Expanded(child: _settlementPanel()),
+                          ],
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 16),
                     Text(

@@ -23,3 +23,7 @@ android/app/release
 web_server.log
 web_server.err.log
 output/*.tmp
+output/*.exe
+output/*.apk
+
+supabase/.temp/

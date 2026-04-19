@@ -77,12 +77,10 @@ class _CompactDateRangePickerDialogState
     return !previous.isBefore(_monthOnly(widget.firstDate));
   }
 
-  bool _canMoveNext() {
-    final rightMonth = DateTime(visibleMonth.year, visibleMonth.month + 1);
-    final nextRightMonth = DateTime(rightMonth.year, rightMonth.month + 1);
-    return !nextRightMonth.isAfter(
-      DateTime(widget.lastDate.year, widget.lastDate.month + 1),
-    );
+  bool _canMoveNext(int monthCount) {
+    final nextVisible = DateTime(visibleMonth.year, visibleMonth.month + monthCount);
+    final lastAllowedMonth = DateTime(widget.lastDate.year, widget.lastDate.month);
+    return !nextVisible.isAfter(lastAllowedMonth);
   }
 
   void _moveMonth(int delta) {
@@ -127,20 +125,29 @@ class _CompactDateRangePickerDialogState
 
   @override
   Widget build(BuildContext context) {
-    final rightMonth = DateTime(visibleMonth.year, visibleMonth.month + 1);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final mobile = screenWidth < 560;
+    final monthCount = mobile ? 1 : 2;
+    final dialogWidth = mobile ? screenWidth - 16 : 680.0;
+    final visibleMonths = List.generate(
+      monthCount,
+      (index) => DateTime(visibleMonth.year, visibleMonth.month + index),
+    );
 
-    return AlertDialog(
+    return Dialog(
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: mobile ? 8 : 24,
+        vertical: mobile ? 16 : 24,
+      ),
       backgroundColor: Colors.white,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-      contentPadding: EdgeInsets.zero,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      content: SizedBox(
-        width: 640,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: dialogWidth),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Padding(
-              padding: const EdgeInsets.fromLTRB(18, 16, 18, 10),
+              padding: EdgeInsets.fromLTRB(mobile ? 14 : 18, 16, mobile ? 14 : 18, 10),
               child: Row(
                 children: [
                   Expanded(
@@ -149,9 +156,9 @@ class _CompactDateRangePickerDialogState
                       children: [
                         Text(
                           widget.title,
-                          style: const TextStyle(
-                            color: Color(0xFF111827),
-                            fontSize: 16,
+                          style: TextStyle(
+                            color: const Color(0xFF111827),
+                            fontSize: mobile ? 15 : 16,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
@@ -176,56 +183,101 @@ class _CompactDateRangePickerDialogState
                   _navButton(
                     tooltip: '다음 달',
                     icon: Icons.chevron_right_rounded,
-                    onPressed: _canMoveNext() ? () => _moveMonth(1) : null,
+                    onPressed: _canMoveNext(monthCount)
+                        ? () => _moveMonth(1)
+                        : null,
                   ),
                 ],
               ),
             ),
             const Divider(height: 1, color: Color(0xFFF3F4F6)),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: _month(visibleMonth)),
-                  const SizedBox(width: 14),
-                  Expanded(child: _month(rightMonth)),
-                ],
-              ),
+              padding: EdgeInsets.fromLTRB(mobile ? 10 : 16, 14, mobile ? 10 : 16, 12),
+              child: mobile
+                  ? _month(visibleMonths.first, compact: true)
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(child: _month(visibleMonths.first)),
+                        const SizedBox(width: 14),
+                        Expanded(child: _month(visibleMonths.last)),
+                      ],
+                    ),
             ),
             const Divider(height: 1, color: Color(0xFFF3F4F6)),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-              child: Row(
-                children: [
-                  const Text(
-                    '시작일과 종료일을 차례대로 선택하세요',
-                    style: TextStyle(
-                      color: Color(0xFF6B7280),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
+              padding: EdgeInsets.fromLTRB(mobile ? 12 : 16, 10, mobile ? 12 : 16, 14),
+              child: mobile
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        const Text(
+                          '시작일과 종료일을 차례대로 선택하세요.',
+                          style: TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                child: const Text('취소'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: ElevatedButton(
+                                onPressed: () =>
+                                    Navigator.of(context).pop(_selectedRange),
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: const Color(0xFFC94C6E),
+                                  foregroundColor: Colors.white,
+                                  elevation: 0,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                                child: const Text('선택'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    )
+                  : Row(
+                      children: [
+                        const Text(
+                          '시작일과 종료일을 차례대로 선택하세요.',
+                          style: TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('취소'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: () => Navigator.of(context).pop(_selectedRange),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFC94C6E),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text('선택'),
+                        ),
+                      ],
                     ),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('취소'),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: () => Navigator.of(context).pop(_selectedRange),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFC94C6E),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                    child: const Text('선택'),
-                  ),
-                ],
-              ),
             ),
           ],
         ),
@@ -239,8 +291,8 @@ class _CompactDateRangePickerDialogState
     required VoidCallback? onPressed,
   }) {
     return SizedBox(
-      width: 34,
-      height: 34,
+      width: 38,
+      height: 38,
       child: IconButton(
         tooltip: tooltip,
         onPressed: onPressed,
@@ -257,7 +309,7 @@ class _CompactDateRangePickerDialogState
     );
   }
 
-  Widget _month(DateTime month) {
+  Widget _month(DateTime month, {bool compact = false}) {
     final monthStart = DateTime(month.year, month.month);
     final firstGridDay =
         monthStart.subtract(Duration(days: monthStart.weekday % 7));
@@ -267,9 +319,9 @@ class _CompactDateRangePickerDialogState
       children: [
         Text(
           DateFormat('yyyy년 M월', 'ko_KR').format(month),
-          style: const TextStyle(
-            color: Color(0xFF111827),
-            fontSize: 14,
+          style: TextStyle(
+            color: const Color(0xFF111827),
+            fontSize: compact ? 15 : 14,
             fontWeight: FontWeight.w900,
           ),
         ),
@@ -294,6 +346,7 @@ class _CompactDateRangePickerDialogState
                   child: _dayCell(
                     firstGridDay.add(Duration(days: week * 7 + day)),
                     month,
+                    compact: compact,
                   ),
                 ),
             ],
@@ -302,7 +355,11 @@ class _CompactDateRangePickerDialogState
     );
   }
 
-  Widget _dayCell(DateTime date, DateTime visibleMonthForCell) {
+  Widget _dayCell(
+    DateTime date,
+    DateTime visibleMonthForCell, {
+    bool compact = false,
+  }) {
     final inCurrentMonth = _sameMonth(date, visibleMonthForCell);
     final disabled = _isDisabled(date);
     final selectedStart = startDate != null && _sameDate(date, startDate!);
@@ -323,7 +380,7 @@ class _CompactDateRangePickerDialogState
         borderRadius: BorderRadius.circular(8),
         onTap: disabled ? null : () => _selectDate(date),
         child: Container(
-          height: 32,
+          height: compact ? 34 : 32,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: selected
@@ -346,7 +403,7 @@ class _CompactDateRangePickerDialogState
                       : inCurrentMonth
                           ? baseColor
                           : const Color(0xFFD1D5DB),
-              fontSize: 12,
+              fontSize: compact ? 13 : 12,
               fontWeight: selected || today ? FontWeight.w900 : FontWeight.w700,
             ),
           ),

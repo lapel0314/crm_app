@@ -1,0 +1,2 @@
+[functions.auth-policy]
+verify_jwt = false

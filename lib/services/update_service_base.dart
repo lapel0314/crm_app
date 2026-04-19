@@ -1,6 +1,5 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-const String appVersion = '1.0.4';
 const String installerPassword = String.fromEnvironment(
   'INSTALLER_PASSWORD',
   defaultValue: '123456',

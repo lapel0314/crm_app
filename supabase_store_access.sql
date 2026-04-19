@@ -1,4 +1,4 @@
--- CRM role and store access policies.
+-- CRM role and store access policies
 -- Run this in the Supabase SQL Editor after backing up the project.
 
 create or replace function public.normalize_store_name(input text)
@@ -17,8 +17,8 @@ begin
   cleaned := regexp_replace(cleaned, '\s+', '', 'g');
   cleaned := replace(cleaned, '매장', '');
   cleaned := replace(cleaned, '지점', '');
-  cleaned := replace(cleaned, '점포', '');
-  cleaned := regexp_replace(cleaned, '점+$', '');
+  cleaned := replace(cleaned, '스토어', '');
+  cleaned := regexp_replace(cleaned, '점$', '');
 
   if cleaned = '' then
     return '';
@@ -82,16 +82,6 @@ as $$
   select public.current_profile_has_role(array['대표', '개발자'])
 $$;
 
-create or replace function public.current_profile_can_register_customer()
-returns boolean
-language sql
-stable
-security definer
-set search_path = public
-as $$
-  select public.current_profile_has_role(array['대표', '개발자', '점장', '사원', '조회용'])
-$$;
-
 create or replace function public.current_profile_is_manager()
 returns boolean
 language sql
@@ -102,7 +92,17 @@ as $$
   select public.current_profile_has_role(array['점장'])
 $$;
 
-create or replace function public.current_profile_can_view_rebate()
+create or replace function public.current_profile_is_staff()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.current_profile_has_role(array['사원'])
+$$;
+
+create or replace function public.current_profile_can_edit_store_records()
 returns boolean
 language sql
 stable
@@ -110,6 +110,26 @@ security definer
 set search_path = public
 as $$
   select public.current_profile_has_role(array['대표', '개발자', '점장', '사원'])
+$$;
+
+create or replace function public.current_profile_can_delete_store_records()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.current_profile_has_role(array['대표', '개발자', '점장'])
+$$;
+
+create or replace function public.current_profile_can_manage_inventory()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.current_profile_has_role(array['대표', '개발자', '점장'])
 $$;
 
 alter table public.profiles
@@ -154,7 +174,7 @@ to authenticated
 using (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_is_manager()
+    public.current_profile_can_edit_store_records()
     and normalized_store = public.current_profile_store()
   )
 );
@@ -166,7 +186,7 @@ to authenticated
 with check (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_can_register_customer()
+    public.current_profile_can_edit_store_records()
     and normalized_store = public.current_profile_store()
   )
 );
@@ -178,14 +198,14 @@ to authenticated
 using (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_is_manager()
+    public.current_profile_can_edit_store_records()
     and normalized_store = public.current_profile_store()
   )
 )
 with check (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_is_manager()
+    public.current_profile_can_edit_store_records()
     and normalized_store = public.current_profile_store()
   )
 );
@@ -197,7 +217,7 @@ to authenticated
 using (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_is_manager()
+    public.current_profile_can_delete_store_records()
     and normalized_store = public.current_profile_store()
   )
 );
@@ -209,7 +229,7 @@ to authenticated
 using (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_is_manager()
+    public.current_profile_can_edit_store_records()
     and normalized_store = public.current_profile_store()
   )
 );
@@ -221,7 +241,7 @@ to authenticated
 with check (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_is_manager()
+    public.current_profile_can_edit_store_records()
     and normalized_store = public.current_profile_store()
   )
 );
@@ -233,14 +253,14 @@ to authenticated
 using (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_is_manager()
+    public.current_profile_can_edit_store_records()
     and normalized_store = public.current_profile_store()
   )
 )
 with check (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_is_manager()
+    public.current_profile_can_edit_store_records()
     and normalized_store = public.current_profile_store()
   )
 );
@@ -252,7 +272,7 @@ to authenticated
 using (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_is_manager()
+    public.current_profile_can_delete_store_records()
     and normalized_store = public.current_profile_store()
   )
 );
@@ -264,7 +284,7 @@ to authenticated
 using (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_is_manager()
+    public.current_profile_can_edit_store_records()
     and normalized_store = public.current_profile_store()
   )
 );
@@ -276,7 +296,7 @@ to authenticated
 with check (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_is_manager()
+    public.current_profile_can_edit_store_records()
     and normalized_store = public.current_profile_store()
   )
 );
@@ -288,14 +308,14 @@ to authenticated
 using (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_is_manager()
+    public.current_profile_can_edit_store_records()
     and normalized_store = public.current_profile_store()
   )
 )
 with check (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_is_manager()
+    public.current_profile_can_edit_store_records()
     and normalized_store = public.current_profile_store()
   )
 );
@@ -307,7 +327,7 @@ to authenticated
 using (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_is_manager()
+    public.current_profile_can_delete_store_records()
     and normalized_store = public.current_profile_store()
   )
 );
@@ -319,7 +339,7 @@ to authenticated
 using (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_has_role(array['점장', '조회용'])
+    public.current_profile_can_manage_inventory()
     and normalized_store = public.current_profile_store()
   )
 );
@@ -331,7 +351,7 @@ to authenticated
 with check (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_is_manager()
+    public.current_profile_can_manage_inventory()
     and normalized_store = public.current_profile_store()
   )
 );
@@ -343,14 +363,14 @@ to authenticated
 using (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_is_manager()
+    public.current_profile_can_manage_inventory()
     and normalized_store = public.current_profile_store()
   )
 )
 with check (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_is_manager()
+    public.current_profile_can_manage_inventory()
     and normalized_store = public.current_profile_store()
   )
 );
@@ -362,7 +382,7 @@ to authenticated
 using (
   public.current_profile_is_privileged()
   or (
-    public.current_profile_is_manager()
+    public.current_profile_can_manage_inventory()
     and normalized_store = public.current_profile_store()
   )
 );
@@ -374,6 +394,11 @@ to authenticated
 using (
   id = auth.uid()
   or public.current_profile_is_privileged()
+  or (
+    public.current_profile_has_role(array['점장', '사원'])
+    and normalized_store = public.current_profile_store()
+    and approval_status = 'approved'
+  )
 );
 
 drop policy if exists profiles_privileged_update on public.profiles;
@@ -542,7 +567,7 @@ begin
       to authenticated
       with check (
         actor_id = auth.uid()
-        and public.current_profile_has_role(array[''대표'', ''개발자'', ''점장''])
+        and public.current_profile_has_role(array[''대표'', ''개발자'', ''점장'', ''사원''])
       )';
   end if;
 end;

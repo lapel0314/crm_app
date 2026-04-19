@@ -51,12 +51,17 @@ class UpdateService extends UpdateServiceBase {
       latestVersion: latestVersion,
       minRequiredVersion: minRequiredVersion,
       packageUrl: apkUrl,
-      message: message.isEmpty ? '새 Android 앱을 설치한 뒤 다시 실행해주세요.' : message,
+      message: message.isEmpty
+          ? '최신 Android 앱을 설치한 뒤 다시 실행해 주세요.'
+          : message,
       isRequired: true,
     );
   }
 
   Future<AppUpdateInfo?> _checkWindowsUpdate() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    final currentVersion = packageInfo.version;
+
     final data = await supabase
         .from('app_updates')
         .select('version, installer_url, notes, auto_install')
@@ -70,16 +75,20 @@ class UpdateService extends UpdateServiceBase {
 
     final version = data['version']?.toString().trim() ?? '';
     final installerUrl = data['installer_url']?.toString().trim() ?? '';
+    final notes = data['notes']?.toString().trim() ?? '';
     if (version.isEmpty || installerUrl.isEmpty) return null;
 
-    if (compareVersions(version, appVersion) <= 0) return null;
+    if (compareVersions(version, currentVersion) <= 0) return null;
+
     return AppUpdateInfo(
       platform: 'windows',
-      currentVersion: appVersion,
+      currentVersion: currentVersion,
       latestVersion: version,
       minRequiredVersion: version,
       packageUrl: installerUrl,
-      message: data['notes']?.toString().trim() ?? '',
+      message: notes.isEmpty
+          ? '최신 Windows 버전을 설치한 뒤 다시 실행해 주세요.'
+          : notes,
       isRequired: true,
     );
   }
@@ -124,7 +133,8 @@ class UpdateService extends UpdateServiceBase {
       final response = await request.close();
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw HttpException(
-            'installer download failed: ${response.statusCode}');
+          'installer download failed: ${response.statusCode}',
+        );
       }
 
       final sink = file.openWrite();

@@ -682,73 +682,94 @@ class _RebatePageState extends State<RebatePage> {
       );
     }
 
+    final mobile = MediaQuery.of(context).size.width < 900;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F8),
       body: Padding(
-        padding: const EdgeInsets.all(28),
+        padding: EdgeInsets.all(mobile ? 14 : 28),
         child: Column(
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        '리베이트',
-                        style: TextStyle(
-                          color: Color(0xFF111827),
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
+            LayoutBuilder(
+              builder: (context, constraints) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SizedBox(
+                    width: mobile ? 620 : constraints.maxWidth,
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                '리베이트',
+                                style: TextStyle(
+                                  color: Color(0xFF111827),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              _carrierTabs(),
+                            ],
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      _carrierTabs(),
-                    ],
-                  ),
-                ),
-                _headerActionButton(
-                  icon: Icons.calendar_month_outlined,
-                  label: '날짜 선택',
-                  onTap: _pickDate,
-                ),
-                if (canManage) ...[
-                  const SizedBox(width: 10),
-                  _headerActionButton(
-                    icon: currentImage == null
-                        ? Icons.upload_file_rounded
-                        : Icons.change_circle_outlined,
-                    label: currentImage == null ? '업로드' : '수정',
-                    onTap: isSaving ? null : _uploadImage,
-                  ),
-                  if (currentImage != null) ...[
-                    const SizedBox(width: 10),
-                    _headerActionButton(
-                      icon: Icons.delete_outline,
-                      label: '삭제',
-                      onTap: isSaving ? null : _confirmDelete,
-                      danger: true,
+                        _headerActionButton(
+                          icon: Icons.calendar_month_outlined,
+                          label: '날짜 선택',
+                          onTap: _pickDate,
+                        ),
+                        if (canManage) ...[
+                          const SizedBox(width: 10),
+                          _headerActionButton(
+                            icon: currentImage == null
+                                ? Icons.upload_file_rounded
+                                : Icons.change_circle_outlined,
+                            label: currentImage == null ? '업로드' : '수정',
+                            onTap: isSaving ? null : _uploadImage,
+                          ),
+                          if (currentImage != null) ...[
+                            const SizedBox(width: 10),
+                            _headerActionButton(
+                              icon: Icons.delete_outline,
+                              label: '삭제',
+                              onTap: isSaving ? null : _confirmDelete,
+                              danger: true,
+                            ),
+                          ],
+                        ],
+                        const SizedBox(width: 10),
+                        _headerActionButton(
+                          icon: Icons.refresh_rounded,
+                          label: '새로고침',
+                          onTap: isSaving ? null : _load,
+                        ),
+                      ],
                     ),
-                  ],
-                ],
-                const SizedBox(width: 10),
-                _headerActionButton(
-                  icon: Icons.refresh_rounded,
-                  label: '새로고침',
-                  onTap: isSaving ? null : _load,
-                ),
-              ],
+                  ),
+                );
+              },
             ),
             const SizedBox(height: 18),
             Expanded(
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _datePanel(),
-                  const SizedBox(width: 18),
-                  _mainPanel(),
-                ],
-              ),
+              child: mobile
+                  ? Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(height: 210, child: _datePanel()),
+                        const SizedBox(height: 14),
+                        Expanded(child: _mainPanel()),
+                      ],
+                    )
+                  : Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _datePanel(),
+                        const SizedBox(width: 18),
+                        _mainPanel(),
+                      ],
+                    ),
             ),
           ],
         ),

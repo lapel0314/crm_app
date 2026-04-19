@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:io' show Platform, exit;
-import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'package:crm_app/pages/login_page.dart';
+import 'package:crm_app/services/login_policy_service.dart';
 import 'package:crm_app/services/update_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:crm_app/widgets/app_layout.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,18 +22,9 @@ Future<void> main() async {
     return;
   }
 
-  await Supabase.initialize(
-    url: supabaseUrl,
-    anonKey: supabaseAnonKey,
-    authOptions: const FlutterAuthClientOptions(
-      localStorage: EmptyLocalStorage(),
-    ),
-  );
-
-  try {
+  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
+  if (!kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
     await Supabase.instance.client.auth.signOut();
-  } catch (e) {
-    debugPrint('startup signOut skipped: $e');
   }
 
   runApp(const MyApp());
@@ -41,6 +35,11 @@ final supabase = Supabase.instance.client;
 class ConfigErrorApp extends StatelessWidget {
   const ConfigErrorApp({super.key});
 
+  static const _configErrorMessage =
+      'Supabase \uC124\uC815\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. '
+      'SUPABASE_URL / SUPABASE_ANON_KEY\uB97C dart-define\uC73C\uB85C '
+      '\uC804\uB2EC\uD574 \uC8FC\uC138\uC694.';
+
   @override
   Widget build(BuildContext context) {
     return const MaterialApp(
@@ -50,7 +49,7 @@ class ConfigErrorApp extends StatelessWidget {
           child: Padding(
             padding: EdgeInsets.all(24),
             child: Text(
-              'Supabase ?ㅼ젙???놁뒿?덈떎. SUPABASE_URL / SUPABASE_ANON_KEY瑜?dart-define?쇰줈 ?꾨떖?댁＜?몄슂.',
+              _configErrorMessage,
               textAlign: TextAlign.center,
             ),
           ),
@@ -66,7 +65,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '?묓겕??CRM',
+      title: '\uD551\uD06C\uD3F0 CRM',
       debugShowCheckedModeBanner: false,
       locale: const Locale('ko', 'KR'),
       localizationsDelegates: const [
@@ -107,7 +106,8 @@ class _UpdateGateState extends State<UpdateGate> {
   bool _failed = false;
   bool _isUpdating = false;
   AppUpdateInfo? _blockedUpdate;
-  String _updateStatus = '업데이트 버전을 확인하고 있습니다.';
+  String _updateStatus =
+      '\uC5C5\uB370\uC774\uD2B8 \uBC84\uC804\uC744 \uD655\uC778\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4.';
 
   @override
   void initState() {
@@ -142,7 +142,10 @@ class _UpdateGateState extends State<UpdateGate> {
       if (!mounted) return;
       setState(() {
         _failed = true;
-        _updateStatus = '업데이트 확인에 실패했습니다. 인터넷 연결을 확인한 뒤 다시 시도해주세요.';
+        _updateStatus =
+            '\uC5C5\uB370\uC774\uD2B8 \uD655\uC778\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. '
+            '\uB124\uD2B8\uC6CC\uD06C \uC5F0\uACB0\uC744 \uD655\uC778\uD55C \uB4A4 '
+            '\uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.';
       });
     }
   }
@@ -155,8 +158,9 @@ class _UpdateGateState extends State<UpdateGate> {
       _failed = false;
       _isUpdating = true;
       _updateStatus = update.platform == 'android'
-          ? 'APK 다운로드 페이지를 여는 중입니다.'
-          : '새 버전 ${update.latestVersion} 업데이트를 준비하고 있습니다.';
+          ? 'APK \uB2E4\uC6B4\uB85C\uB4DC \uD398\uC774\uC9C0\uB97C \uC5EC\uB294 \uC911\uC785\uB2C8\uB2E4.'
+          : '\uC0C8 \uBC84\uC804 ${update.latestVersion} '
+              '\uC5C5\uB370\uC774\uD2B8\uB97C \uC900\uBE44\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4.';
     });
 
     try {
@@ -167,7 +171,9 @@ class _UpdateGateState extends State<UpdateGate> {
       }
       setState(() {
         _isUpdating = false;
-        _updateStatus = '다운로드한 APK를 설치한 뒤 앱을 다시 실행해주세요.';
+        _updateStatus =
+            '\uB2E4\uC6B4\uB85C\uB4DC\uD55C APK\uB97C \uC124\uCE58\uD55C \uB4A4 '
+            '\uC571\uC744 \uB2E4\uC2DC \uC2E4\uD589\uD574 \uC8FC\uC138\uC694.';
       });
     } catch (e) {
       debugPrint('update install failed: $e');
@@ -175,7 +181,9 @@ class _UpdateGateState extends State<UpdateGate> {
       setState(() {
         _isUpdating = false;
         _failed = true;
-        _updateStatus = '업데이트를 시작하지 못했습니다. 다시 시도해주세요.';
+        _updateStatus =
+            '\uC5C5\uB370\uC774\uD2B8\uB97C \uC2DC\uC791\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4. '
+            '\uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.';
       });
     }
   }
@@ -185,7 +193,8 @@ class _UpdateGateState extends State<UpdateGate> {
       _checked = false;
       _failed = false;
       _blockedUpdate = null;
-      _updateStatus = '업데이트 버전을 확인하고 있습니다.';
+      _updateStatus =
+          '\uC5C5\uB370\uC774\uD2B8 \uBC84\uC804\uC744 \uD655\uC778\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4.';
     });
     _checkUpdate();
   }
@@ -221,7 +230,7 @@ class _UpdateGateState extends State<UpdateGate> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                '업데이트 확인',
+                '\uC5C5\uB370\uC774\uD2B8 \uD655\uC778',
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
@@ -231,11 +240,17 @@ class _UpdateGateState extends State<UpdateGate> {
               if (blockedUpdate != null) ...[
                 const SizedBox(height: 12),
                 _UpdateVersionRow(
-                    label: '현재 버전', value: blockedUpdate.currentVersion),
+                  label: '\uD604\uC7AC \uBC84\uC804',
+                  value: blockedUpdate.currentVersion,
+                ),
                 _UpdateVersionRow(
-                    label: '필수 버전', value: blockedUpdate.minRequiredVersion),
+                  label: '\uD544\uC218 \uBC84\uC804',
+                  value: blockedUpdate.minRequiredVersion,
+                ),
                 _UpdateVersionRow(
-                    label: '최신 버전', value: blockedUpdate.latestVersion),
+                  label: '\uCD5C\uC2E0 \uBC84\uC804',
+                  value: blockedUpdate.latestVersion,
+                ),
               ],
               const SizedBox(height: 12),
               Text(
@@ -256,7 +271,11 @@ class _UpdateGateState extends State<UpdateGate> {
                         ? null
                         : () => _startUpdate(updateService, blockedUpdate),
                     icon: const Icon(Icons.system_update_alt_rounded),
-                    label: Text(_isUpdating ? '업데이트 준비 중' : '업데이트'),
+                    label: Text(
+                      _isUpdating
+                          ? '\uC5C5\uB370\uC774\uD2B8 \uC900\uBE44 \uC911'
+                          : '\uC5C5\uB370\uC774\uD2B8',
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFC94C6E),
                       foregroundColor: Colors.white,
@@ -272,7 +291,7 @@ class _UpdateGateState extends State<UpdateGate> {
                   width: double.infinity,
                   child: OutlinedButton(
                     onPressed: _isUpdating ? null : _retryCheck,
-                    child: const Text('다시 확인'),
+                    child: const Text('\uB2E4\uC2DC \uD655\uC778'),
                   ),
                 ),
               ] else if (_failed)
@@ -288,7 +307,7 @@ class _UpdateGateState extends State<UpdateGate> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
-                    child: const Text('다시 시도'),
+                    child: const Text('\uB2E4\uC2DC \uC2DC\uB3C4'),
                   ),
                 )
               else
@@ -351,6 +370,9 @@ class AuthGate extends StatefulWidget {
 class _AuthGateState extends State<AuthGate> {
   Session? session;
   late final StreamSubscription<AuthState> _authSubscription;
+  final loginPolicyService = LoginPolicyService(supabase);
+  String? _authErrorMessage;
+  bool _logoutScheduled = false;
 
   @override
   void initState() {
@@ -370,17 +392,42 @@ class _AuthGateState extends State<AuthGate> {
     if (user == null) return null;
 
     try {
+      _authErrorMessage = null;
+      final decision = await loginPolicyService.checkLoginPolicy();
       final profile = await supabase
           .from('profiles')
-          .select('role, approval_status, store, name, phone')
+          .select(
+            'role, role_code, approval_status, store, store_id, name, phone',
+          )
           .eq('id', user.id)
           .maybeSingle();
 
-      return profile;
+      if (profile == null) return null;
+
+      return {
+        ...profile,
+        'role': decision.role ?? profile['role_code'] ?? profile['role'],
+        'store': decision.storeName ?? profile['store'],
+        'store_id': decision.storeId ?? profile['store_id'],
+      };
     } catch (e) {
       debugPrint('fetchProfile error: $e');
+      _authErrorMessage = e.toString().replaceFirst('Exception: ', '');
       return null;
     }
+  }
+
+  void _scheduleSignOutOnce() {
+    if (_logoutScheduled) return;
+    _logoutScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await supabase.auth.signOut();
+      if (mounted) {
+        setState(() {
+          _logoutScheduled = false;
+        });
+      }
+    });
   }
 
   @override
@@ -406,15 +453,22 @@ class _AuthGateState extends State<AuthGate> {
 
         final profile = snapshot.data;
 
-        // ?꾨줈?꾩씠 ?놁쑝硫?怨듦컻?⑹쑝濡?蹂대궡吏 留먭퀬 濡쒓렇???붾㈃?쇰줈 蹂듦?
         if (profile == null) {
-          WidgetsBinding.instance.addPostFrameCallback((_) async {
-            await supabase.auth.signOut();
-          });
+          final message = _authErrorMessage ??
+              '\uD504\uB85C\uD544 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uC9C0 '
+                  '\uBABB\uD588\uC2B5\uB2C8\uB2E4. \uB2E4\uC2DC \uB85C\uADF8\uC778\uD574 '
+                  '\uC8FC\uC138\uC694.';
+          _scheduleSignOutOnce();
 
-          return const Scaffold(
+          return Scaffold(
             body: Center(
-              child: Text('?ъ슜???꾨줈?꾩쓣 李얠쓣 ???놁뒿?덈떎. ?ㅼ떆 濡쒓렇?명빐二쇱꽭??'),
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  message,
+                  textAlign: TextAlign.center,
+                ),
+              ),
             ),
           );
         }
@@ -425,13 +479,15 @@ class _AuthGateState extends State<AuthGate> {
         final store = normalizeStoreName(profile['store']);
 
         if (approvalStatus != 'approved' || role.isEmpty) {
-          WidgetsBinding.instance.addPostFrameCallback((_) async {
-            await supabase.auth.signOut();
-          });
+          _scheduleSignOutOnce();
 
           return const Scaffold(
             body: Center(
-              child: Text('?뱀씤?섏? ?딆븯嫄곕굹 沅뚰븳 ?뺣낫媛 ?щ컮瑜댁? ?딆뒿?덈떎.'),
+              child: Text(
+                '\uC2B9\uC778\uB418\uC9C0 \uC54A\uC740 \uACC4\uC815\uC785\uB2C8\uB2E4. '
+                '\uAD00\uB9AC\uC790 \uC2B9\uC778 \uD6C4 \uB2E4\uC2DC '
+                '\uB85C\uADF8\uC778\uD574 \uC8FC\uC138\uC694.',
+              ),
             ),
           );
         }

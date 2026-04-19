@@ -38,8 +38,8 @@ class ContactActionButtons extends StatelessWidget {
       customerName: customerName,
       template: messageTemplate,
     );
-    final iconSize = dense ? 16.0 : 18.0;
-    final minimumSize = dense ? const Size(34, 34) : const Size(42, 38);
+    final iconSize = dense ? 14.0 : 18.0;
+    final minimumSize = dense ? const Size(30, 30) : const Size(42, 38);
 
     Widget button({
       required IconData icon,
@@ -53,6 +53,8 @@ class ContactActionButtons extends StatelessWidget {
         style: IconButton.styleFrom(
           minimumSize: minimumSize,
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          padding: EdgeInsets.zero,
+          visualDensity: VisualDensity.compact,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       );

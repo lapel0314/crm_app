@@ -31,6 +31,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
   final NumberFormat moneyFormat = NumberFormat('#,###');
 
   bool isLoading = false;
+  bool showSummaryDashboard = false;
   List<Map<String, dynamic>> members = [];
   final Set<String> selectedMemberIds = {};
   String selectedCarrierFilter = '전체';
@@ -38,7 +39,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
   static const int pageSize = 20;
 
   bool get canEdit => canUseWiredMembers(widget.role);
-  bool get canDelete => canUseWiredMembers(widget.role);
+  bool get canDelete => canDeleteWiredMember(widget.role);
   bool get canViewAllStores => isPrivilegedRole(widget.role);
 
   @override
@@ -1416,11 +1417,14 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
     required String label,
     required String value,
     required Color color,
+    bool compact = false,
   }) {
-    return Expanded(
-      child: Container(
-        height: 88,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+    return Container(
+      height: compact ? 74 : 88,
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 18,
+        vertical: compact ? 10 : 14,
+      ),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(8),
@@ -1437,13 +1441,13 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
           children: [
             Container(
               width: 4,
-              height: 34,
+              height: compact ? 28 : 34,
               decoration: BoxDecoration(
                 color: color,
                 borderRadius: BorderRadius.circular(99),
               ),
             ),
-            const SizedBox(width: 14),
+            SizedBox(width: compact ? 10 : 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1451,21 +1455,24 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                 children: [
                   Text(
                     label,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Color(0xFF9CA3AF),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                      fontSize: compact ? 11 : 12,
+                      fontWeight: FontWeight.w700,
+                      height: 1.15,
                     ),
                   ),
-                  const SizedBox(height: 5),
+                  SizedBox(height: compact ? 4 : 5),
                   Text(
                     value,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Color(0xFF111827),
-                      fontSize: 21,
+                      fontSize: compact ? 18 : 21,
                       fontWeight: FontWeight.w800,
+                      height: 1,
                     ),
                   ),
                 ],
@@ -1473,8 +1480,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 
   Widget _dateSearchButton() {
@@ -1602,7 +1608,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
       118,
       118,
       118,
-      210,
+      246,
     ];
     const headers = [
       '',
@@ -1851,7 +1857,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
       icon: icon,
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
-      constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+      constraints: const BoxConstraints.tightFor(width: 30, height: 30),
     );
   }
 
@@ -1953,14 +1959,78 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
     var pageEnd = pageStart + pageSize;
     if (pageEnd > filteredMembers.length) pageEnd = filteredMembers.length;
     final visibleMembers = filteredMembers.sublist(pageStart, pageEnd);
+    final mobile = MediaQuery.of(context).size.width < 900;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F8),
       body: Padding(
-        padding: const EdgeInsets.all(28),
+        padding: EdgeInsets.all(mobile ? 14 : 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (showSummaryDashboard) ...[
+              const SizedBox(height: 10),
+              mobile
+                  ? GridView.count(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 1.95,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      children: [
+                        _summaryTile(
+                          label: '조회 가입자',
+                          value: '${filteredMembers.length}건',
+                          color: const Color(0xFF6B7280),
+                          compact: true,
+                        ),
+                        _summaryTile(
+                          label: '상품권',
+                          value: money(totalGiftCard),
+                          color: const Color(0xFFF59E0B),
+                          compact: true,
+                        ),
+                        _summaryTile(
+                          label: '선입금',
+                          value: money(totalPrepaid),
+                          color: const Color(0xFF10B981),
+                          compact: true,
+                        ),
+                        _summaryTile(
+                          label: '후입금',
+                          value: money(totalPostpaid),
+                          color: const Color(0xFFC94C6E),
+                          compact: true,
+                        ),
+                      ],
+                    )
+                  : Row(
+              children: [
+                OutlinedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      showSummaryDashboard = !showSummaryDashboard;
+                    });
+                  },
+                  icon: Icon(
+                    showSummaryDashboard
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    size: 16,
+                  ),
+                  label: Text(showSummaryDashboard ? '요약 숨기기' : '요약 보기'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF6B7280),
+                    visualDensity: VisualDensity.compact,
+                    minimumSize: const Size(0, 34),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
+                    side: const BorderSide(color: Color(0xFFE8E9EF)),
+                  ),
+                ),
+              ],
+            ),
             Row(
               children: [
                 _summaryTile(
@@ -1988,7 +2058,9 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
+            ] else
+              const SizedBox(height: 6),
             Expanded(
               child: Container(
                 width: double.infinity,
@@ -2008,7 +2080,176 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                   children: [
                     Padding(
                       padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-                      child: Row(
+                      child: mobile
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                SingleChildScrollView(
+                                  scrollDirection: Axis.horizontal,
+                                  child: Row(
+                                    children: [
+                                      _dateSearchButton(),
+                                      const SizedBox(width: 8),
+                                      SizedBox(
+                                        width: 220,
+                                        height: 38,
+                                        child: TextField(
+                                          controller: searchController,
+                                          onChanged: (value) =>
+                                              fetchMembers(keyword: value),
+                                          style: const TextStyle(fontSize: 13),
+                                          decoration: InputDecoration(
+                                            hintText:
+                                                '번호, 판매점, 가입자, 통신사, 개통처 검색',
+                                            prefixIcon: const Icon(
+                                              Icons.search,
+                                              size: 17,
+                                              color: Color(0xFF9CA3AF),
+                                            ),
+                                            filled: true,
+                                            fillColor:
+                                                const Color(0xFFF9FAFB),
+                                            contentPadding:
+                                                const EdgeInsets.symmetric(
+                                                    horizontal: 12),
+                                            border: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              borderSide: const BorderSide(
+                                                color: Color(0xFFE8E9EF),
+                                              ),
+                                            ),
+                                            enabledBorder: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              borderSide: const BorderSide(
+                                                color: Color(0xFFE8E9EF),
+                                              ),
+                                            ),
+                                            focusedBorder: OutlineInputBorder(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              borderSide: const BorderSide(
+                                                color: Color(0xFFC94C6E),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      _segmentedFilter(
+                                        options: const [
+                                          '전체',
+                                          'SKT',
+                                          'KT',
+                                          'LGU+'
+                                        ],
+                                        selected: selectedCarrierFilter,
+                                        onSelected: (value) {
+                                          setState(() {
+                                            selectedCarrierFilter = value;
+                                            currentPage = 0;
+                                          });
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                Row(
+                                  children: [
+                                    SizedBox(
+                                      width: 36,
+                                      height: 36,
+                                      child: OutlinedButton(
+                                        onPressed: selectedMemberIds.isEmpty
+                                            ? null
+                                            : showSmsSendDialog,
+                                        style: OutlinedButton.styleFrom(
+                                          minimumSize: const Size(36, 36),
+                                          padding: EdgeInsets.zero,
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                        child: const Icon(
+                                          Icons.sms_rounded,
+                                          size: 16,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    SizedBox(
+                                      width: 36,
+                                      height: 36,
+                                      child: OutlinedButton(
+                                        onPressed: selectedMemberIds.isEmpty
+                                            ? null
+                                            : sendKakaoToSelectedMembers,
+                                        style: OutlinedButton.styleFrom(
+                                          minimumSize: const Size(36, 36),
+                                          padding: EdgeInsets.zero,
+                                          visualDensity: VisualDensity.compact,
+                                        ),
+                                        child: const Icon(
+                                          Icons.chat_bubble_rounded,
+                                          size: 16,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: showCreateDialog,
+                                        icon: const Icon(Icons.add, size: 14),
+                                        label: const Text('등록'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              const Color(0xFFC94C6E),
+                                          foregroundColor: Colors.white,
+                                          elevation: 0,
+                                          minimumSize: const Size(0, 36),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 0,
+                                          ),
+                                          textStyle:
+                                              const TextStyle(fontSize: 12),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: () => fetchMembers(
+                                          keyword: searchController.text,
+                                        ),
+                                        icon: const Icon(
+                                          Icons.refresh,
+                                          size: 14,
+                                        ),
+                                        label: const Text('새로고침'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.white,
+                                          foregroundColor:
+                                              const Color(0xFF6B7280),
+                                          elevation: 0,
+                                          minimumSize: const Size(0, 36),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 0,
+                                          ),
+                                          textStyle:
+                                              const TextStyle(fontSize: 12),
+                                          side: const BorderSide(
+                                            color: Color(0xFFE8E9EF),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            )
+                          : Row(
                         children: [
                           Expanded(
                             child: SingleChildScrollView(

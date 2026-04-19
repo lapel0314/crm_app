@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:crm_app/services/kakao_talk_service.dart';
 import 'package:crm_app/services/contact_action_service.dart';
@@ -43,6 +46,7 @@ class _CustomerPageState extends State<CustomerPage> {
   final Set<String> selectedCustomerIds = {};
   bool isLoading = true;
   bool isSendingKakao = false;
+  bool showSummaryDashboard = false;
   String selectedCarrierFilter = '전체';
   String selectedJoinTypeFilter = '전체';
   int currentPage = 0;
@@ -50,7 +54,7 @@ class _CustomerPageState extends State<CustomerPage> {
 
   bool get isOpenView => widget.openMode || canUseOpenCustomerDb(widget.role);
   bool get canEdit => !isOpenView && canUseCustomerDb(widget.role);
-  bool get canDelete => !isOpenView && canUseCustomerDb(widget.role);
+  bool get canDelete => !isOpenView && canDeleteCustomer(widget.role);
   bool get canViewAllStores => isPrivilegedRole(widget.role);
 
   @override
@@ -706,6 +710,18 @@ class _CustomerPageState extends State<CustomerPage> {
       return;
     }
 
+    if (kIsWeb || !Platform.isWindows) {
+      final result = await const ContactActionService().kakao(message);
+      if (!mounted) return;
+      _showCenterMessage(
+        result.message ??
+            (result.success
+                ? '${selected.length}명 카카오톡 공유 화면을 열었습니다.'
+                : '카카오톡을 열 수 없습니다.'),
+      );
+      return;
+    }
+
     final targets = selected.map((customer) {
       final searchName = _firstText(
         customer,
@@ -907,7 +923,7 @@ class _CustomerPageState extends State<CustomerPage> {
   Future<void> showKakaoSendDialog() async {
     final selected = _selectedCustomers();
     final messageController = TextEditingController(
-      text: _defaultKakaoGreeting(selected),
+      text: buildContactMessage(customerName: ''),
     );
     var templates = await _loadKakaoTemplates();
     if (!mounted) return;
@@ -1757,11 +1773,12 @@ class _CustomerPageState extends State<CustomerPage> {
                             ],
                           ),
                         ),
-                        ContactActionButtons(
-                          customerName: customer['name']?.toString() ?? '',
-                          phone: customer['phone']?.toString() ?? '',
-                          onMessage: _showCenterMessage,
-                        ),
+                        if (!isOpenView)
+                          ContactActionButtons(
+                            customerName: customer['name']?.toString() ?? '',
+                            phone: customer['phone']?.toString() ?? '',
+                            onMessage: _showCenterMessage,
+                          ),
                       ],
                     ),
                   ),
@@ -1883,11 +1900,14 @@ class _CustomerPageState extends State<CustomerPage> {
     required String label,
     required String value,
     required Color color,
+    bool compact = false,
   }) {
-    return Expanded(
-      child: Container(
-        height: 88,
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+    return Container(
+      height: compact ? 74 : 88,
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 12 : 18,
+        vertical: compact ? 10 : 14,
+      ),
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(8),
@@ -1904,13 +1924,13 @@ class _CustomerPageState extends State<CustomerPage> {
           children: [
             Container(
               width: 4,
-              height: 34,
+              height: compact ? 28 : 34,
               decoration: BoxDecoration(
                 color: color,
                 borderRadius: BorderRadius.circular(99),
               ),
             ),
-            const SizedBox(width: 14),
+            SizedBox(width: compact ? 10 : 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1918,21 +1938,24 @@ class _CustomerPageState extends State<CustomerPage> {
                 children: [
                   Text(
                     label,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Color(0xFF9CA3AF),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
+                      fontSize: compact ? 11 : 12,
+                      fontWeight: FontWeight.w700,
+                      height: 1.15,
                     ),
                   ),
-                  const SizedBox(height: 5),
+                  SizedBox(height: compact ? 4 : 5),
                   Text(
                     value,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Color(0xFF111827),
-                      fontSize: 21,
+                      fontSize: compact ? 18 : 21,
                       fontWeight: FontWeight.w800,
+                      height: 1,
                     ),
                   ),
                 ],
@@ -1940,8 +1963,7 @@ class _CustomerPageState extends State<CustomerPage> {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 
   Widget _filterField({
@@ -2068,7 +2090,7 @@ class _CustomerPageState extends State<CustomerPage> {
       150,
       92,
       86,
-      126,
+      184,
     ];
     final headers = [
       if (showSelection) '',
@@ -2215,6 +2237,32 @@ class _CustomerPageState extends State<CustomerPage> {
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                if (!isOpenView)
+                                  _compactIconButton(
+                                    tooltip: '\uC804\uD654',
+                                    onPressed: () async {
+                                      final phoneNumber =
+                                          customer['phone']?.toString() ?? '';
+                                      if (_displayPhone(phoneNumber).isEmpty) {
+                                        _showCenterMessage(
+                                          '\uC0AC\uC6A9 \uAC00\uB2A5\uD55C \uC804\uD654\uBC88\uD638\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.',
+                                        );
+                                        return;
+                                      }
+                                      final result =
+                                          await const ContactActionService()
+                                              .call(phoneNumber);
+                                      if (!mounted) return;
+                                      if (!result.success &&
+                                          result.message != null) {
+                                        _showCenterMessage(result.message!);
+                                      }
+                                    },
+                                    icon: const Icon(
+                                      Icons.call_outlined,
+                                      size: 18,
+                                    ),
+                                  ),
                                 _compactIconButton(
                                   tooltip: '상세',
                                   onPressed: () => showDetail(customer),
@@ -2327,7 +2375,7 @@ class _CustomerPageState extends State<CustomerPage> {
       icon: icon,
       visualDensity: VisualDensity.compact,
       padding: EdgeInsets.zero,
-      constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+      constraints: const BoxConstraints.tightFor(width: 30, height: 30),
     );
   }
 
@@ -2422,11 +2470,286 @@ class _CustomerPageState extends State<CustomerPage> {
     var pageEnd = pageStart + pageSize;
     if (pageEnd > customers.length) pageEnd = customers.length;
     final visibleCustomers = customers.sublist(pageStart, pageEnd);
+    final mobile = MediaQuery.of(context).size.width < 900;
+
+    if (mobile) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF4F5F8),
+        body: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        showSummaryDashboard = !showSummaryDashboard;
+                      });
+                    },
+                    icon: Icon(
+                      showSummaryDashboard
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      size: 16,
+                    ),
+                    label: Text(
+                      showSummaryDashboard
+                          ? '\uC694\uC57D \uC228\uAE30\uAE30'
+                          : '\uC694\uC57D \uBCF4\uAE30',
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      minimumSize: const Size(0, 34),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 0,
+                      ),
+                      foregroundColor: const Color(0xFF4B5563),
+                      side: const BorderSide(color: Color(0xFFE5E7EB)),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: showSummaryDashboard ? 12 : 6),
+              if (showSummaryDashboard) ...[
+                SizedBox(
+                  height: 168,
+                  child: GridView.count(
+                    crossAxisCount: 2,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 2.0,
+                    children: [
+                      _summaryTile(
+                        label: '\uC804\uCCB4 \uACE0\uAC1D',
+                        value: '$totalCustomers\uBA85',
+                        color: const Color(0xFF6B7280),
+                        compact: true,
+                      ),
+                      _summaryTile(
+                        label: '\uC2E0\uADDC \uAC1C\uD1B5',
+                        value: '$newJoinCount\uBA85',
+                        color: const Color(0xFF10B981),
+                        compact: true,
+                      ),
+                      _summaryTile(
+                        label: '\uBC88\uD638\uC774\uB3D9',
+                        value: '$transferCount\uBA85',
+                        color: const Color(0xFF3B82F6),
+                        compact: true,
+                      ),
+                      _summaryTile(
+                        label: '\uAE30\uAE30\uBCC0\uACBD',
+                        value: '$deviceChangeCount\uBA85',
+                        color: const Color(0xFFF59E0B),
+                        compact: true,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 14),
+              ],
+              Expanded(
+                child: Container(
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFE8E9EF)),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x0A000000),
+                        blurRadius: 8,
+                        offset: Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  _filterField(
+                                    controller: dateSearchController,
+                                    hint: '\uAC00\uC785\uC77C',
+                                    icon: Icons.calendar_today_outlined,
+                                    width: 132,
+                                    onIconPressed: _pickSearchDate,
+                                    onClear: _clearSearchDate,
+                                    onChanged: _handleDateSearchChanged,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _filterField(
+                                    controller: searchController,
+                                    hint: '\uACE0\uAC1D\uBA85',
+                                    icon: Icons.person_search_outlined,
+                                    width: 120,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _filterField(
+                                    controller: phoneSearchController,
+                                    hint: '\uC804\uD654\uBC88\uD638',
+                                    icon: Icons.phone_iphone_outlined,
+                                    width: 132,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _segmentedFilter(
+                                    options: const [
+                                      '\uC804\uCCB4',
+                                      'SKT',
+                                      'KT',
+                                      'LGU+',
+                                    ],
+                                    selected: selectedCarrierFilter,
+                                    onSelected: (value) {
+                                      setState(() {
+                                        selectedCarrierFilter = value;
+                                        currentPage = 0;
+                                      });
+                                      fetchCustomers();
+                                    },
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _segmentedFilter(
+                                    options: const [
+                                      '\uC804\uCCB4',
+                                      '\uC2E0\uADDC',
+                                      '\uBC88\uD638\uC774\uB3D9',
+                                      '\uAE30\uAE30\uBCC0\uACBD',
+                                    ],
+                                    selected: selectedJoinTypeFilter,
+                                    onSelected: (value) {
+                                      setState(() {
+                                        selectedJoinTypeFilter = value;
+                                        currentPage = 0;
+                                      });
+                                      fetchCustomers();
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                if (!isOpenView) ...[
+                                  SizedBox(
+                                    width: 36,
+                                    height: 36,
+                                    child: OutlinedButton(
+                                      onPressed:
+                                          selectedCustomerIds.isEmpty ||
+                                                  isSendingKakao
+                                              ? null
+                                              : showKakaoSendDialog,
+                                      style: OutlinedButton.styleFrom(
+                                        minimumSize: const Size(36, 36),
+                                        padding: EdgeInsets.zero,
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                      child: Icon(
+                                        isSendingKakao
+                                            ? Icons.hourglass_top_rounded
+                                            : Icons.chat_bubble_outline,
+                                        size: 16,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  SizedBox(
+                                    width: 36,
+                                    height: 36,
+                                    child: OutlinedButton(
+                                      onPressed: selectedCustomerIds.isEmpty
+                                          ? null
+                                          : showSmsSendDialog,
+                                      style: OutlinedButton.styleFrom(
+                                        minimumSize: const Size(36, 36),
+                                        padding: EdgeInsets.zero,
+                                        visualDensity: VisualDensity.compact,
+                                      ),
+                                      child: const Icon(
+                                        Icons.sms_outlined,
+                                        size: 16,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                ],
+                                Expanded(
+                                  child: ElevatedButton.icon(
+                                    onPressed: () => fetchCustomers(),
+                                    icon: const Icon(Icons.refresh, size: 14),
+                                    label: const Text(
+                                      '\uC0C8\uB85C\uACE0\uCE68',
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      foregroundColor: const Color(0xFF6B7280),
+                                      elevation: 0,
+                                      minimumSize: const Size(0, 36),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 8,
+                                        vertical: 0,
+                                      ),
+                                      textStyle:
+                                          const TextStyle(fontSize: 12),
+                                      side: const BorderSide(
+                                        color: Color(0xFFE8E9EF),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Divider(height: 1, color: Color(0xFFF3F4F6)),
+                      Expanded(
+                        child: isLoading
+                            ? const Center(child: CircularProgressIndicator())
+                            : customers.isEmpty
+                                ? const Center(
+                                    child: Text(
+                                      '\uACE0\uAC1D \uC815\uBCF4\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4',
+                                    ),
+                                  )
+                                : Scrollbar(
+                                    thumbVisibility: true,
+                                    child: SingleChildScrollView(
+                                      child: _customerTable(visibleCustomers),
+                                    ),
+                                  ),
+                      ),
+                      _pagination(
+                        totalItems: totalCustomers,
+                        safePage: safePage,
+                        totalPages: totalPages,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F8),
       body: Padding(
-        padding: const EdgeInsets.all(28),
+        padding: EdgeInsets.all(mobile ? 14 : 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
