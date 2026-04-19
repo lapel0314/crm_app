@@ -1,4 +1,4 @@
-import 'package:file_picker/file_picker.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -135,16 +135,15 @@ class _RebatePageState extends State<RebatePage> {
     final target = await _showUploadTargetDialog();
     if (target == null) return;
 
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.custom,
-      allowedExtensions: const ['jpg', 'jpeg', 'png', 'webp', 'gif'],
-      withData: true,
+    const imageTypes = XTypeGroup(
+      label: 'images',
+      extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'],
     );
+    final file = await openFile(acceptedTypeGroups: const [imageTypes]);
 
-    if (result == null || result.files.isEmpty) return;
-    final file = result.files.single;
-    final bytes = file.bytes;
-    if (bytes == null || bytes.isEmpty) {
+    if (file == null) return;
+    final bytes = await file.readAsBytes();
+    if (bytes.isEmpty) {
       _showMessage('이미지 파일을 읽을 수 없습니다.');
       return;
     }
@@ -161,7 +160,7 @@ class _RebatePageState extends State<RebatePage> {
         carrier: target.carrier,
         bytes: bytes,
         fileName: file.name,
-        contentType: _contentType(file.extension),
+        contentType: _contentType(file.name.split('.').last),
       );
 
       setState(() {

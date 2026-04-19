@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io' show exit;
+import 'dart:io' show Platform, exit;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -50,7 +50,7 @@ class ConfigErrorApp extends StatelessWidget {
           child: Padding(
             padding: EdgeInsets.all(24),
             child: Text(
-              'Supabase 설정이 없습니다. SUPABASE_URL / SUPABASE_ANON_KEY를 dart-define으로 전달해주세요.',
+              'Supabase ?ㅼ젙???놁뒿?덈떎. SUPABASE_URL / SUPABASE_ANON_KEY瑜?dart-define?쇰줈 ?꾨떖?댁＜?몄슂.',
               textAlign: TextAlign.center,
             ),
           ),
@@ -66,7 +66,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: '핑크폰 CRM',
+      title: '?묓겕??CRM',
       debugShowCheckedModeBanner: false,
       locale: const Locale('ko', 'KR'),
       localizationsDelegates: const [
@@ -105,6 +105,8 @@ class _UpdateGateState extends State<UpdateGate> {
   bool _checked = false;
   bool _ready = false;
   bool _failed = false;
+  bool _isUpdating = false;
+  AppUpdateInfo? _blockedUpdate;
   String _updateStatus = '업데이트 버전을 확인하고 있습니다.';
 
   @override
@@ -125,59 +127,82 @@ class _UpdateGateState extends State<UpdateGate> {
       if (update == null) {
         setState(() {
           _ready = true;
+          _blockedUpdate = null;
         });
         return;
       }
 
-      await _installUpdate(updateService, update);
+      setState(() {
+        _failed = false;
+        _blockedUpdate = update;
+        _updateStatus = update.message;
+      });
     } catch (e) {
       debugPrint('forced update check failed: $e');
       if (!mounted) return;
       setState(() {
         _failed = true;
-        _updateStatus = '업데이트 확인에 실패했습니다. 인터넷 연결 후 다시 시도해 주세요.';
+        _updateStatus = '업데이트 확인에 실패했습니다. 인터넷 연결을 확인한 뒤 다시 시도해주세요.';
       });
     }
   }
 
-  Future<void> _installUpdate(
+  Future<void> _startUpdate(
     UpdateService updateService,
     AppUpdateInfo update,
   ) async {
     setState(() {
       _failed = false;
-      _updateStatus = '새 버전 ${update.version} 업데이트를 준비하고 있습니다.';
+      _isUpdating = true;
+      _updateStatus = update.platform == 'android'
+          ? 'APK 다운로드 페이지를 여는 중입니다.'
+          : '새 버전 ${update.latestVersion} 업데이트를 준비하고 있습니다.';
     });
 
     try {
-      final installer = await updateService.downloadInstaller(update);
+      await updateService.startUpdate(update);
       if (!mounted) return;
-
+      if (Platform.isWindows) {
+        exit(0);
+      }
       setState(() {
-        _updateStatus = '설치 파일을 실행합니다. 앱이 자동으로 종료됩니다.';
+        _isUpdating = false;
+        _updateStatus = '다운로드한 APK를 설치한 뒤 앱을 다시 실행해주세요.';
       });
-
-      await updateService.runInstaller(installer);
-      exit(0);
     } catch (e) {
       debugPrint('update install failed: $e');
       if (!mounted) return;
       setState(() {
+        _isUpdating = false;
         _failed = true;
-        _updateStatus = '업데이트 설치를 시작하지 못했습니다. 다시 시도해 주세요.';
+        _updateStatus = '업데이트를 시작하지 못했습니다. 다시 시도해주세요.';
       });
     }
+  }
+
+  void _retryCheck() {
+    setState(() {
+      _checked = false;
+      _failed = false;
+      _blockedUpdate = null;
+      _updateStatus = '업데이트 버전을 확인하고 있습니다.';
+    });
+    _checkUpdate();
   }
 
   @override
   Widget build(BuildContext context) {
     if (_ready) return widget.child;
+    final blockedUpdate = _blockedUpdate;
+    final updateService = UpdateService(supabase);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F8),
       body: Center(
         child: Container(
           width: 420,
+          constraints: const BoxConstraints(maxWidth: 420),
+          margin: const EdgeInsets.all(18),
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: Colors.white,
@@ -203,6 +228,15 @@ class _UpdateGateState extends State<UpdateGate> {
                   color: Color(0xFF111827),
                 ),
               ),
+              if (blockedUpdate != null) ...[
+                const SizedBox(height: 12),
+                _UpdateVersionRow(
+                    label: '현재 버전', value: blockedUpdate.currentVersion),
+                _UpdateVersionRow(
+                    label: '필수 버전', value: blockedUpdate.minRequiredVersion),
+                _UpdateVersionRow(
+                    label: '최신 버전', value: blockedUpdate.latestVersion),
+              ],
               const SizedBox(height: 12),
               Text(
                 _updateStatus,
@@ -214,18 +248,38 @@ class _UpdateGateState extends State<UpdateGate> {
                 ),
               ),
               const SizedBox(height: 18),
-              if (_failed)
+              if (blockedUpdate != null) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _isUpdating
+                        ? null
+                        : () => _startUpdate(updateService, blockedUpdate),
+                    icon: const Icon(Icons.system_update_alt_rounded),
+                    label: Text(_isUpdating ? '업데이트 준비 중' : '업데이트'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFC94C6E),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: _isUpdating ? null : _retryCheck,
+                    child: const Text('다시 확인'),
+                  ),
+                ),
+              ] else if (_failed)
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: () {
-                      setState(() {
-                        _checked = false;
-                        _failed = false;
-                        _updateStatus = '업데이트 버전을 확인하고 있습니다.';
-                      });
-                      _checkUpdate();
-                    },
+                    onPressed: _retryCheck,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFC94C6E),
                       foregroundColor: Colors.white,
@@ -245,6 +299,43 @@ class _UpdateGateState extends State<UpdateGate> {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _UpdateVersionRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _UpdateVersionRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 76,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF6B7280),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: Color(0xFF111827),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -315,7 +406,7 @@ class _AuthGateState extends State<AuthGate> {
 
         final profile = snapshot.data;
 
-        // 프로필이 없으면 공개용으로 보내지 말고 로그인 화면으로 복귀
+        // ?꾨줈?꾩씠 ?놁쑝硫?怨듦컻?⑹쑝濡?蹂대궡吏 留먭퀬 濡쒓렇???붾㈃?쇰줈 蹂듦?
         if (profile == null) {
           WidgetsBinding.instance.addPostFrameCallback((_) async {
             await supabase.auth.signOut();
@@ -323,7 +414,7 @@ class _AuthGateState extends State<AuthGate> {
 
           return const Scaffold(
             body: Center(
-              child: Text('사용자 프로필을 찾을 수 없습니다. 다시 로그인해주세요.'),
+              child: Text('?ъ슜???꾨줈?꾩쓣 李얠쓣 ???놁뒿?덈떎. ?ㅼ떆 濡쒓렇?명빐二쇱꽭??'),
             ),
           );
         }
@@ -340,7 +431,7 @@ class _AuthGateState extends State<AuthGate> {
 
           return const Scaffold(
             body: Center(
-              child: Text('승인되지 않았거나 권한 정보가 올바르지 않습니다.'),
+              child: Text('?뱀씤?섏? ?딆븯嫄곕굹 沅뚰븳 ?뺣낫媛 ?щ컮瑜댁? ?딆뒿?덈떎.'),
             ),
           );
         }

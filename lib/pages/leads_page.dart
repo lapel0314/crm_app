@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:crm_app/constants/message_templates.dart';
+import 'package:crm_app/services/contact_action_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
+import 'package:crm_app/widgets/contact_action_buttons.dart';
 import 'package:crm_app/widgets/compact_date_range_picker.dart';
 
 final supabase = Supabase.instance.client;
@@ -28,6 +31,7 @@ class _LeadsPageState extends State<LeadsPage> {
 
   bool isLoading = true;
   List<Map<String, dynamic>> leads = [];
+  final Set<String> selectedLeadIds = {};
   String selectedTypeFilter = '전체';
   int currentPage = 0;
   static const int pageSize = 20;
@@ -344,6 +348,9 @@ class _LeadsPageState extends State<LeadsPage> {
               .where((lead) => matchesDateSearch(lead['lead_date'], dateFilter))
               .toList();
         }
+        selectedLeadIds.removeWhere(
+          (id) => !leads.any((lead) => textValue(lead['id']) == id),
+        );
         currentPage = 0;
       });
     } catch (e) {
@@ -760,6 +767,76 @@ class _LeadsPageState extends State<LeadsPage> {
     return text.isEmpty ? '-' : text;
   }
 
+  List<Map<String, dynamic>> _selectedLeads() {
+    return leads
+        .where((lead) => selectedLeadIds.contains(textValue(lead['id'])))
+        .toList();
+  }
+
+  Future<void> _sendSmsToSelectedLeads(String message) async {
+    final selected = _selectedLeads();
+    final result = await const ContactActionService().smsBulk(
+      selected.map((lead) => textValue(lead['phone'])).toList(),
+      message,
+    );
+    if (!mounted) return;
+    showMessage(result.message ?? '${selected.length}명 문자 앱을 열었습니다.');
+  }
+
+  Future<void> showSmsSendDialog() async {
+    final selected = _selectedLeads();
+    if (selected.isEmpty) {
+      showMessage('문자를 보낼 가망고객을 선택해주세요.');
+      return;
+    }
+    final controller = TextEditingController(
+      text: buildContactMessage(
+        customerName: textValue(selected.first['subscriber']),
+      ),
+    );
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('문자 발송 (${selected.length}명)'),
+        content: TextField(
+          controller: controller,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            labelText: '문자 내용',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _sendSmsToSelectedLeads(controller.text);
+            },
+            child: const Text('문자 앱 열기'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> sendKakaoToSelectedLeads() async {
+    final selected = _selectedLeads();
+    if (selected.isEmpty) {
+      showMessage('카카오톡을 보낼 가망고객을 선택해주세요.');
+      return;
+    }
+    final message = buildContactMessage(
+      customerName: textValue(selected.first['subscriber']),
+    );
+    final result = await const ContactActionService().kakao(message);
+    if (!mounted) return;
+    showMessage(result.message ?? '${selected.length}명 카카오톡 공유 화면을 열었습니다.');
+  }
+
   String _normalizeCarrier(String value) {
     return value.toUpperCase().replaceAll(RegExp(r'[\s_-]'), '');
   }
@@ -951,8 +1028,9 @@ class _LeadsPageState extends State<LeadsPage> {
   }
 
   Widget _leadsTable(List<Map<String, dynamic>> visibleLeads) {
-    const baseWidths = <double>[110, 120, 130, 150, 130, 130, 300, 90];
+    const baseWidths = <double>[48, 110, 120, 130, 150, 130, 130, 300, 190];
     const headers = [
+      '',
       '날짜',
       '담당자',
       '가입자',
@@ -971,13 +1049,13 @@ class _LeadsPageState extends State<LeadsPage> {
         final extraWidth = tableWidth - baseWidth;
         final widths = [...baseWidths];
         if (extraWidth > 0) {
-          widths[1] += extraWidth * 0.12;
           widths[2] += extraWidth * 0.12;
           widths[3] += extraWidth * 0.12;
-          widths[4] += extraWidth * 0.10;
+          widths[4] += extraWidth * 0.12;
           widths[5] += extraWidth * 0.10;
-          widths[6] += extraWidth * 0.36;
-          widths[7] += extraWidth * 0.08;
+          widths[6] += extraWidth * 0.10;
+          widths[7] += extraWidth * 0.34;
+          widths[8] += extraWidth * 0.10;
         }
 
         return SingleChildScrollView(
@@ -1002,6 +1080,8 @@ class _LeadsPageState extends State<LeadsPage> {
                   ),
                 ),
                 ...visibleLeads.map((item) {
+                  final leadId = textValue(item['id']);
+                  final selected = selectedLeadIds.contains(leadId);
                   return InkWell(
                     onTap: () => showEditDialog(item),
                     child: Container(
@@ -1013,38 +1093,60 @@ class _LeadsPageState extends State<LeadsPage> {
                       ),
                       child: Row(
                         children: [
+                          _tableCell(
+                            Checkbox(
+                              value: selected,
+                              onChanged: (value) {
+                                setState(() {
+                                  if (value == true) {
+                                    selectedLeadIds.add(leadId);
+                                  } else {
+                                    selectedLeadIds.remove(leadId);
+                                  }
+                                });
+                              },
+                            ),
+                            widths[0],
+                          ),
                           _tableCell(_tableText(shortDate(item['lead_date'])),
-                              widths[0]),
-                          _tableCell(_tableText(textValue(item['manager'])),
                               widths[1]),
+                          _tableCell(_tableText(textValue(item['manager'])),
+                              widths[2]),
                           _tableCell(
                             _tableText(textValue(item['subscriber']),
                                 strong: true),
-                            widths[2],
+                            widths[3],
                           ),
                           _tableCell(
-                              _tableText(textValue(item['phone'])), widths[3]),
+                              _tableText(textValue(item['phone'])), widths[4]),
                           _tableCell(
                             _tableBadge(
                               textValue(item['previous_carrier']),
                               color: _carrierColor(item['previous_carrier']),
                             ),
-                            widths[4],
+                            widths[5],
                           ),
                           _tableCell(
                             _tableBadge(
                               textValue(item['target_carrier']),
                               color: _carrierColor(item['target_carrier']),
                             ),
-                            widths[5],
+                            widths[6],
                           ),
                           _tableCell(
-                              _tableText(textValue(item['memo'])), widths[6]),
+                              _tableText(textValue(item['memo'])), widths[7]),
                           _tableCell(
                             canEdit
                                 ? Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
+                                      ContactActionButtons(
+                                        customerName:
+                                            textValue(item['subscriber']),
+                                        phone: textValue(item['phone']),
+                                        onMessage: showMessage,
+                                        dense: true,
+                                      ),
                                       _compactIconButton(
                                         tooltip: '수정',
                                         onPressed: () => showEditDialog(item),
@@ -1060,7 +1162,7 @@ class _LeadsPageState extends State<LeadsPage> {
                                     ],
                                   )
                                 : const SizedBox.shrink(),
-                            widths[7],
+                            widths[8],
                           ),
                         ],
                       ),
@@ -1380,6 +1482,23 @@ class _LeadsPageState extends State<LeadsPage> {
                             ),
                           ),
                           const SizedBox(width: 12),
+                          OutlinedButton.icon(
+                            onPressed: selectedLeadIds.isEmpty
+                                ? null
+                                : showSmsSendDialog,
+                            icon: const Icon(Icons.sms_rounded, size: 17),
+                            label: Text('문자 (${selectedLeadIds.length})'),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            onPressed: selectedLeadIds.isEmpty
+                                ? null
+                                : sendKakaoToSelectedLeads,
+                            icon:
+                                const Icon(Icons.chat_bubble_rounded, size: 17),
+                            label: Text('카카오 (${selectedLeadIds.length})'),
+                          ),
+                          const SizedBox(width: 8),
                           ElevatedButton.icon(
                             onPressed: showCreateDialog,
                             icon: const Icon(Icons.add, size: 17),

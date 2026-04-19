@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:crm_app/constants/message_templates.dart';
+import 'package:crm_app/services/contact_action_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
+import 'package:crm_app/widgets/contact_action_buttons.dart';
 import 'package:crm_app/widgets/compact_date_range_picker.dart';
 
 final supabase = Supabase.instance.client;
@@ -29,6 +32,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
 
   bool isLoading = false;
   List<Map<String, dynamic>> members = [];
+  final Set<String> selectedMemberIds = {};
   String selectedCarrierFilter = '전체';
   int currentPage = 0;
   static const int pageSize = 20;
@@ -366,6 +370,9 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                   matchesDateSearch(member['subscription_date'], dateFilter))
               .toList();
         }
+        selectedMemberIds.removeWhere(
+          (id) => !members.any((member) => textValue(member['id']) == id),
+        );
         currentPage = 0;
       });
     } catch (e) {
@@ -1305,6 +1312,76 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
     return text.isEmpty ? '-' : text;
   }
 
+  List<Map<String, dynamic>> _selectedMembers() {
+    return members
+        .where((member) => selectedMemberIds.contains(textValue(member['id'])))
+        .toList();
+  }
+
+  Future<void> _sendSmsToSelectedMembers(String message) async {
+    final selected = _selectedMembers();
+    final result = await const ContactActionService().smsBulk(
+      selected.map((member) => textValue(member['phone'])).toList(),
+      message,
+    );
+    if (!mounted) return;
+    showMessage(result.message ?? '${selected.length}명 문자 앱을 열었습니다.');
+  }
+
+  Future<void> showSmsSendDialog() async {
+    final selected = _selectedMembers();
+    if (selected.isEmpty) {
+      showMessage('문자를 보낼 유선회원을 선택해주세요.');
+      return;
+    }
+    final controller = TextEditingController(
+      text: buildContactMessage(
+        customerName: textValue(selected.first['subscriber']),
+      ),
+    );
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('문자 발송 (${selected.length}명)'),
+        content: TextField(
+          controller: controller,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            labelText: '문자 내용',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _sendSmsToSelectedMembers(controller.text);
+            },
+            child: const Text('문자 앱 열기'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> sendKakaoToSelectedMembers() async {
+    final selected = _selectedMembers();
+    if (selected.isEmpty) {
+      showMessage('카카오톡을 보낼 유선회원을 선택해주세요.');
+      return;
+    }
+    final message = buildContactMessage(
+      customerName: textValue(selected.first['subscriber']),
+    );
+    final result = await const ContactActionService().kakao(message);
+    if (!mounted) return;
+    showMessage(result.message ?? '${selected.length}명 카카오톡 공유 화면을 열었습니다.');
+  }
+
   String _normalizeCarrier(String value) {
     return value.toUpperCase().replaceAll(RegExp(r'[\s_-]'), '');
   }
@@ -1515,6 +1592,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
 
   Widget _wiredTable(List<Map<String, dynamic>> visibleMembers) {
     const baseWidths = <double>[
+      48,
       92,
       170,
       120,
@@ -1524,9 +1602,10 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
       118,
       118,
       118,
-      112,
+      210,
     ];
     const headers = [
+      '',
       '통신사',
       '개통처',
       '판매자',
@@ -1547,15 +1626,15 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
         final extraWidth = tableWidth - baseWidth;
         final widths = [...baseWidths];
         if (extraWidth > 0) {
-          widths[1] += extraWidth * 0.18;
-          widths[2] += extraWidth * 0.10;
-          widths[3] += extraWidth * 0.12;
+          widths[2] += extraWidth * 0.18;
+          widths[3] += extraWidth * 0.10;
           widths[4] += extraWidth * 0.12;
-          widths[5] += extraWidth * 0.20;
-          widths[6] += extraWidth * 0.08;
-          widths[7] += extraWidth * 0.08;
-          widths[8] += extraWidth * 0.08;
-          widths[9] += extraWidth * 0.04;
+          widths[5] += extraWidth * 0.12;
+          widths[6] += extraWidth * 0.18;
+          widths[7] += extraWidth * 0.07;
+          widths[8] += extraWidth * 0.07;
+          widths[9] += extraWidth * 0.07;
+          widths[10] += extraWidth * 0.09;
         }
 
         return SingleChildScrollView(
@@ -1580,6 +1659,8 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                   ),
                 ),
                 ...visibleMembers.map((item) {
+                  final memberId = textValue(item['id']);
+                  final selected = selectedMemberIds.contains(memberId);
                   return InkWell(
                     onTap: () => showDetailDialog(item),
                     child: Container(
@@ -1592,50 +1673,71 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                       child: Row(
                         children: [
                           _tableCell(
+                            Checkbox(
+                              value: selected,
+                              onChanged: (value) {
+                                setState(() {
+                                  if (value == true) {
+                                    selectedMemberIds.add(memberId);
+                                  } else {
+                                    selectedMemberIds.remove(memberId);
+                                  }
+                                });
+                              },
+                            ),
+                            widths[0],
+                          ),
+                          _tableCell(
                               _tableBadge(
                                 textValue(item['carrier']),
                                 color: _carrierColor(item['carrier']),
                               ),
-                              widths[0]),
+                              widths[1]),
                           _tableCell(
                             _tableText(textValue(item['activation_center'])),
-                            widths[1],
+                            widths[2],
                           ),
                           _tableCell(
-                              _tableText(textValue(item['seller'])), widths[2]),
+                              _tableText(textValue(item['seller'])), widths[3]),
                           _tableCell(
                             _tableText(textValue(item['subscriber']),
                                 strong: true),
-                            widths[3],
+                            widths[4],
                           ),
                           _tableCell(
-                              _tableText(textValue(item['phone'])), widths[4]),
+                              _tableText(textValue(item['phone'])), widths[5]),
                           _tableCell(
                             _tableBadge(
                               textValue(item['internet_type']),
                               color: const Color(0xFF3B82F6),
                             ),
-                            widths[5],
+                            widths[6],
                           ),
                           _tableCell(
                             _tableText(money(item['gift_card']),
                                 color: const Color(0xFFF59E0B), strong: true),
-                            widths[6],
+                            widths[7],
                           ),
                           _tableCell(
                             _tableText(money(item['prepaid_amount']),
                                 color: const Color(0xFF10B981), strong: true),
-                            widths[7],
+                            widths[8],
                           ),
                           _tableCell(
                             _tableText(money(item['postpaid_amount']),
                                 color: const Color(0xFFC94C6E), strong: true),
-                            widths[8],
+                            widths[9],
                           ),
                           _tableCell(
                             Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
+                                ContactActionButtons(
+                                  customerName: textValue(item['subscriber']),
+                                  phone: textValue(item['phone']),
+                                  onMessage: showMessage,
+                                  dense: true,
+                                ),
                                 _compactIconButton(
                                   tooltip: '상세',
                                   onPressed: () => showDetailDialog(item),
@@ -1658,7 +1760,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                                   ),
                               ],
                             ),
-                            widths[9],
+                            widths[10],
                           ),
                         ],
                       ),
@@ -1975,6 +2077,23 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                             ),
                           ),
                           const SizedBox(width: 12),
+                          OutlinedButton.icon(
+                            onPressed: selectedMemberIds.isEmpty
+                                ? null
+                                : showSmsSendDialog,
+                            icon: const Icon(Icons.sms_rounded, size: 17),
+                            label: Text('문자 (${selectedMemberIds.length})'),
+                          ),
+                          const SizedBox(width: 8),
+                          OutlinedButton.icon(
+                            onPressed: selectedMemberIds.isEmpty
+                                ? null
+                                : sendKakaoToSelectedMembers,
+                            icon:
+                                const Icon(Icons.chat_bubble_rounded, size: 17),
+                            label: Text('카카오 (${selectedMemberIds.length})'),
+                          ),
+                          const SizedBox(width: 8),
                           ElevatedButton.icon(
                             onPressed: showCreateDialog,
                             icon: const Icon(Icons.add, size: 17),

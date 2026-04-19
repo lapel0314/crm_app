@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:crm_app/services/kakao_talk_service.dart';
+import 'package:crm_app/services/contact_action_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:crm_app/constants/message_templates.dart';
 import 'package:crm_app/utils/store_utils.dart';
+import 'package:crm_app/widgets/contact_action_buttons.dart';
 import 'package:crm_app/widgets/compact_date_range_picker.dart';
 
 final supabase = Supabase.instance.client;
@@ -34,6 +37,7 @@ class _CustomerPageState extends State<CustomerPage> {
   final phoneSearchController = TextEditingController();
   final NumberFormat moneyFormat = NumberFormat('#,###');
   final kakaoTalkService = KakaoTalkService();
+  final contactActionService = const ContactActionService();
 
   List<Map<String, dynamic>> customers = [];
   final Set<String> selectedCustomerIds = {};
@@ -738,6 +742,64 @@ class _CustomerPageState extends State<CustomerPage> {
       setState(() => isSendingKakao = false);
       _showCenterMessage('카카오 발송 중 오류가 발생했습니다: $e');
     }
+  }
+
+  Future<void> _sendSmsToSelected(String message) async {
+    final selected = _selectedCustomers();
+    if (selected.isEmpty) {
+      _showCenterMessage('문자를 보낼 고객을 선택해 주세요');
+      return;
+    }
+    final result = await contactActionService.smsBulk(
+      selected.map((customer) => customer['phone']?.toString() ?? '').toList(),
+      message,
+    );
+    if (!result.success) {
+      _showCenterMessage(result.message ?? '문자 앱을 열 수 없습니다.');
+    }
+  }
+
+  Future<void> showSmsSendDialog() async {
+    final selected = _selectedCustomers();
+    if (selected.isEmpty) {
+      _showCenterMessage('문자를 보낼 고객을 선택해 주세요');
+      return;
+    }
+    final controller = TextEditingController(
+      text: buildContactMessage(customerName: _text(selected.first['name'])),
+    );
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: Text('문자 발송 (${selected.length}명)'),
+        content: TextField(
+          controller: controller,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            labelText: '문자 내용',
+            alignLabelWithHint: true,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final message = controller.text.trim();
+              if (message.isEmpty) {
+                _showCenterMessage('문자 내용을 입력해 주세요');
+                return;
+              }
+              Navigator.pop(context);
+              await _sendSmsToSelected(message);
+            },
+            child: const Text('문자 앱 열기'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<List<String>> _loadKakaoTemplates() async {
@@ -1695,6 +1757,11 @@ class _CustomerPageState extends State<CustomerPage> {
                             ],
                           ),
                         ),
+                        ContactActionButtons(
+                          customerName: customer['name']?.toString() ?? '',
+                          phone: customer['phone']?.toString() ?? '',
+                          onMessage: _showCenterMessage,
+                        ),
                       ],
                     ),
                   ),
@@ -2484,6 +2551,23 @@ class _CustomerPageState extends State<CustomerPage> {
                                 backgroundColor: const Color(0xFFFEE500),
                                 foregroundColor: const Color(0xFF111827),
                                 elevation: 0,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton.icon(
+                              onPressed: selectedCustomerIds.isEmpty
+                                  ? null
+                                  : showSmsSendDialog,
+                              icon: const Icon(Icons.sms_outlined, size: 17),
+                              label:
+                                  Text('문자 발송 (${selectedCustomerIds.length})'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.white,
+                                foregroundColor: const Color(0xFF374151),
+                                elevation: 0,
+                                side: const BorderSide(
+                                  color: Color(0xFFE8E9EF),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 8),

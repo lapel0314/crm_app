@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ffi';
 import 'dart:io';
 
+import 'package:android_intent_plus/android_intent.dart';
 import 'package:ffi/ffi.dart';
 import 'package:win32/win32.dart';
 
@@ -55,7 +56,7 @@ class KakaoTalkService {
 
   Future<void> ensureKakaoTalkRunning() async {
     if (!Platform.isWindows) {
-      throw UnsupportedError('카카오톡 발송은 Windows에서만 사용할 수 있습니다.');
+      throw UnsupportedError('移댁뭅?ㅽ넚 諛쒖넚? Windows?먯꽌留??ъ슜?????덉뒿?덈떎.');
     }
 
     if (findKakaoMainWindow() != null) return;
@@ -80,7 +81,7 @@ class KakaoTalkService {
     await Process.start('cmd', const ['/c', 'start', '', 'kakaotalk://']);
     await Future<void>.delayed(const Duration(seconds: 2));
     if (findKakaoMainWindow() == null) {
-      throw StateError('카카오톡 PC 실행 여부를 확인해 주세요.');
+      throw StateError('移댁뭅?ㅽ넚 PC ?ㅽ뻾 ?щ?瑜??뺤씤??二쇱꽭??');
     }
   }
 
@@ -95,7 +96,7 @@ class KakaoTalkService {
       final isKakaoClass = _kakaoClassCandidates
           .any((candidate) => className.contains(candidate));
       final isKakaoTitle =
-          title.contains('카카오톡') || title.contains('KakaoTalk');
+          title.contains('移댁뭅?ㅽ넚') || title.contains('KakaoTalk');
       if (isKakaoClass && isKakaoTitle && IsWindowVisible(hwnd)) return hwnd;
     }
   }
@@ -104,7 +105,7 @@ class KakaoTalkService {
     await ensureKakaoTalkRunning();
     final mainWindow = findKakaoMainWindow();
     if (mainWindow == null) {
-      throw StateError('카카오톡 메인창을 찾지 못했습니다.');
+      throw StateError('移댁뭅?ㅽ넚 硫붿씤李쎌쓣 李얠? 紐삵뻽?듬땲??');
     }
 
     ShowWindow(mainWindow, SW_RESTORE);
@@ -113,7 +114,7 @@ class KakaoTalkService {
 
     final online = _findChildWindowByTitle(mainWindow, 'OnlineMainView');
     if (online == null) {
-      throw StateError('카카오톡 OnlineMainView를 찾지 못했습니다.');
+      throw StateError('移댁뭅?ㅽ넚 OnlineMainView瑜?李얠? 紐삵뻽?듬땲??');
     }
 
     final listViewName = switch (chatType) {
@@ -122,12 +123,12 @@ class KakaoTalkService {
     };
     final listView = _findChildWindowByTitle(online, listViewName);
     if (listView == null) {
-      throw StateError('카카오톡 $listViewName 영역을 찾지 못했습니다.');
+      throw StateError('移댁뭅?ㅽ넚 $listViewName ?곸뿭??李얠? 紐삵뻽?듬땲??');
     }
 
     final edit = _findDirectChildByClass(listView, 'Edit');
     if (edit == null) {
-      throw StateError('카카오톡 검색 입력창을 찾지 못했습니다.');
+      throw StateError('移댁뭅?ㅽ넚 寃???낅젰李쎌쓣 李얠? 紐삵뻽?듬땲??');
     }
 
     if (chatType == KakaoChatType.openChat) {
@@ -168,22 +169,39 @@ class KakaoTalkService {
     required String message,
   }) async {
     try {
+      if (Platform.isAndroid) {
+        if (message.trim().isEmpty) {
+          throw ArgumentError('발송 메시지가 비어 있습니다.');
+        }
+        final intent = AndroidIntent(
+          action: 'android.intent.action.SEND',
+          package: 'com.kakao.talk',
+          type: 'text/plain',
+          arguments: {'android.intent.extra.TEXT': message},
+        );
+        await intent.launch();
+        return KakaoSendResult(
+          target: target,
+          message: message,
+          success: true,
+        );
+      }
       if (target.searchName.trim().isEmpty) {
-        throw ArgumentError('카카오톡 검색 이름이 비어 있습니다.');
+        throw ArgumentError('移댁뭅?ㅽ넚 寃???대쫫??鍮꾩뼱 ?덉뒿?덈떎.');
       }
       if (message.trim().isEmpty) {
-        throw ArgumentError('발송 메시지가 비어 있습니다.');
+        throw ArgumentError('諛쒖넚 硫붿떆吏媛 鍮꾩뼱 ?덉뒿?덈떎.');
       }
 
       await activateChat(target.searchName.trim(), target.chatType);
       final chatWindow = await waitForChatWindow(target.searchName.trim());
       if (chatWindow == null) {
-        throw StateError('채팅창을 찾지 못했습니다.');
+        throw StateError('梨꾪똿李쎌쓣 李얠? 紐삵뻽?듬땲??');
       }
 
       final input = _findDirectChildByClass(chatWindow, 'RichEdit50W');
       if (input == null) {
-        throw StateError('채팅창 입력창(RichEdit50W)을 찾지 못했습니다.');
+        throw StateError('梨꾪똿李??낅젰李?RichEdit50W)??李얠? 紐삵뻽?듬땲??');
       }
 
       SetForegroundWindow(chatWindow);

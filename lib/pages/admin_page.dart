@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/services/notice_service.dart';
@@ -138,24 +138,20 @@ class _AdminPageState extends State<AdminPage> {
                   const SizedBox(height: 12),
                   OutlinedButton.icon(
                     onPressed: () async {
-                      final result = await FilePicker.platform.pickFiles(
-                        type: FileType.custom,
-                        allowedExtensions: const [
-                          'jpg',
-                          'jpeg',
-                          'png',
-                          'webp',
-                          'gif'
-                        ],
-                        withData: true,
+                      const imageTypes = XTypeGroup(
+                        label: 'images',
+                        extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif'],
                       );
-                      if (result == null || result.files.isEmpty) return;
-                      final file = result.files.single;
+                      final file = await openFile(
+                        acceptedTypeGroups: const [imageTypes],
+                      );
+                      if (file == null) return;
+                      final bytes = await file.readAsBytes();
                       setDialogState(() {
-                        imageBytes = file.bytes;
+                        imageBytes = bytes;
                         imageName = file.name;
                         imageContentType =
-                            switch ((file.extension ?? '').toLowerCase()) {
+                            switch (file.name.split('.').last.toLowerCase()) {
                           'png' => 'image/png',
                           'webp' => 'image/webp',
                           'gif' => 'image/gif',

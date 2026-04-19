@@ -54,6 +54,16 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build_windows_installer.ps
 
 설치파일은 `output` 폴더에 생성됩니다.
 
+## Android APK 빌드/수동 배포
+
+Android는 Google Play가 아니라 수동 APK 배포 기준으로 동작합니다. 앱 시작 시
+Supabase `app_updates`에서 `platform = 'android'` 정책을 조회하고,
+현재 앱 버전이 `min_required_version`보다 낮으면 업데이트 화면 외에는 진입할 수
+없습니다.
+
+자세한 빌드, Supabase 데이터 예시, APK 업로드 절차는
+`BUILD_ANDROID.md`를 확인하세요.
+
 ## 업데이트 배포
 
 새 버전을 배포할 때는 다음 값을 함께 올립니다.
