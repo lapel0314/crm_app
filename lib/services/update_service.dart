@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-const String appVersion = '1.0.3';
+const String appVersion = '1.0.4';
 const String installerPassword = String.fromEnvironment(
   'INSTALLER_PASSWORD',
   defaultValue: '123456',
@@ -93,14 +93,17 @@ class UpdateService {
   }
 
   Future<void> runInstaller(File installer) async {
+    final logPath =
+        '${Directory.systemTemp.path}\\pink_phone_crm_update\\installer.log';
     await Process.start(
       installer.path,
-      const [
+      [
         '/SP-',
         '/VERYSILENT',
         '/SUPPRESSMSGBOXES',
         '/NORESTART',
         '/PASSWORD=$installerPassword',
+        '/LOG=$logPath',
       ],
       mode: ProcessStartMode.detached,
     );

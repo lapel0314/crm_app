@@ -5,7 +5,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:crm_app/services/rebate_image_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
-import 'package:crm_app/widgets/rate_card_rules_panel.dart';
 
 final supabase = Supabase.instance.client;
 
@@ -21,7 +20,6 @@ class RebatePage extends StatefulWidget {
 class _RebatePageState extends State<RebatePage> {
   static const carriers = ['SKT', 'KT', 'LG'];
   late final RebateImageService service;
-  final rateCardPanelKey = GlobalKey<RateCardRulesPanelState>();
   DateTime selectedDate = DateTime.now();
   String selectedCarrier = 'SKT';
   RebateImage? currentImage;
@@ -710,14 +708,6 @@ class _RebatePageState extends State<RebatePage> {
                     ],
                   ),
                 ),
-                if (canManage) ...[
-                  RateCardRulesPanel(
-                    key: rateCardPanelKey,
-                    carrier: selectedCarrier,
-                    onMessage: _showMessage,
-                  ),
-                  const SizedBox(width: 10),
-                ],
                 _headerActionButton(
                   icon: Icons.calendar_month_outlined,
                   label: '날짜 선택',

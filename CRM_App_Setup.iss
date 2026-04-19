@@ -1,5 +1,5 @@
 #define MyAppName "핑크폰 CRM"
-#define MyAppVersion "1.0.3"
+#define MyAppVersion "1.0.4"
 #define MyAppPublisher "Pink Phone"
 #define MyAppExeName "핑크폰 CRM.exe"
 #define MyBuildExeName "crm_app.exe"
@@ -47,7 +47,7 @@ Name: "{autoprograms}\제거 {#MyAppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#MyAppExeName}"; Description: "{#MyAppName} 실행"; Flags: nowait postinstall skipifsilent
+Filename: "{app}\{#MyAppExeName}"; Description: "{#MyAppName} 실행"; Flags: nowait postinstall
 
 [InstallDelete]
 Type: files; Name: "{app}\crm_app.exe"
