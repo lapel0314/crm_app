@@ -527,7 +527,7 @@ class _LoginPageState extends State<LoginPage>
           ),
           const SizedBox(height: 8),
           Text(
-            latestNotice?.content ?? '?濚밸Ŧ援욃ㅇ?????살쓴?????????⑤８?????덊렡.',
+            latestNotice?.content ?? '등록된 공지사항이 없습니다.',
             maxLines: 4,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
@@ -981,4 +981,3 @@ class _LoginPageState extends State<LoginPage>
     );
   }
 }
-

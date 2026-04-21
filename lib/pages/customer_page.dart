@@ -57,6 +57,10 @@ class _CustomerPageState extends State<CustomerPage> {
   bool get canDelete => !isOpenView && canDeleteCustomer(widget.role);
   bool get canViewAllStores => isPrivilegedRole(widget.role);
 
+  bool _isCompactIosDialogContext(BuildContext context) {
+    return !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -555,6 +559,9 @@ class _CustomerPageState extends State<CustomerPage> {
   }
 
   void _showKakaoSendingDialog(int total) {
+    final compactIos = _isCompactIosDialogContext(context);
+    final screenSize = MediaQuery.of(context).size;
+
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -563,7 +570,7 @@ class _CustomerPageState extends State<CustomerPage> {
         child: Dialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           child: Container(
-            width: 420,
+            width: compactIos ? screenSize.width - 56 : 420,
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: Colors.white,
@@ -611,10 +618,13 @@ class _CustomerPageState extends State<CustomerPage> {
 
     showDialog<void>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) {
+        final compactIos = _isCompactIosDialogContext(dialogContext);
+        final screenSize = MediaQuery.of(dialogContext).size;
+        return AlertDialog(
         title: const Text('카카오 발송 결과'),
         content: SizedBox(
-          width: 520,
+          width: compactIos ? screenSize.width - 56 : 520,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -679,7 +689,8 @@ class _CustomerPageState extends State<CustomerPage> {
             child: const Text('확인'),
           ),
         ],
-      ),
+      );
+      },
     );
   }
 
@@ -932,6 +943,9 @@ class _CustomerPageState extends State<CustomerPage> {
       context: context,
       builder: (dialogContext) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final compactIos = _isCompactIosDialogContext(context);
+          final screenSize = MediaQuery.of(context).size;
+
           void applyTemplates(List<String> next) {
             setDialogState(() => templates = next);
           }
@@ -946,11 +960,17 @@ class _CustomerPageState extends State<CustomerPage> {
           }
 
           return Dialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: compactIos ? 16 : 24,
+              vertical: 24,
+            ),
             shape:
                 RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             child: Container(
-              width: 720,
+              width: compactIos ? screenSize.width - 32 : 720,
+              constraints: BoxConstraints(
+                maxHeight: compactIos ? screenSize.height * 0.82 : 760,
+              ),
               padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -1461,6 +1481,9 @@ class _CustomerPageState extends State<CustomerPage> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final compactIos = _isCompactIosDialogContext(context);
+          final screenSize = MediaQuery.of(context).size;
+
           void onMoneyChanged(TextEditingController controller, String value) {
             _applyMoneyFormat(controller, value);
             setDialogState(() {});
@@ -1489,7 +1512,7 @@ class _CustomerPageState extends State<CustomerPage> {
               ],
             ),
             content: SizedBox(
-              width: 680,
+              width: compactIos ? screenSize.width - 56 : 680,
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

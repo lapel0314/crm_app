@@ -1,6 +1,9 @@
+import 'dart:io' show Platform;
+
 import 'package:crm_app/pages/login_page.dart';
 import 'package:crm_app/services/login_policy_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -99,6 +102,54 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> logout(BuildContext context) async {
+    final shouldLogout = await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            backgroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+            title: const Text(
+              '로그아웃',
+              style: TextStyle(
+                color: Color(0xFF111827),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            content: const Text(
+              '현재 계정에서 로그아웃하시겠습니까?',
+              style: TextStyle(
+                color: Color(0xFF6B7280),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF6B7280),
+                ),
+                child: const Text('취소'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFC94C6E),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                child: const Text('로그아웃'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!shouldLogout || !context.mounted) return;
+
     try {
       await supabase.auth.signOut();
       if (!context.mounted) return;
@@ -637,6 +688,8 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _networkManagementCard() {
     final snapshot = networkSnapshot;
     final networks = snapshot?.networks ?? const <StoreNetworkRecord>[];
+    final compactIos =
+        !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -672,26 +725,33 @@ class _SettingsPageState extends State<SettingsPage> {
             ],
           ),
           const SizedBox(height: 16),
-          Row(
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
             children: [
-              ElevatedButton.icon(
-                onPressed: isNetworkLoading ? null : _registerCurrentNetwork,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFC94C6E),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+              SizedBox(
+                width: compactIos ? double.infinity : null,
+                child: ElevatedButton.icon(
+                  onPressed: isNetworkLoading ? null : _registerCurrentNetwork,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFC94C6E),
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
+                  icon: const Icon(Icons.wifi_protected_setup_rounded, size: 18),
+                  label: const Text('현재 네트워크 등록'),
                 ),
-                icon: const Icon(Icons.wifi_protected_setup_rounded, size: 18),
-                label: const Text('현재 네트워크 등록'),
               ),
-              const SizedBox(width: 10),
-              OutlinedButton.icon(
-                onPressed: isNetworkLoading ? null : _loadStoreNetworks,
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('새로고침'),
+              SizedBox(
+                width: compactIos ? double.infinity : null,
+                child: OutlinedButton.icon(
+                  onPressed: isNetworkLoading ? null : _loadStoreNetworks,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('새로고침'),
+                ),
               ),
             ],
           ),
@@ -782,6 +842,7 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final mobile = MediaQuery.of(context).size.width < 900;
+    final compactIos = !kIsWeb && Platform.isIOS && mobile;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F8),
@@ -796,18 +857,31 @@ class _SettingsPageState extends State<SettingsPage> {
                       ? Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: _tabRail(),
-                            ),
+                            if (compactIos)
+                              _compactSectionHeader('내 정보')
+                            else
+                              SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: _tabRail(),
+                              ),
                             const SizedBox(height: 18),
                             _profileCard(),
                             const SizedBox(height: 18),
                             if (canManageStoreNetworks) ...[
+                              if (compactIos) _compactSectionHeader('매장 네트워크'),
                               _networkManagementCard(),
                               const SizedBox(height: 18),
                             ],
+                            if (compactIos) _compactSectionHeader('매장 그룹'),
                             _teamGroups(),
+                            if (compactIos) ...[
+                              const SizedBox(height: 18),
+                              OutlinedButton.icon(
+                                onPressed: () => logout(context),
+                                icon: const Icon(Icons.logout_rounded),
+                                label: const Text('로그아웃'),
+                              ),
+                            ],
                           ],
                         )
                       : Row(
@@ -833,6 +907,20 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
             ),
+    );
+  }
+
+  Widget _compactSectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        title,
+        style: const TextStyle(
+          color: Color(0xFF111827),
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
     );
   }
 }

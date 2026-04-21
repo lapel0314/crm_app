@@ -109,4 +109,16 @@ class NoticeService {
 
     await supabase.from('crm_notices').insert(payload);
   }
+
+  Future<void> deleteNotice(Notice notice) async {
+    if (notice.hasImage) {
+      try {
+        await supabase.storage.from(bucketName).remove([notice.imagePath]);
+      } catch (_) {
+        // Ignore missing or already-removed assets and continue deleting the row.
+      }
+    }
+
+    await supabase.from('crm_notices').delete().eq('id', notice.id);
+  }
 }

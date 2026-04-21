@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:crm_app/services/device_context_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -129,6 +130,19 @@ class LoginPolicyService {
     });
 
     final decision = LoginPolicyDecision.fromJson(data);
+    if (_shouldBypassIosDebugPolicy(decision, context)) {
+      return LoginPolicyDecision(
+        allowed: true,
+        message: decision.message,
+        reasonCode: 'ios_debug_bypass',
+        detectedPublicIp: decision.detectedPublicIp,
+        role: decision.role,
+        storeName: decision.storeName,
+        storeId: decision.storeId,
+        ssid: decision.ssid,
+        canManageNetworks: decision.canManageNetworks,
+      );
+    }
     if (!decision.allowed) {
       throw LoginPolicyException(
         decision.message.isEmpty ? '로그인이 허용되지 않습니다.' : decision.message,
@@ -228,5 +242,14 @@ class LoginPolicyService {
       return data.map((key, value) => MapEntry(key.toString(), value));
     }
     return <String, dynamic>{};
+  }
+
+  bool _shouldBypassIosDebugPolicy(
+    LoginPolicyDecision decision,
+    DeviceContext context,
+  ) {
+    return kDebugMode &&
+        context.platform == 'ios' &&
+        decision.reasonCode == 'staff_network_blocked';
   }
 }

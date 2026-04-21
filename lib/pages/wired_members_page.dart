@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -41,6 +44,10 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
   bool get canEdit => canUseWiredMembers(widget.role);
   bool get canDelete => canDeleteWiredMember(widget.role);
   bool get canViewAllStores => isPrivilegedRole(widget.role);
+
+  bool _isCompactIosDialogContext(BuildContext context) {
+    return !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
+  }
 
   @override
   void initState() {
@@ -692,6 +699,9 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final compactIos = _isCompactIosDialogContext(context);
+          final dialogWidth =
+              compactIos ? MediaQuery.of(context).size.width - 56 : 560.0;
           final rebate = parseInt(rebateController.text);
           final extra = parseInt(extraRebateController.text);
           final prepaid = parseInt(prepaidAmountController.text);
@@ -709,7 +719,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
               ),
             ),
             content: SizedBox(
-              width: 560,
+              width: dialogWidth,
               child: SingleChildScrollView(
                 child: Wrap(
                   spacing: 12,
@@ -717,7 +727,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                   children: [
                     _dialogSectionTitle('기본 정보'),
                     SizedBox(
-                      width: 244,
+                      width: compactIos ? dialogWidth : 244,
                       child: ElevatedButton(
                         onPressed: () async {
                           final picked = await showDatePicker(
@@ -821,7 +831,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                       extra: extra,
                       prepaid: prepaid,
                       postpaid: postpaid,
-                      width: 500,
+                      width: compactIos ? dialogWidth : 500,
                     ),
                     _dialogSectionTitle('입금 계좌 및 메모'),
                     _wiredInput(label: '은행명', controller: bankNameController),
@@ -832,7 +842,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                     _wiredInput(
                       label: '메모',
                       controller: memoController,
-                      width: 500,
+                      width: compactIos ? dialogWidth : 500,
                       maxLines: 3,
                     ),
                   ],
@@ -925,6 +935,9 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final compactIos = _isCompactIosDialogContext(context);
+          final dialogWidth =
+              compactIos ? MediaQuery.of(context).size.width - 56 : 560.0;
           final rebate = parseInt(rebateController.text);
           final extra = parseInt(extraRebateController.text);
           final prepaid = parseInt(prepaidAmountController.text);
@@ -942,7 +955,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
               ),
             ),
             content: SizedBox(
-              width: 560,
+              width: dialogWidth,
               child: SingleChildScrollView(
                 child: Wrap(
                   spacing: 12,
@@ -950,7 +963,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                   children: [
                     _dialogSectionTitle('기본 정보'),
                     SizedBox(
-                      width: 244,
+                      width: compactIos ? dialogWidth : 244,
                       child: ElevatedButton(
                         onPressed: () async {
                           final picked = await showDatePicker(
@@ -1054,7 +1067,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                       extra: extra,
                       prepaid: prepaid,
                       postpaid: postpaid,
-                      width: 500,
+                      width: compactIos ? dialogWidth : 500,
                     ),
                     _dialogSectionTitle('입금 계좌 및 메모'),
                     _wiredInput(label: '은행명', controller: bankNameController),
@@ -1065,7 +1078,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                     _wiredInput(
                       label: '메모',
                       controller: memoController,
-                      width: 500,
+                      width: compactIos ? dialogWidth : 500,
                       maxLines: 3,
                     ),
                   ],
@@ -1227,7 +1240,11 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
   void showDetailDialog(Map<String, dynamic> item) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (context) {
+        final compactIos = _isCompactIosDialogContext(context);
+        final dialogWidth =
+            compactIos ? MediaQuery.of(context).size.width - 56 : 760.0;
+        return AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         title: Text(
@@ -1238,7 +1255,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
           ),
         ),
         content: SizedBox(
-          width: 760,
+          width: dialogWidth,
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1303,7 +1320,8 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
               child: const Text('삭제'),
             ),
         ],
-      ),
+      );
+      },
     );
   }
 
@@ -1342,14 +1360,19 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
     );
     await showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) {
+        final compactIos = _isCompactIosDialogContext(context);
+        return AlertDialog(
         title: Text('문자 발송 (${selected.length}명)'),
-        content: TextField(
-          controller: controller,
-          maxLines: 5,
-          decoration: const InputDecoration(
-            labelText: '문자 내용',
-            border: OutlineInputBorder(),
+        content: SizedBox(
+          width: compactIos ? MediaQuery.of(context).size.width - 56 : 420,
+          child: TextField(
+            controller: controller,
+            maxLines: 5,
+            decoration: const InputDecoration(
+              labelText: '문자 내용',
+              border: OutlineInputBorder(),
+            ),
           ),
         ),
         actions: [
@@ -1365,7 +1388,8 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
             child: const Text('문자 앱 열기'),
           ),
         ],
-      ),
+      );
+      },
     );
   }
 

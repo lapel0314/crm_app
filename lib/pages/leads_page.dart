@@ -1,4 +1,7 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/constants/message_templates.dart';
@@ -41,6 +44,10 @@ class _LeadsPageState extends State<LeadsPage> {
   bool get canEdit => canUseLeads(widget.role);
   bool get canDelete => canDeleteLead(widget.role);
   bool get canViewAllStores => isPrivilegedRole(widget.role);
+
+  bool _isCompactIosDialogContext(BuildContext context) {
+    return !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
+  }
 
   @override
   void initState() {
@@ -477,6 +484,10 @@ class _LeadsPageState extends State<LeadsPage> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final compactIos = _isCompactIosDialogContext(context);
+          final dialogWidth =
+              compactIos ? MediaQuery.of(context).size.width - 56 : 760.0;
+
           return AlertDialog(
             backgroundColor: Colors.white,
             shape: RoundedRectangleBorder(
@@ -490,14 +501,14 @@ class _LeadsPageState extends State<LeadsPage> {
               ),
             ),
             content: SizedBox(
-              width: 760,
+              width: dialogWidth,
               child: SingleChildScrollView(
                 child: Wrap(
                   spacing: 12,
                   runSpacing: 12,
                   children: [
                     SizedBox(
-                      width: 240,
+                      width: compactIos ? dialogWidth : 240,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFC94C6E),
@@ -559,7 +570,7 @@ class _LeadsPageState extends State<LeadsPage> {
                     _leadInput(
                       label: '메모',
                       controller: memoController,
-                      width: 492,
+                      width: compactIos ? dialogWidth : 492,
                       maxLines: 3,
                     ),
                   ],
@@ -620,6 +631,10 @@ class _LeadsPageState extends State<LeadsPage> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final compactIos = _isCompactIosDialogContext(context);
+          final dialogWidth =
+              compactIos ? MediaQuery.of(context).size.width - 56 : 760.0;
+
           return AlertDialog(
             backgroundColor: Colors.white,
             shape: RoundedRectangleBorder(
@@ -633,14 +648,14 @@ class _LeadsPageState extends State<LeadsPage> {
               ),
             ),
             content: SizedBox(
-              width: 760,
+              width: dialogWidth,
               child: SingleChildScrollView(
                 child: Wrap(
                   spacing: 12,
                   runSpacing: 12,
                   children: [
                     SizedBox(
-                      width: 240,
+                      width: compactIos ? dialogWidth : 240,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFC94C6E),
@@ -702,7 +717,7 @@ class _LeadsPageState extends State<LeadsPage> {
                     _leadInput(
                       label: '메모',
                       controller: memoController,
-                      width: 492,
+                      width: compactIos ? dialogWidth : 492,
                       maxLines: 3,
                     ),
                   ],
@@ -798,14 +813,19 @@ class _LeadsPageState extends State<LeadsPage> {
     );
     await showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) {
+        final compactIos = _isCompactIosDialogContext(context);
+        return AlertDialog(
         title: Text('문자 발송 (${selected.length}명)'),
-        content: TextField(
-          controller: controller,
-          maxLines: 5,
-          decoration: const InputDecoration(
-            labelText: '문자 내용',
-            border: OutlineInputBorder(),
+        content: SizedBox(
+          width: compactIos ? MediaQuery.of(context).size.width - 56 : 420,
+          child: TextField(
+            controller: controller,
+            maxLines: 5,
+            decoration: const InputDecoration(
+              labelText: '문자 내용',
+              border: OutlineInputBorder(),
+            ),
           ),
         ),
         actions: [
@@ -821,7 +841,8 @@ class _LeadsPageState extends State<LeadsPage> {
             child: const Text('문자 앱 열기'),
           ),
         ],
-      ),
+      );
+      },
     );
   }
 

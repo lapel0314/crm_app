@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -37,6 +40,10 @@ class _DashboardPageState extends State<DashboardPage> {
   int monthRebate = 0;
   int monthTax = 0;
   int monthMargin = 0;
+
+  bool _isCompactIosDialogContext(BuildContext context) {
+    return !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
+  }
 
   @override
   void initState() {
@@ -763,10 +770,13 @@ class _DashboardPageState extends State<DashboardPage> {
     if (mobile) {
       showDialog(
         context: context,
-        builder: (_) => AlertDialog(
-          insetPadding: const EdgeInsets.symmetric(
-            horizontal: 12,
-            vertical: 18,
+        builder: (dialogContext) {
+          final compactIos = _isCompactIosDialogContext(dialogContext);
+          final screenSize = MediaQuery.of(dialogContext).size;
+          return AlertDialog(
+          insetPadding: EdgeInsets.symmetric(
+            horizontal: compactIos ? 10 : 12,
+            vertical: compactIos ? 14 : 18,
           ),
           backgroundColor: Colors.white,
           shape:
@@ -784,7 +794,7 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
           content: SizedBox(
             width: double.maxFinite,
-            height: 560,
+            height: compactIos ? screenSize.height * 0.68 : 560,
             child: Column(
               children: [
                 GridView.count(
@@ -820,7 +830,8 @@ class _DashboardPageState extends State<DashboardPage> {
               child: const Text('닫기'),
             ),
           ],
-        ),
+        );
+        },
       );
       return;
     }

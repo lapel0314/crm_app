@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -29,6 +32,10 @@ class _RebatePageState extends State<RebatePage> {
 
   bool get canView => canViewRebate(widget.role);
   bool get canManage => isPrivilegedRole(widget.role);
+
+  bool _isCompactIosDialogContext(BuildContext context) {
+    return !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
+  }
 
   @override
   void initState() {
@@ -198,6 +205,7 @@ class _RebatePageState extends State<RebatePage> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final compactIos = _isCompactIosDialogContext(context);
           Future<void> pickDate() async {
             final picked = await showDialog<DateTime>(
               context: context,
@@ -218,7 +226,7 @@ class _RebatePageState extends State<RebatePage> {
               style: TextStyle(fontWeight: FontWeight.w900),
             ),
             content: SizedBox(
-              width: 360,
+              width: compactIos ? MediaQuery.of(context).size.width - 56 : 360,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -851,7 +859,10 @@ class _CompactMonthPickerState extends State<_CompactMonthPicker> {
         ],
       ),
       content: SizedBox(
-        width: 360,
+        width:
+            (!kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900)
+                ? MediaQuery.of(context).size.width - 56
+                : 360,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

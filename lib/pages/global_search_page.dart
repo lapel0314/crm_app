@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -33,6 +36,10 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
   String? errorMessage;
   final NumberFormat moneyFormat = NumberFormat('#,###');
   bool get canViewAllStores => isPrivilegedRole(widget.role);
+
+  bool _isCompactIosDialogContext(BuildContext context) {
+    return !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
+  }
 
   @override
   void initState() {
@@ -508,7 +515,11 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
   }) {
     showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (context) {
+        final compactIos = _isCompactIosDialogContext(context);
+        final dialogWidth =
+            compactIos ? MediaQuery.of(context).size.width - 56 : 720.0;
+        return AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         title: Text(
@@ -519,13 +530,19 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
           ),
         ),
         content: SizedBox(
-          width: 720,
+          width: dialogWidth,
           child: SingleChildScrollView(
             child: Wrap(
               spacing: 18,
               runSpacing: 0,
               children: [
-                for (final row in rows) _detailRow(row.key, row.value),
+                for (final row in rows)
+                  _detailRow(
+                    row.key,
+                    row.value,
+                    width: compactIos ? dialogWidth : 330,
+                    labelWidth: compactIos ? 92 : 110,
+                  ),
               ],
             ),
           ),
@@ -536,13 +553,19 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
             child: const Text('닫기'),
           ),
         ],
-      ),
+      );
+      },
     );
   }
 
-  Widget _detailRow(String label, dynamic value) {
+  Widget _detailRow(
+    String label,
+    dynamic value, {
+    double width = 330,
+    double labelWidth = 110,
+  }) {
     return SizedBox(
-      width: 330,
+      width: width,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 9),
         decoration: const BoxDecoration(
@@ -554,7 +577,7 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
-              width: 110,
+              width: labelWidth,
               child: Text(
                 label,
                 style: const TextStyle(

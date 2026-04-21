@@ -233,14 +233,14 @@ class _AppLayoutState extends State<AppLayout> {
               borderRadius: BorderRadius.circular(8),
             ),
             title: const Text(
-              '로그아웃',
+              '\uB85C\uADF8\uC544\uC6C3',
               style: TextStyle(
                 color: Color(0xFF111827),
                 fontWeight: FontWeight.w900,
               ),
             ),
             content: const Text(
-              '현재 계정에서 로그아웃하시겠습니까?',
+              '\uD604\uC7AC \uACC4\uC815\uC5D0\uC11C \uB85C\uADF8\uC544\uC6C3\uD558\uC2DC\uACA0\uC2B5\uB2C8\uAE4C?',
               style: TextStyle(
                 color: Color(0xFF6B7280),
                 fontWeight: FontWeight.w600,
@@ -252,7 +252,7 @@ class _AppLayoutState extends State<AppLayout> {
                 style: TextButton.styleFrom(
                   foregroundColor: const Color(0xFF6B7280),
                 ),
-                child: const Text('취소'),
+                child: const Text('\uCDE8\uC18C'),
               ),
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
@@ -264,7 +264,7 @@ class _AppLayoutState extends State<AppLayout> {
                     borderRadius: BorderRadius.circular(8),
                   ),
                 ),
-                child: const Text('로그아웃'),
+                child: const Text('\uB85C\uADF8\uC544\uC6C3'),
               ),
             ],
           ),
@@ -344,6 +344,8 @@ class _AppLayoutState extends State<AppLayout> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final screenSize = MediaQuery.of(context).size;
+          final compact = screenSize.width < 900;
           final totalPages = notices.isEmpty
               ? 1
               : ((notices.length - 1) ~/ noticePageSize) + 1;
@@ -364,8 +366,8 @@ class _AppLayoutState extends State<AppLayout> {
               ),
             ),
             content: SizedBox(
-              width: 620,
-              height: 540,
+              width: compact ? screenSize.width - 56 : 620,
+              height: compact ? screenSize.height * 0.62 : 540,
               child: notices.isEmpty
                   ? const Center(child: Text('등록된 공지사항이 없습니다.'))
                   : Column(
@@ -376,7 +378,10 @@ class _AppLayoutState extends State<AppLayout> {
                             separatorBuilder: (_, __) =>
                                 const SizedBox(height: 8),
                             itemBuilder: (context, index) {
-                              return _noticeTile(pageItems[index]);
+                              return _noticeTile(
+                                pageItems[index],
+                                setDialogState,
+                              );
                             },
                           ),
                         ),
@@ -424,13 +429,66 @@ class _AppLayoutState extends State<AppLayout> {
     );
   }
 
+  Future<void> _deleteNoticeFromPopup(
+    BuildContext context,
+    Notice notice,
+    void Function(void Function()) setDialogState,
+  ) async {
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            title: const Text('공지사항 삭제'),
+            content: Text('"${notice.title}" 공지사항을 삭제하시겠습니까?'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('취소'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('삭제'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !mounted) return;
+
+    await noticeService.deleteNotice(notice);
+    final refreshed = await noticeService.fetchNotices();
+    if (!mounted) return;
+
+    setDialogState(() {
+      notices = refreshed;
+      final totalPages =
+          refreshed.isEmpty ? 1 : ((refreshed.length - 1) ~/ noticePageSize) + 1;
+      if (noticePage >= totalPages) {
+        noticePage = totalPages - 1;
+      }
+      if (noticePage < 0) {
+        noticePage = 0;
+      }
+    });
+    setState(() {});
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('공지사항이 삭제되었습니다.')),
+    );
+  }
+
   String _noticeTime(Notice notice) {
     final date = notice.createdAt?.toLocal();
     if (date == null) return '-';
     return DateFormat('MM/dd HH:mm').format(date);
   }
 
-  Widget _noticeTile(Notice notice) {
+  Widget _noticeTile(Notice notice, StateSetter setDialogState) {
     return FutureBuilder<String?>(
       future: notice.hasImage
           ? noticeService.signedImageUrl(notice.imagePath)
@@ -478,6 +536,18 @@ class _AppLayoutState extends State<AppLayout> {
                   style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
+              if (isAdminRole)
+                IconButton(
+                  tooltip: '삭제',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () =>
+                      _deleteNoticeFromPopup(context, notice, setDialogState),
+                  icon: const Icon(
+                    Icons.delete_outline_rounded,
+                    size: 18,
+                    color: Color(0xFFDC2626),
+                  ),
+                ),
             ],
           ),
           children: [
@@ -698,6 +768,303 @@ class _AppLayoutState extends State<AppLayout> {
     );
   }
 
+  Widget _iosCompactLayout(
+    BuildContext context,
+    List<_NavItem> navItems,
+    List<int> visibleNavIndexes,
+    int settingsIndex,
+  ) {
+    final currentItem = navItems[selectedIndex];
+
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F5F8),
+      drawer: Drawer(
+        backgroundColor: const Color(0xFF191B2A),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFC94C6E),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.phone_rounded,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '핑크폰',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                          ),
+                        ),
+                        Text(
+                          '권한: ${widget.role}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF7C7F96),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                child: Container(
+                  height: 38,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFC94C6E).withValues(alpha: 0.14),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(
+                          Icons.bolt_rounded,
+                          size: 12,
+                          color: Color(0xFFC94C6E),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          widget.store.isEmpty ? '-' : widget.store,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFFD1D3E0),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const Divider(height: 1, color: Color(0xFF252740)),
+              Expanded(
+                child: ListView(
+                  padding: const EdgeInsets.all(12),
+                  children: [
+                    for (final navIndex in visibleNavIndexes)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: _compactDrawerItem(
+                          item: navItems[navIndex],
+                          selected: selectedIndex == navIndex,
+                          onTap: () {
+                            Navigator.pop(context);
+                            setState(() {
+                              selectedIndex = navIndex;
+                            });
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1, color: Color(0xFF252740)),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
+                child: Column(
+                  children: [
+                    if (settingsIndex >= 0) ...[
+                      _compactDrawerItem(
+                        item: navItems[settingsIndex],
+                        selected: selectedIndex == settingsIndex,
+                        onTap: () {
+                          Navigator.pop(context);
+                          setState(() {
+                            selectedIndex = settingsIndex;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                    _compactActionItem(
+                      icon: Icons.logout_rounded,
+                      label: '로그아웃',
+                      color: const Color(0xFF8A8DA6),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _confirmLogout();
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _compactActionItem(
+                      icon: Icons.power_settings_new_rounded,
+                      label: '종료',
+                      color: const Color(0xFFDC2626),
+                      onTap: () {
+                        Navigator.pop(context);
+                        _confirmExit();
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF191B2A),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        titleSpacing: 0,
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              currentItem.title,
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
+            ),
+            Text(
+              widget.store.isEmpty ? '-' : widget.store,
+              style: const TextStyle(
+                fontSize: 11,
+                color: Color(0xFFB5B8C9),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            onPressed: isNoticeLoading ? null : _showNoticePopup,
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(Icons.notifications_active_outlined),
+                if (hasUnreadNotice)
+                  const Positioned(
+                    right: -1,
+                    top: -1,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Color(0xFFDC2626),
+                        shape: BoxShape.circle,
+                      ),
+                      child: SizedBox(width: 8, height: 8),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        top: false,
+        child: IndexedStack(
+          index: selectedIndex,
+          children: navItems.map((e) => e.page).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _compactDrawerItem({
+    required _NavItem item,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xFFC94C6E).withValues(alpha: 0.14)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              item.icon,
+              color: selected
+                  ? const Color(0xFFC94C6E)
+                  : const Color(0xFF8A8DA6),
+              size: 18,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                item.title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: selected ? Colors.white : const Color(0xFF8A8DA6),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _compactActionItem({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF252740)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   void dispose() {
     globalNameSearchController.dispose();
@@ -716,6 +1083,17 @@ class _AppLayoutState extends State<AppLayout> {
 
     if (selectedIndex >= navItems.length) {
       selectedIndex = 0;
+    }
+
+    final useIosCompactLayout =
+        !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
+    if (useIosCompactLayout) {
+      return _iosCompactLayout(
+        context,
+        navItems,
+        visibleNavIndexes,
+        settingsIndex,
+      );
     }
 
     return Scaffold(
@@ -969,7 +1347,7 @@ class _AppLayoutState extends State<AppLayout> {
                                 SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
-                                    '로그아웃',
+                                    '\uB85C\uADF8\uC544\uC6C3',
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w800,

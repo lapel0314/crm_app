@@ -1,3 +1,6 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/utils/store_utils.dart';
@@ -38,6 +41,10 @@ class _InventoryPageState extends State<InventoryPage> {
   }
 
   bool get canViewAllStores => isPrivilegedRole(widget.role);
+
+  bool _isCompactIosDialogContext(BuildContext context) {
+    return !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
+  }
 
   @override
   void initState() {
@@ -257,6 +264,9 @@ class _InventoryPageState extends State<InventoryPage> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final compactIos = _isCompactIosDialogContext(context);
+          final dialogWidth =
+              compactIos ? MediaQuery.of(context).size.width - 56 : 680.0;
           return AlertDialog(
             backgroundColor: Colors.white,
             shape:
@@ -269,7 +279,7 @@ class _InventoryPageState extends State<InventoryPage> {
               ),
             ),
             content: SizedBox(
-              width: 680,
+              width: dialogWidth,
               child: SingleChildScrollView(
                 child: Wrap(
                   spacing: 12,
@@ -282,6 +292,7 @@ class _InventoryPageState extends State<InventoryPage> {
                       label: '상태',
                       value: createStatus,
                       items: const ['보유', '판매', '불량', '이동'],
+                      width: compactIos ? dialogWidth : 240,
                       onChanged: (v) {
                         if (v != null) {
                           setDialogState(() {
@@ -290,7 +301,12 @@ class _InventoryPageState extends State<InventoryPage> {
                         }
                       },
                     ),
-                    _input('메모', createMemoController, maxLines: 3, width: 492),
+                    _input(
+                      '메모',
+                      createMemoController,
+                      maxLines: 3,
+                      width: compactIos ? dialogWidth : 492,
+                    ),
                   ],
                 ),
               ),
@@ -339,6 +355,9 @@ class _InventoryPageState extends State<InventoryPage> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final compactIos = _isCompactIosDialogContext(context);
+          final dialogWidth =
+              compactIos ? MediaQuery.of(context).size.width - 56 : 680.0;
           return AlertDialog(
             backgroundColor: Colors.white,
             shape:
@@ -351,7 +370,7 @@ class _InventoryPageState extends State<InventoryPage> {
               ),
             ),
             content: SizedBox(
-              width: 680,
+              width: dialogWidth,
               child: SingleChildScrollView(
                 child: Wrap(
                   spacing: 12,
@@ -364,6 +383,7 @@ class _InventoryPageState extends State<InventoryPage> {
                       label: '상태',
                       value: editStatus,
                       items: const ['보유', '판매', '불량', '이동'],
+                      width: compactIos ? dialogWidth : 240,
                       onChanged: (v) {
                         if (v != null) {
                           setDialogState(() {
@@ -372,7 +392,12 @@ class _InventoryPageState extends State<InventoryPage> {
                         }
                       },
                     ),
-                    _input('메모', editMemoController, maxLines: 3, width: 492),
+                    _input(
+                      '메모',
+                      editMemoController,
+                      maxLines: 3,
+                      width: compactIos ? dialogWidth : 492,
+                    ),
                   ],
                 ),
               ),
@@ -424,7 +449,11 @@ class _InventoryPageState extends State<InventoryPage> {
   void showDetail(Map<String, dynamic> item) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (context) {
+        final compactIos = _isCompactIosDialogContext(context);
+        final dialogWidth =
+            compactIos ? MediaQuery.of(context).size.width - 56 : 560.0;
+        return AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         title: Text(
@@ -437,17 +466,37 @@ class _InventoryPageState extends State<InventoryPage> {
           ),
         ),
         content: SizedBox(
-          width: 560,
+          width: dialogWidth,
           child: SingleChildScrollView(
             child: Wrap(
               spacing: 18,
               runSpacing: 0,
               children: [
-                _detail('매장', item['store']),
-                _detail('모델명', item['model_name']),
-                _detail('일련번호', item['serial_number']),
-                _detail('상태', item['status']),
-                _detail('메모', item['memo']),
+                _detail(
+                  '매장',
+                  item['store'],
+                  width: compactIos ? dialogWidth : 250,
+                ),
+                _detail(
+                  '모델명',
+                  item['model_name'],
+                  width: compactIos ? dialogWidth : 250,
+                ),
+                _detail(
+                  '일련번호',
+                  item['serial_number'],
+                  width: compactIos ? dialogWidth : 250,
+                ),
+                _detail(
+                  '상태',
+                  item['status'],
+                  width: compactIos ? dialogWidth : 250,
+                ),
+                _detail(
+                  '메모',
+                  item['memo'],
+                  width: compactIos ? dialogWidth : 250,
+                ),
               ],
             ),
           ),
@@ -466,7 +515,8 @@ class _InventoryPageState extends State<InventoryPage> {
               child: const Text('수정'),
             ),
         ],
-      ),
+      );
+      },
     );
   }
 
@@ -496,9 +546,10 @@ class _InventoryPageState extends State<InventoryPage> {
     required T value,
     required List<T> items,
     required ValueChanged<T?> onChanged,
+    double width = 240,
   }) {
     return SizedBox(
-      width: 240,
+      width: width,
       child: DropdownButtonFormField<T>(
         initialValue: value,
         decoration: _inputDecoration(label),
@@ -515,9 +566,13 @@ class _InventoryPageState extends State<InventoryPage> {
     );
   }
 
-  Widget _detail(String title, dynamic value) {
+  Widget _detail(
+    String title,
+    dynamic value, {
+    double width = 250,
+  }) {
     return SizedBox(
-      width: 250,
+      width: width,
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 9),
         decoration: const BoxDecoration(

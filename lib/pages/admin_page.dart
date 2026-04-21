@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/services/notice_service.dart';
@@ -27,6 +29,12 @@ class _AdminPageState extends State<AdminPage> {
 
   bool isAdmin() {
     return isPrivilegedRole(widget.role);
+  }
+
+  bool get canDeleteNotices => isPrivilegedRole(widget.role);
+
+  bool _isCompactIosDialogContext(BuildContext context) {
+    return !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
   }
 
   @override
@@ -108,6 +116,10 @@ class _AdminPageState extends State<AdminPage> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final compactIos = _isCompactIosDialogContext(context);
+          final dialogWidth =
+              compactIos ? MediaQuery.of(context).size.width - 56 : 520.0;
+
           return AlertDialog(
             backgroundColor: Colors.white,
             shape:
@@ -120,7 +132,7 @@ class _AdminPageState extends State<AdminPage> {
               ),
             ),
             content: SizedBox(
-              width: 520,
+              width: dialogWidth,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -206,6 +218,177 @@ class _AdminPageState extends State<AdminPage> {
     );
   }
 
+  void showNoticeManagementDialog() {
+    Future<List<Notice>> noticesFuture = noticeService.fetchNotices();
+
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final compactIos = _isCompactIosDialogContext(context);
+          final screenSize = MediaQuery.of(context).size;
+
+          Future<void> reloadNotices() async {
+            setDialogState(() {
+              noticesFuture = noticeService.fetchNotices();
+            });
+          }
+
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            title: const Text(
+              '공지사항 관리',
+              style: TextStyle(
+                color: Color(0xFF111827),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            content: SizedBox(
+              width: compactIos ? screenSize.width - 56 : 720,
+              height: compactIos ? screenSize.height * 0.62 : 520,
+              child: FutureBuilder<List<Notice>>(
+                future: noticesFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (snapshot.hasError) {
+                    return Center(
+                      child: Text('공지사항을 불러오지 못했습니다: ${snapshot.error}'),
+                    );
+                  }
+
+                  final notices = snapshot.data ?? const <Notice>[];
+                  if (notices.isEmpty) {
+                    return const Center(child: Text('등록된 공지사항이 없습니다.'));
+                  }
+
+                  return ListView.separated(
+                    itemCount: notices.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final notice = notices[index];
+                      final subtitle = [
+                        _noticeDateText(notice.createdAt),
+                        notice.content.trim(),
+                      ].where((value) => value.isNotEmpty).join('\n');
+
+                      return ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 6,
+                        ),
+                        title: Text(
+                          notice.title.trim().isEmpty ? '공지사항' : notice.title,
+                          style: const TextStyle(fontWeight: FontWeight.w800),
+                        ),
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 6),
+                          child: Text(
+                            subtitle,
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        trailing: canDeleteNotices
+                            ? IconButton(
+                                tooltip: '삭제',
+                                onPressed: () async {
+                                  final shouldDelete = await showDialog<bool>(
+                                        context: context,
+                                        builder: (_) => AlertDialog(
+                                          backgroundColor: Colors.white,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          title: const Text('공지사항 삭제'),
+                                          content: Text(
+                                            '"${notice.title}" 공지사항을 삭제하시겠습니까?',
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(
+                                                context,
+                                                false,
+                                              ),
+                                              child: const Text('취소'),
+                                            ),
+                                            ElevatedButton(
+                                              style: _primaryButtonStyle(
+                                                danger: true,
+                                              ),
+                                              onPressed: () => Navigator.pop(
+                                                context,
+                                                true,
+                                              ),
+                                              child: const Text('삭제'),
+                                            ),
+                                          ],
+                                        ),
+                                      ) ??
+                                      false;
+
+                                  if (!shouldDelete) return;
+
+                                  try {
+                                    await noticeService.deleteNotice(notice);
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context)
+                                        .clearSnackBars();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('공지사항이 삭제되었습니다.'),
+                                      ),
+                                    );
+                                    await reloadNotices();
+                                  } catch (e) {
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context)
+                                        .clearSnackBars();
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content:
+                                            Text('공지사항 삭제 실패: $e'),
+                                      ),
+                                    );
+                                  }
+                                },
+                                icon: const Icon(Icons.delete_outline),
+                                color: const Color(0xFFDC2626),
+                              )
+                            : null,
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('닫기'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  String _noticeDateText(DateTime? value) {
+    if (value == null) return '';
+    final local = value.toLocal();
+    final month = local.month.toString().padLeft(2, '0');
+    final day = local.day.toString().padLeft(2, '0');
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
+    return '$month/$day $hour:$minute';
+  }
+
   void showDeleteDialog(Map<String, dynamic> user) {
     showDialog(
       context: context,
@@ -251,6 +434,10 @@ class _AdminPageState extends State<AdminPage> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final compactIos = _isCompactIosDialogContext(context);
+          final dialogWidth =
+              compactIos ? MediaQuery.of(context).size.width - 56 : 680.0;
+
           return AlertDialog(
             backgroundColor: Colors.white,
             shape: RoundedRectangleBorder(
@@ -264,34 +451,34 @@ class _AdminPageState extends State<AdminPage> {
               ),
             ),
             content: SizedBox(
-              width: 680,
+              width: dialogWidth,
               child: Wrap(
                 spacing: 12,
                 runSpacing: 12,
                 children: [
                   SizedBox(
-                    width: 240,
+                    width: compactIos ? dialogWidth : 240,
                     child: TextField(
                       controller: nameController,
                       decoration: _inputDecoration('이름'),
                     ),
                   ),
                   SizedBox(
-                    width: 240,
+                    width: compactIos ? dialogWidth : 240,
                     child: TextField(
                       controller: phoneController,
                       decoration: _inputDecoration('전화번호'),
                     ),
                   ),
                   SizedBox(
-                    width: 240,
+                    width: compactIos ? dialogWidth : 240,
                     child: TextField(
                       controller: storeController,
                       decoration: _inputDecoration('매장'),
                     ),
                   ),
                   SizedBox(
-                    width: 240,
+                    width: compactIos ? dialogWidth : 240,
                     child: DropdownButtonFormField<String>(
                       initialValue: role,
                       decoration: _inputDecoration('직급'),
@@ -481,6 +668,12 @@ class _AdminPageState extends State<AdminPage> {
                           icon: Icons.campaign_outlined,
                           label: '공지사항 작성',
                           onTap: showNoticeDialog,
+                        ),
+                        const SizedBox(width: 12),
+                        _headerActionButton(
+                          icon: Icons.delete_sweep_outlined,
+                          label: '공지사항 관리',
+                          onTap: showNoticeManagementDialog,
                         ),
                         const SizedBox(width: 12),
                         _headerActionButton(
