@@ -161,6 +161,8 @@ serve(async (req) => {
           ),
         );
       }
+      case "delete_notice":
+        return json(await deleteNotice(adminClient, profile, body));
       default:
         return json(
           {
@@ -445,6 +447,68 @@ async function bootstrapSignupNetwork(
     store_name: store.name,
     detected_public_ip: detectedPublicIp,
     ssid,
+  };
+}
+
+async function deleteNotice(
+  adminClient: ReturnType<typeof createClient>,
+  profile: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  if (!isPrivileged(profile)) {
+    return {
+      success: false,
+      message: "현재 계정은 공지사항을 삭제할 수 없습니다.",
+    };
+  }
+
+  const noticeId = String(body.notice_id ?? "").trim();
+  if (!noticeId) {
+    return {
+      success: false,
+      message: "삭제할 공지사항 ID가 없습니다.",
+    };
+  }
+
+  const { data: notice, error: noticeError } = await adminClient
+    .from("crm_notices")
+    .select("id, image_path")
+    .eq("id", noticeId)
+    .maybeSingle();
+
+  if (noticeError) {
+    throw new Error("공지사항 정보를 확인하지 못했습니다.");
+  }
+
+  if (!notice) {
+    return {
+      success: false,
+      message: "공지사항을 찾을 수 없습니다.",
+    };
+  }
+
+  const { error: updateError } = await adminClient
+    .from("crm_notices")
+    .update({ is_active: false })
+    .eq("id", noticeId);
+
+  if (updateError) {
+    throw new Error("공지사항을 삭제하지 못했습니다.");
+  }
+
+  const imagePath = String(notice.image_path ?? "").trim();
+  if (imagePath) {
+    const { error: storageError } = await adminClient.storage
+      .from("crm-notice-images")
+      .remove([imagePath]);
+    if (storageError) {
+      console.error("delete_notice storage remove failed", storageError);
+    }
+  }
+
+  return {
+    success: true,
+    message: "공지사항이 삭제되었습니다.",
   };
 }
 

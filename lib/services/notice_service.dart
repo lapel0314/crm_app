@@ -111,17 +111,24 @@ class NoticeService {
   }
 
   Future<void> deleteNotice(Notice notice) async {
-    await supabase
-        .from('crm_notices')
-        .update({'is_active': false})
-        .eq('id', notice.id);
+    final response = await supabase.functions.invoke(
+      'auth-policy',
+      body: {
+        'action': 'delete_notice',
+        'access_token': supabase.auth.currentSession?.accessToken,
+        'notice_id': notice.id,
+      },
+    );
 
-    if (notice.hasImage) {
-      try {
-        await supabase.storage.from(bucketName).remove([notice.imagePath]);
-      } catch (_) {
-        // Ignore missing or already-removed assets after the notice is hidden.
-      }
+    final data = response.data is Map<String, dynamic>
+        ? response.data as Map<String, dynamic>
+        : response.data is Map
+            ? (response.data as Map)
+                .map((key, value) => MapEntry(key.toString(), value))
+            : <String, dynamic>{};
+
+    if (response.status >= 400 || data['success'] == false) {
+      throw Exception((data['message'] ?? '공지사항 삭제에 실패했습니다.').toString());
     }
   }
 }
