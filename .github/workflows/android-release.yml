@@ -44,6 +44,8 @@ jobs:
       - name: Build signed APK
         working-directory: android
         run: |
+          sed -i 's/\r$//' gradlew
+          chmod +x gradlew
           ./gradlew assembleRelease \
             "-Ptarget-platform=android-arm,android-arm64,android-x64" \
             "-Pdart-defines=${{ secrets.FLUTTER_DART_DEFINES }}"
