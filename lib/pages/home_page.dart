@@ -109,6 +109,10 @@ class _HomePageState extends State<HomePage> {
 
   String formatMonth(DateTime date) => DateFormat('yy-MM').format(date);
 
+  DateTime _settlementMonth(DateTime joinDate, int offsetMonths) {
+    return DateTime(joinDate.year, joinDate.month + offsetMonths, 1);
+  }
+
   void _setTodayJoinDate() {
     final today = DateTime.now();
     joinDate = today;
@@ -340,8 +344,8 @@ class _HomePageState extends State<HomePage> {
     try {
       await supabase.from('customers').insert({
         'join_date': currentJoinDate.toIso8601String(),
-        'm3': formatMonth(currentJoinDate.add(const Duration(days: 90))),
-        'm6': formatMonth(currentJoinDate.add(const Duration(days: 180))),
+        'm3': formatMonth(_settlementMonth(currentJoinDate, 4)),
+        'm6': formatMonth(_settlementMonth(currentJoinDate, 7)),
         'staff': managerController.text.trim().isEmpty
             ? (defaultManagerName.isEmpty
                 ? (user.email ?? '')
@@ -651,10 +655,10 @@ class _HomePageState extends State<HomePage> {
     final currentJoinDate = _formJoinDate();
     final m3 = currentJoinDate == null
         ? '-'
-        : formatMonth(currentJoinDate.add(const Duration(days: 90)));
+        : formatMonth(_settlementMonth(currentJoinDate, 4));
     final m6 = currentJoinDate == null
         ? '-'
-        : formatMonth(currentJoinDate.add(const Duration(days: 180)));
+        : formatMonth(_settlementMonth(currentJoinDate, 7));
 
     final totalRebate = calcTotalRebate();
     final margin = calcMargin();

@@ -61,7 +61,7 @@ class _CustomerPageState extends State<CustomerPage> {
   bool get canExportExcel => isPrivilegedRole(widget.role);
 
   bool _isCompactIosDialogContext(BuildContext context) {
-    return !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
+    return !kIsWeb && MediaQuery.of(context).size.width < 900;
   }
 
   @override
@@ -2252,10 +2252,10 @@ class _CustomerPageState extends State<CustomerPage> {
     bool compact = false,
   }) {
     return Container(
-      height: compact ? 74 : 88,
+      height: compact ? 58 : 88,
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 12 : 18,
-        vertical: compact ? 10 : 14,
+        horizontal: compact ? 10 : 18,
+        vertical: compact ? 8 : 14,
       ),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -2272,14 +2272,14 @@ class _CustomerPageState extends State<CustomerPage> {
       child: Row(
         children: [
           Container(
-            width: 4,
-            height: compact ? 28 : 34,
+            width: compact ? 3 : 4,
+            height: compact ? 22 : 34,
             decoration: BoxDecoration(
               color: color,
               borderRadius: BorderRadius.circular(99),
             ),
           ),
-          SizedBox(width: compact ? 10 : 14),
+          SizedBox(width: compact ? 8 : 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -2291,18 +2291,18 @@ class _CustomerPageState extends State<CustomerPage> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Color(0xFF9CA3AF),
-                    fontSize: compact ? 11 : 12,
+                    fontSize: compact ? 10 : 12,
                     fontWeight: FontWeight.w700,
-                    height: 1.15,
+                    height: 1.1,
                   ),
                 ),
-                SizedBox(height: compact ? 4 : 5),
+                SizedBox(height: compact ? 2 : 5),
                 Text(
                   value,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Color(0xFF111827),
-                    fontSize: compact ? 18 : 21,
+                    fontSize: compact ? 16 : 21,
                     fontWeight: FontWeight.w800,
                     height: 1,
                   ),
@@ -2924,13 +2924,13 @@ class _CustomerPageState extends State<CustomerPage> {
               SizedBox(height: showSummaryDashboard ? 12 : 6),
               if (showSummaryDashboard) ...[
                 SizedBox(
-                  height: 168,
+                  height: 132,
                   child: GridView.count(
                     crossAxisCount: 2,
                     physics: const NeverScrollableScrollPhysics(),
-                    mainAxisSpacing: 10,
-                    crossAxisSpacing: 10,
-                    childAspectRatio: 2.0,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                    childAspectRatio: 2.5,
                     children: [
                       _summaryTile(
                         label: '\uC804\uCCB4 \uACE0\uAC1D',

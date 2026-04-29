@@ -96,7 +96,7 @@ class _LoginPageState extends State<LoginPage>
   Future<void> login() async {
     if (emailController.text.trim().isEmpty ||
         passwordController.text.trim().isEmpty) {
-      showMessage('???筌???ㅺ땁 ?????뺢퀡???믩ご????놁졑??怨삵룖?筌뤾쑴??');
+      showMessage('이메일과 비밀번호를 모두 입력해 주세요.');
       return;
     }
 
@@ -112,7 +112,7 @@ class _LoginPageState extends State<LoginPage>
 
       final user = result.user;
       if (user == null) {
-        throw Exception('?β돦裕?????????筌먲퐢沅???띠럾??筌뤾쑴沅롧춯?뼿 嶺뚮쪇沅?쭛???鍮??');
+        throw Exception('로그인에 실패했습니다. 다시 시도해 주세요.');
       }
 
       final profile = await supabase
@@ -123,23 +123,23 @@ class _LoginPageState extends State<LoginPage>
 
       if (profile == null) {
         await supabase.auth.signOut();
-        throw Exception('?熬곣뫁夷???筌먲퐢沅뽪뤆?쎛 ??怨룸????덈펲. ??㉱?洹먮봿????????쒖굣???怨삵룖?筌뤾쑴??');
+        throw Exception('승인된 사용자 정보가 없습니다. 관리자에게 문의해 주세요.');
       }
 
       if ((profile['approval_status'] ?? 'pending') != 'approved') {
         await supabase.auth.signOut();
-        throw Exception('???筌???筌뤾쑴理????㉱?洹먮봿???獄?????熬곣뫁???琉우꽑???β돦裕??筌뤿굝留??????곕????덈펲.');
+        throw Exception('아직 관리자 승인이 완료되지 않았습니다. 승인 후 다시 로그인해 주세요.');
       }
 
       await loginPolicyService.checkLoginPolicy();
-      showMessage('?β돦裕??筌뤾퍓????곕????덈펲.');
+      showMessage('로그인되었습니다.');
     } catch (e) {
       debugPrint('login failed: $e');
       if (e is LoginPolicyException) {
         await supabase.auth.signOut();
         showMessage(e.message);
       } else {
-        showMessage('?β돦裕??筌뤾쑬?????덉넮???곕????덈펲.');
+        showMessage('로그인에 실패했습니다. 이메일과 비밀번호를 확인해 주세요.');
       }
     } finally {
       if (mounted) {
@@ -156,17 +156,17 @@ class _LoginPageState extends State<LoginPage>
         signupEmailController.text.trim().isEmpty ||
         signupPasswordController.text.trim().isEmpty ||
         signupRole == null) {
-      showMessage('???藥? ?熬곥굦?끿뵓怨뺣쐡?? ???筌?? ?????뺢퀡??? 嶺뚯쉳???? ?熬곣뫖????낅퉵??');
+      showMessage('이름, 전화번호, 이메일, 비밀번호, 직급을 모두 입력해 주세요.');
       return;
     }
 
     if (!agreedTerms) {
-      showMessage('??類λ룴??????????됰꺄??怨삵룖?筌뤾쑴??');
+      showMessage('서비스 약관 동의가 필요합니다.');
       return;
     }
 
     if (!_isValidPhone(signupPhoneController.text.trim())) {
-      showMessage('?熬곥굦?끿뵓怨뺣쐡???筌먦끇六?? 010-1234-1234 ???낅퉵??');
+      showMessage('전화번호는 010-1234-1234 형식으로 입력해 주세요.');
       return;
     }
 
@@ -189,7 +189,7 @@ class _LoginPageState extends State<LoginPage>
 
       final user = authResponse.user;
       if (user == null) {
-        throw Exception('????싨뤆?쎛????????筌먲퐢沅???띠럾??筌뤾쑴沅롧춯?뼿 嶺뚮쪇沅?쭛???鍮??');
+        throw Exception('회원가입에 실패했습니다. 다시 시도해 주세요.');
       }
 
       if (normalizedStore.isNotEmpty &&
@@ -205,7 +205,7 @@ class _LoginPageState extends State<LoginPage>
         }
       }
 
-      showMessage('???筌???筌뤾쑴理?嶺뚮∥?????꾩룇裕???琉????鍮?? ?筌뤾쑴理????㉱?洹먮봿???獄?????熬곣뫁???濡?듆 ?β돦裕??筌뤿굝留??????곕????덈펲.');
+      showMessage('회원가입이 완료되었습니다. 이메일 인증과 관리자 승인이 완료된 뒤 로그인할 수 있습니다.');
 
       setState(() {
         isLoginMode = true;
@@ -219,8 +219,8 @@ class _LoginPageState extends State<LoginPage>
       signupRole = null;
       agreedTerms = false;
     } catch (e) {
-      debugPrint('signup failed: ');
-      showMessage('????싨뤆?쎛???욱뱺 ???덉넮???곕????덈펲.');
+      debugPrint('signup failed: $e');
+      showMessage('회원가입 처리 중 오류가 발생했습니다.');
     } finally {
       if (mounted) {
         setState(() {

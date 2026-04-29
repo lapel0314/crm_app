@@ -667,21 +667,17 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   List<String> _availableSettlementMonths() {
-    final months = <String>{};
+    final year = DateTime.now().year;
+    return List.generate(
+      12,
+      (index) => '$year-${(index + 1).toString().padLeft(2, '0')}',
+    );
+  }
 
-    for (final customer in customers) {
-      final date = _customerDate(customer);
-      if (date != null) months.add(_monthKey(date));
-    }
-
-    for (final member in wiredMembers) {
-      final date = _wiredDate(member);
-      if (date != null) months.add(_monthKey(date));
-    }
-
-    final sorted = months.toList();
-    sorted.sort((a, b) => b.compareTo(a));
-    return sorted;
+  String _monthButtonLabel(String monthKey) {
+    final parts = monthKey.split('-');
+    if (parts.length != 2) return monthKey;
+    return '${int.tryParse(parts[1]) ?? parts[1]}월';
   }
 
   List<Map<String, dynamic>> _customerRowsForMonth(String monthKey) {
@@ -1037,8 +1033,8 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                     const SizedBox(height: 10),
                     Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
+                      spacing: 6,
+                      runSpacing: 6,
                       children: availableMonths.map((month) {
                         final active = selectedMonth == month;
                         return InkWell(
@@ -1047,8 +1043,8 @@ class _DashboardPageState extends State<DashboardPage> {
                           borderRadius: BorderRadius.circular(999),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
+                              horizontal: 10,
+                              vertical: 6,
                             ),
                             decoration: BoxDecoration(
                               color: active
@@ -1063,12 +1059,12 @@ class _DashboardPageState extends State<DashboardPage> {
                               ),
                             ),
                             child: Text(
-                              _monthLabel(month),
+                              _monthButtonLabel(month),
                               style: TextStyle(
                                 color: active
                                     ? const Color(0xFF111827)
                                     : const Color(0xFF6B7280),
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w800,
                               ),
                             ),

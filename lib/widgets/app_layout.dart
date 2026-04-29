@@ -1085,9 +1085,9 @@ class _AppLayoutState extends State<AppLayout> {
       selectedIndex = 0;
     }
 
-    final useIosCompactLayout =
-        !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
-    if (useIosCompactLayout) {
+    final useCompactLayout =
+        !kIsWeb && MediaQuery.of(context).size.width < 900;
+    if (useCompactLayout) {
       return _iosCompactLayout(
         context,
         navItems,
