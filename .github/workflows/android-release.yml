@@ -41,6 +41,21 @@ jobs:
           storeFile=upload-keystore.jks
           EOF
 
+      - name: Prepare Android local.properties
+        shell: bash
+        run: |
+          VERSION_LINE=$(grep '^version:' pubspec.yaml | head -1 | awk '{print $2}')
+          VERSION_NAME=${VERSION_LINE%%+*}
+          VERSION_CODE=${VERSION_LINE##*+}
+          SDK_DIR=${ANDROID_SDK_ROOT:-$ANDROID_HOME}
+          cat <<EOF > android/local.properties
+          sdk.dir=$SDK_DIR
+          flutter.sdk=$FLUTTER_ROOT
+          flutter.buildMode=release
+          flutter.versionName=$VERSION_NAME
+          flutter.versionCode=$VERSION_CODE
+          EOF
+
       - name: Build signed APK
         shell: bash
         env:
