@@ -233,20 +233,14 @@ class _HomePageState extends State<HomePage> {
   int calcTotalRebate() {
     return parseInt(rebateController.text) +
         parseInt(addRebateController.text) +
-        parseInt(hiddenRebateController.text) -
-        parseInt(deductionController.text) -
-        parseInt(supportMoneyController.text) -
-        parseInt(paymentController.text) -
-        parseInt(depositController.text) +
-        parseInt(tradePriceController.text);
-  }
-
-  int calcTax() {
-    return (calcTotalRebate() * 0.13).round();
+        parseInt(hiddenRebateController.text);
   }
 
   int calcMargin() {
-    return calcTotalRebate() - calcTax();
+    return calcTotalRebate() -
+        parseInt(supportMoneyController.text) -
+        parseInt(paymentController.text) -
+        parseInt(depositController.text);
   }
 
   String moneyText(int value) => '${moneyFormat.format(value)}원';
@@ -338,17 +332,10 @@ class _HomePageState extends State<HomePage> {
     final deposit = parseInt(depositController.text);
     final tradePrice = parseInt(tradePriceController.text);
 
-    final totalRebate = rebate +
-        addRebate +
-        hiddenRebate -
-        deduction -
-        supportMoney -
-        payment -
-        deposit +
-        tradePrice;
+    final totalRebate = rebate + addRebate + hiddenRebate;
 
-    final tax = (totalRebate * 0.13).round();
-    final margin = totalRebate - tax;
+    final tax = 0;
+    final margin = totalRebate - supportMoney - payment - deposit;
 
     try {
       await supabase.from('customers').insert({
@@ -670,7 +657,6 @@ class _HomePageState extends State<HomePage> {
         : formatMonth(currentJoinDate.add(const Duration(days: 180)));
 
     final totalRebate = calcTotalRebate();
-    final tax = calcTax();
     final margin = calcMargin();
 
     return Scaffold(
@@ -909,7 +895,6 @@ class _HomePageState extends State<HomePage> {
                   const SizedBox(height: 18),
                   formRow([
                     summaryBox('총리베이트', moneyText(totalRebate)),
-                    summaryBox('세금', moneyText(tax)),
                     summaryBox('마진', moneyText(margin)),
                   ], mobile: mobile),
                   const SizedBox(height: 18),
@@ -965,20 +950,6 @@ class _HomePageState extends State<HomePage> {
                           keyboardType: TextInputType.number,
                           onChanged: (value) =>
                               applyMoneyFormat(tradePriceController, value),
-                        ),
-                      ),
-                      pair(
-                        label: '세금(자동)',
-                        field: Container(
-                          height: 52,
-                          alignment: Alignment.centerLeft,
-                          padding: const EdgeInsets.symmetric(horizontal: 14),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFE7E9EE)),
-                          ),
-                          child: Text(moneyText(tax)),
                         ),
                       ),
                       pair(

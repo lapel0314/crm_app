@@ -520,40 +520,40 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
         final dialogWidth =
             compactIos ? MediaQuery.of(context).size.width - 56 : 720.0;
         return AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        title: Text(
-          title,
-          style: const TextStyle(
-            color: Color(0xFF111827),
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        content: SizedBox(
-          width: dialogWidth,
-          child: SingleChildScrollView(
-            child: Wrap(
-              spacing: 18,
-              runSpacing: 0,
-              children: [
-                for (final row in rows)
-                  _detailRow(
-                    row.key,
-                    row.value,
-                    width: compactIos ? dialogWidth : 330,
-                    labelWidth: compactIos ? 92 : 110,
-                  ),
-              ],
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          title: Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF111827),
+              fontWeight: FontWeight.w900,
             ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('닫기'),
+          content: SizedBox(
+            width: dialogWidth,
+            child: SingleChildScrollView(
+              child: Wrap(
+                spacing: 18,
+                runSpacing: 0,
+                children: [
+                  for (final row in rows)
+                    _detailRow(
+                      row.key,
+                      row.value,
+                      width: compactIos ? dialogWidth : 330,
+                      labelWidth: compactIos ? 92 : 110,
+                    ),
+                ],
+              ),
+            ),
           ),
-        ],
-      );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('닫기'),
+            ),
+          ],
+        );
       },
     );
   }
@@ -832,7 +832,6 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
         MapEntry('입금', _money(row['deposit'])),
         MapEntry('매입금액', _money(row['trade_price'])),
         MapEntry('총리베이트', _money(row['total_rebate'])),
-        MapEntry('세금', _money(row['tax'])),
         MapEntry('마진', _money(row['margin'])),
         MapEntry('메모', row['memo']),
         MapEntry('모바일', row['mobile']),
@@ -996,8 +995,10 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
                                         ],
                                         widths: const [88, 92, 118],
                                         cells: (row) => [
-                                          _tableText(_date(row['subscription_date'])),
-                                          _tableText(row['subscriber'], strong: true),
+                                          _tableText(
+                                              _date(row['subscription_date'])),
+                                          _tableText(row['subscriber'],
+                                              strong: true),
                                           _tableText(row['phone']),
                                         ],
                                         onTap: _showWiredDetail,
@@ -1016,7 +1017,8 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
                                         widths: const [88, 92, 118],
                                         cells: (row) => [
                                           _tableText(_date(row['lead_date'])),
-                                          _tableText(row['subscriber'], strong: true),
+                                          _tableText(row['subscriber'],
+                                              strong: true),
                                           _tableText(row['phone']),
                                         ],
                                         onTap: _showLeadDetail,

@@ -1,7 +1,9 @@
 import 'dart:io';
 
-import 'package:flutter/material.dart';
+import 'package:excel/excel.dart' as xls;
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:crm_app/services/kakao_talk_service.dart';
 import 'package:crm_app/services/contact_action_service.dart';
@@ -56,6 +58,7 @@ class _CustomerPageState extends State<CustomerPage> {
   bool get canEdit => !isOpenView && canUseCustomerDb(widget.role);
   bool get canDelete => !isOpenView && canDeleteCustomer(widget.role);
   bool get canViewAllStores => isPrivilegedRole(widget.role);
+  bool get canExportExcel => isPrivilegedRole(widget.role);
 
   bool _isCompactIosDialogContext(BuildContext context) {
     return !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
@@ -276,6 +279,314 @@ class _CustomerPageState extends State<CustomerPage> {
     fetchCustomers();
   }
 
+  Future<void> _exportCustomersExcel(List<Map<String, dynamic>> rows) async {
+    if (rows.isEmpty) {
+      _showCenterMessage('내보낼 고객 데이터가 없습니다.');
+      return;
+    }
+    if (kIsWeb) {
+      _showCenterMessage('웹에서는 아직 엑셀 저장을 지원하지 않습니다.');
+      return;
+    }
+    if (!Platform.isWindows && !Platform.isMacOS && !Platform.isLinux) {
+      _showCenterMessage('엑셀 저장은 PC에서만 지원됩니다.');
+      return;
+    }
+
+    const typeGroup = XTypeGroup(label: 'Excel', extensions: ['xlsx']);
+    final suggestedName = _buildCustomerExcelFileName(rows);
+    final saveLocation = await getSaveLocation(
+      acceptedTypeGroups: const [typeGroup],
+      suggestedName: suggestedName,
+      confirmButtonText: '저장',
+    );
+    if (saveLocation == null) return;
+
+    final excel = xls.Excel.createExcel();
+    final defaultSheet = excel.getDefaultSheet();
+    final sheetName = '고객DB';
+    if (defaultSheet != null && defaultSheet != sheetName) {
+      excel.rename(defaultSheet, sheetName);
+    }
+    final sheet = excel[sheetName];
+
+    excel.appendRow(sheetName, [
+      xls.TextCellValue('가입일'),
+      xls.TextCellValue('매장'),
+      xls.TextCellValue('담당자'),
+      xls.TextCellValue('고객명'),
+      xls.TextCellValue('휴대폰번호'),
+      xls.TextCellValue('통신사'),
+      xls.TextCellValue('가입유형'),
+      xls.TextCellValue('모델명'),
+      xls.TextCellValue('요금제'),
+      xls.TextCellValue('리베이트'),
+      xls.TextCellValue('부가리베이트'),
+      xls.TextCellValue('히든리베이트'),
+      xls.TextCellValue('총리베이트'),
+      xls.TextCellValue('유통망지원금'),
+      xls.TextCellValue('결제'),
+      xls.TextCellValue('입금'),
+      xls.TextCellValue('마진'),
+      xls.TextCellValue('은행정보'),
+      xls.TextCellValue('메모'),
+    ]);
+
+    for (final customer in rows) {
+      final rebate = _toInt(customer['rebate']);
+      final addRebate = _toInt(customer['add_rebate']);
+      final hiddenRebate = _toInt(customer['hidden_rebate']);
+      final supportMoney = _toInt(customer['support_money']);
+      final payment = _toInt(customer['payment']);
+      final deposit = _toInt(customer['deposit']);
+      final totalRebate = _calcTotalRebate(
+        rebate: rebate,
+        addRebate: addRebate,
+        hiddenRebate: hiddenRebate,
+        deduction: _toInt(customer['deduction']),
+        supportMoney: supportMoney,
+        payment: payment,
+        deposit: deposit,
+        tradePrice: _toInt(customer['trade_price']),
+      );
+      final margin = _calcMargin(
+        totalRebate: totalRebate,
+        supportMoney: supportMoney,
+        payment: payment,
+        deposit: deposit,
+      );
+
+      excel.appendRow(sheetName, [
+        xls.TextCellValue(_date(customer['join_date'])),
+        xls.TextCellValue(customer['store']?.toString() ?? ''),
+        xls.TextCellValue(customer['staff']?.toString() ?? ''),
+        xls.TextCellValue(customer['name']?.toString() ?? ''),
+        xls.TextCellValue(customer['phone']?.toString() ?? ''),
+        xls.TextCellValue(customer['carrier']?.toString() ?? ''),
+        xls.TextCellValue(customer['join_type']?.toString() ?? ''),
+        xls.TextCellValue(customer['model']?.toString() ?? ''),
+        xls.TextCellValue(customer['plan']?.toString() ?? ''),
+        xls.IntCellValue(rebate),
+        xls.IntCellValue(addRebate),
+        xls.IntCellValue(hiddenRebate),
+        xls.IntCellValue(totalRebate),
+        xls.IntCellValue(supportMoney),
+        xls.IntCellValue(payment),
+        xls.IntCellValue(deposit),
+        xls.IntCellValue(margin),
+        xls.TextCellValue(customer['bank_info']?.toString() ?? ''),
+        xls.TextCellValue(customer['memo']?.toString() ?? ''),
+      ]);
+    }
+
+    _styleCustomerExcelSheet(sheet, rows);
+
+    final bytes = excel.save(fileName: suggestedName);
+    if (bytes == null || bytes.isEmpty) {
+      _showCenterMessage('엑셀 파일 생성에 실패했습니다.');
+      return;
+    }
+
+    await File(saveLocation.path).writeAsBytes(bytes, flush: true);
+    if (!mounted) return;
+    _showCenterMessage('고객DB 엑셀 저장이 완료되었습니다.');
+  }
+
+  String _buildCustomerExcelFileName(List<Map<String, dynamic>> rows) {
+    final storeLabel = _buildExcelStoreLabel(
+      rows.map((row) => row['store']),
+      fallback: '전체매장',
+    );
+    final dateLabel = _buildExcelDateLabel(
+      selectedText: dateSearchController.text,
+      dates: rows.map((row) => _date(row['join_date'])),
+      fallback: '전체기간',
+    );
+    return '고객DB_${_sanitizeExcelFilePart(storeLabel)}_${_sanitizeExcelFilePart(dateLabel)}.xlsx';
+  }
+
+  void _styleCustomerExcelSheet(
+    xls.Sheet sheet,
+    List<Map<String, dynamic>> rows,
+  ) {
+    final headerStyle = xls.CellStyle(
+      bold: true,
+      fontColorHex: xls.ExcelColor.white,
+      backgroundColorHex: xls.ExcelColor.blueGrey600,
+      horizontalAlign: xls.HorizontalAlign.Center,
+      verticalAlign: xls.VerticalAlign.Center,
+      leftBorder: xls.Border(borderStyle: xls.BorderStyle.Thin),
+      rightBorder: xls.Border(borderStyle: xls.BorderStyle.Thin),
+      topBorder: xls.Border(borderStyle: xls.BorderStyle.Thin),
+      bottomBorder: xls.Border(borderStyle: xls.BorderStyle.Thin),
+    );
+    final moneyStyle = xls.CellStyle(
+      numberFormat: xls.NumFormat.standard_3,
+      horizontalAlign: xls.HorizontalAlign.Right,
+      verticalAlign: xls.VerticalAlign.Center,
+    );
+    final totalRebateStyle = xls.CellStyle(
+      bold: true,
+      numberFormat: xls.NumFormat.standard_3,
+      fontColorHex: xls.ExcelColor.blue800,
+      backgroundColorHex: xls.ExcelColor.blue50,
+      horizontalAlign: xls.HorizontalAlign.Right,
+      verticalAlign: xls.VerticalAlign.Center,
+    );
+    final marginPositiveStyle = xls.CellStyle(
+      bold: true,
+      numberFormat: xls.NumFormat.standard_3,
+      fontColorHex: xls.ExcelColor.green800,
+      backgroundColorHex: xls.ExcelColor.green50,
+      horizontalAlign: xls.HorizontalAlign.Right,
+      verticalAlign: xls.VerticalAlign.Center,
+    );
+    final marginNegativeStyle = xls.CellStyle(
+      bold: true,
+      numberFormat: xls.NumFormat.standard_3,
+      fontColorHex: xls.ExcelColor.red800,
+      backgroundColorHex: xls.ExcelColor.red50,
+      horizontalAlign: xls.HorizontalAlign.Right,
+      verticalAlign: xls.VerticalAlign.Center,
+    );
+    final marginZeroStyle = xls.CellStyle(
+      bold: true,
+      numberFormat: xls.NumFormat.standard_3,
+      fontColorHex: xls.ExcelColor.orange800,
+      backgroundColorHex: xls.ExcelColor.orange50,
+      horizontalAlign: xls.HorizontalAlign.Right,
+      verticalAlign: xls.VerticalAlign.Center,
+    );
+
+    const widths = <double>[
+      12,
+      14,
+      12,
+      12,
+      16,
+      10,
+      12,
+      16,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      14,
+      24,
+      28,
+    ];
+    for (var i = 0; i < widths.length; i++) {
+      sheet.setColumnWidth(i, widths[i]);
+      sheet
+          .cell(xls.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0))
+          .cellStyle = headerStyle;
+    }
+
+    const moneyColumns = <int>[9, 10, 11, 12, 13, 14, 15, 16];
+    for (var rowIndex = 1; rowIndex <= rows.length; rowIndex++) {
+      for (final columnIndex in moneyColumns) {
+        sheet
+            .cell(
+              xls.CellIndex.indexByColumnRow(
+                columnIndex: columnIndex,
+                rowIndex: rowIndex,
+              ),
+            )
+            .cellStyle = moneyStyle;
+      }
+
+      sheet
+          .cell(
+            xls.CellIndex.indexByColumnRow(columnIndex: 15, rowIndex: rowIndex),
+          )
+          .cellStyle = totalRebateStyle;
+
+      final row = rows[rowIndex - 1];
+      final rebate = _toInt(row['rebate']);
+      final addRebate = _toInt(row['add_rebate']);
+      final hiddenRebate = _toInt(row['hidden_rebate']);
+      final supportMoney = _toInt(row['support_money']);
+      final payment = _toInt(row['payment']);
+      final deposit = _toInt(row['deposit']);
+      final totalRebate = _calcTotalRebate(
+        rebate: rebate,
+        addRebate: addRebate,
+        hiddenRebate: hiddenRebate,
+        deduction: _toInt(row['deduction']),
+        supportMoney: supportMoney,
+        payment: payment,
+        deposit: deposit,
+        tradePrice: _toInt(row['trade_price']),
+      );
+      final margin = _calcMargin(
+        totalRebate: totalRebate,
+        supportMoney: supportMoney,
+        payment: payment,
+        deposit: deposit,
+      );
+
+      sheet
+          .cell(
+            xls.CellIndex.indexByColumnRow(columnIndex: 16, rowIndex: rowIndex),
+          )
+          .cellStyle = margin > 0
+          ? marginPositiveStyle
+          : margin < 0
+              ? marginNegativeStyle
+              : marginZeroStyle;
+    }
+  }
+
+  String _buildExcelStoreLabel(
+    Iterable<dynamic> stores, {
+    required String fallback,
+  }) {
+    final uniqueStores = stores
+        .map((store) => store?.toString().trim() ?? '')
+        .where((store) => store.isNotEmpty && store != '-')
+        .toSet()
+        .toList()
+      ..sort();
+
+    if (uniqueStores.isEmpty) return fallback;
+    if (uniqueStores.length == 1) return uniqueStores.first;
+    return '${uniqueStores.first} 외${uniqueStores.length - 1}개';
+  }
+
+  String _buildExcelDateLabel({
+    required String selectedText,
+    required Iterable<String> dates,
+    required String fallback,
+  }) {
+    final normalizedSelected = selectedText.trim().replaceAll(' ~ ', '~');
+    if (normalizedSelected.isNotEmpty) {
+      return normalizedSelected;
+    }
+
+    final uniqueDates = dates
+        .map((date) => date.trim())
+        .where((date) => date.isNotEmpty && date != '-')
+        .toSet()
+        .toList()
+      ..sort();
+
+    if (uniqueDates.isEmpty) return fallback;
+    if (uniqueDates.length == 1) return uniqueDates.first;
+    return '${uniqueDates.first} 외${uniqueDates.length - 1}일';
+  }
+
+  String _sanitizeExcelFilePart(String value) {
+    final cleaned = value
+        .replaceAll(RegExp(r'[<>:"/\\|?*]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    return cleaned.isEmpty ? '미지정' : cleaned;
+  }
+
   int _calcTotalRebate({
     required int rebate,
     required int addRebate,
@@ -286,22 +597,16 @@ class _CustomerPageState extends State<CustomerPage> {
     required int deposit,
     required int tradePrice,
   }) {
-    return rebate +
-        addRebate +
-        hiddenRebate -
-        deduction -
-        supportMoney -
-        payment -
-        deposit +
-        tradePrice;
+    return rebate + addRebate + hiddenRebate;
   }
 
-  int _calcTax(int totalRebate) {
-    return (totalRebate * 0.13).round();
-  }
-
-  int _calcMargin(int totalRebate, int tax) {
-    return totalRebate - tax;
+  int _calcMargin({
+    required int totalRebate,
+    required int supportMoney,
+    required int payment,
+    required int deposit,
+  }) {
+    return totalRebate - supportMoney - payment - deposit;
   }
 
   void _showCenterMessage(String message) {
@@ -551,11 +856,34 @@ class _CustomerPageState extends State<CustomerPage> {
     return '';
   }
 
-  List<Map<String, dynamic>> _selectedCustomers() {
-    return customers
+  List<Map<String, dynamic>> _selectedCustomers([
+    List<Map<String, dynamic>>? source,
+  ]) {
+    final rows = source ?? customers;
+    return rows
         .where((customer) =>
             selectedCustomerIds.contains(customer['id'].toString()))
         .toList();
+  }
+
+  bool _areAllCustomersSelected(List<Map<String, dynamic>> rows) {
+    return rows.isNotEmpty &&
+        rows.every(
+          (customer) => selectedCustomerIds.contains(customer['id'].toString()),
+        );
+  }
+
+  void _toggleSelectAllCustomers(List<Map<String, dynamic>> rows, bool select) {
+    setState(() {
+      for (final customer in rows) {
+        final customerId = customer['id'].toString();
+        if (select) {
+          selectedCustomerIds.add(customerId);
+        } else {
+          selectedCustomerIds.remove(customerId);
+        }
+      }
+    });
   }
 
   void _showKakaoSendingDialog(int total) {
@@ -622,74 +950,74 @@ class _CustomerPageState extends State<CustomerPage> {
         final compactIos = _isCompactIosDialogContext(dialogContext);
         final screenSize = MediaQuery.of(dialogContext).size;
         return AlertDialog(
-        title: const Text('카카오 발송 결과'),
-        content: SizedBox(
-          width: compactIos ? screenSize.width - 56 : 520,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                '성공 $successCount건 / 실패 ${failures.length}건',
-                style: const TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                  color: Color(0xFF111827),
-                ),
-              ),
-              if (failures.isNotEmpty) ...[
-                const SizedBox(height: 14),
-                const Text(
-                  '실패한 대상',
-                  style: TextStyle(
-                    fontSize: 13,
+          title: const Text('카카오 발송 결과'),
+          content: SizedBox(
+            width: compactIos ? screenSize.width - 56 : 520,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '성공 $successCount건 / 실패 ${failures.length}건',
+                  style: const TextStyle(
+                    fontSize: 15,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFFDC2626),
+                    color: Color(0xFF111827),
                   ),
                 ),
-                const SizedBox(height: 8),
-                Container(
-                  constraints: const BoxConstraints(maxHeight: 260),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF9FAFB),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFE8E9EF)),
+                if (failures.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  const Text(
+                    '실패한 대상',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w900,
+                      color: Color(0xFFDC2626),
+                    ),
                   ),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: failures.length,
-                    separatorBuilder: (_, __) =>
-                        const Divider(height: 1, color: Color(0xFFE8E9EF)),
-                    itemBuilder: (context, index) {
-                      final failure = failures[index];
-                      final name = failure.target.customerName;
-                      final target = failure.target.searchName;
-                      return ListTile(
-                        dense: true,
-                        title: Text(
-                          '$name ($target)',
-                          style: const TextStyle(fontWeight: FontWeight.w800),
-                        ),
-                        subtitle: Text(
-                          failure.errorMessage ?? '-',
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    },
+                  const SizedBox(height: 8),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 260),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF9FAFB),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFE8E9EF)),
+                    ),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: failures.length,
+                      separatorBuilder: (_, __) =>
+                          const Divider(height: 1, color: Color(0xFFE8E9EF)),
+                      itemBuilder: (context, index) {
+                        final failure = failures[index];
+                        final name = failure.target.customerName;
+                        final target = failure.target.searchName;
+                        return ListTile(
+                          dense: true,
+                          title: Text(
+                            '$name ($target)',
+                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          ),
+                          subtitle: Text(
+                            failure.errorMessage ?? '-',
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      },
+                    ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
-        actions: [
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('확인'),
-          ),
-        ],
-      );
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('확인'),
+            ),
+          ],
+        );
       },
     );
   }
@@ -1474,8 +1802,12 @@ class _CustomerPageState extends State<CustomerPage> {
       );
     }
 
-    int currentTax() => _calcTax(currentTotalRebate());
-    int currentMargin() => _calcMargin(currentTotalRebate(), currentTax());
+    int currentMargin() => _calcMargin(
+          totalRebate: currentTotalRebate(),
+          supportMoney: _toInt(supportMoneyController.text),
+          payment: _toInt(paymentController.text),
+          deposit: _toInt(depositController.text),
+        );
 
     showDialog(
       context: context,
@@ -1638,11 +1970,6 @@ class _CustomerPageState extends State<CustomerPage> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            '세금: ${_money(currentTax())}',
-                            style: const TextStyle(fontWeight: FontWeight.w800),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
                             '마진: ${_money(currentMargin())}',
                             style: const TextStyle(fontWeight: FontWeight.w800),
                           ),
@@ -1669,7 +1996,7 @@ class _CustomerPageState extends State<CustomerPage> {
                 ),
                 onPressed: () async {
                   final totalRebate = currentTotalRebate();
-                  final tax = currentTax();
+                  const tax = 0;
                   final margin = currentMargin();
 
                   try {
@@ -1848,7 +2175,6 @@ class _CustomerPageState extends State<CustomerPage> {
                       _detailMoneyRow('매입금액', customer['trade_price']),
                       const Divider(height: 24),
                       _detailMoneyRow('총리베이트', customer['total_rebate']),
-                      _detailMoneyRow('세금', customer['tax']),
                       _detailMoneyRow('마진', customer['margin']),
                     ],
                   ),
@@ -1931,62 +2257,62 @@ class _CustomerPageState extends State<CustomerPage> {
         horizontal: compact ? 12 : 18,
         vertical: compact ? 10 : 14,
       ),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFE8E9EF)),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x0A000000),
-              blurRadius: 8,
-              offset: Offset(0, 2),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE8E9EF)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0A000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 4,
+            height: compact ? 28 : 34,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(99),
             ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 4,
-              height: compact ? 28 : 34,
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(99),
-              ),
-            ),
-            SizedBox(width: compact ? 10 : 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Color(0xFF9CA3AF),
-                      fontSize: compact ? 11 : 12,
-                      fontWeight: FontWeight.w700,
-                      height: 1.15,
-                    ),
+          ),
+          SizedBox(width: compact ? 10 : 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Color(0xFF9CA3AF),
+                    fontSize: compact ? 11 : 12,
+                    fontWeight: FontWeight.w700,
+                    height: 1.15,
                   ),
-                  SizedBox(height: compact ? 4 : 5),
-                  Text(
-                    value,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Color(0xFF111827),
-                      fontSize: compact ? 18 : 21,
-                      fontWeight: FontWeight.w800,
-                      height: 1,
-                    ),
+                ),
+                SizedBox(height: compact ? 4 : 5),
+                Text(
+                  value,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: Color(0xFF111827),
+                    fontSize: compact ? 18 : 21,
+                    fontWeight: FontWeight.w800,
+                    height: 1,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
-          ],
-        ),
-      );
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _filterField({
@@ -2097,10 +2423,16 @@ class _CustomerPageState extends State<CustomerPage> {
     );
   }
 
-  Widget _customerTable(List<Map<String, dynamic>> visibleCustomers) {
+  Widget _customerTable(
+    List<Map<String, dynamic>> visibleCustomers, {
+    required bool allSelected,
+    required bool hasSelectionTarget,
+    required int selectionTargetCount,
+    required bool partiallySelected,
+  }) {
     final showSelection = !isOpenView;
     final baseWidths = <double>[
-      if (showSelection) 54,
+      if (showSelection) 118,
       104,
       92,
       108,
@@ -2116,7 +2448,7 @@ class _CustomerPageState extends State<CustomerPage> {
       184,
     ];
     final headers = [
-      if (showSelection) '',
+      if (showSelection) '선택',
       '가입일',
       '담당자',
       '고객명',
@@ -2158,7 +2490,20 @@ class _CustomerPageState extends State<CustomerPage> {
                   child: Row(
                     children: [
                       for (var i = 0; i < headers.length; i++)
-                        _headerCell(headers[i], widths[i]),
+                        if (showSelection && i == 0)
+                          _selectionHeaderCell(
+                            width: widths[i],
+                            allSelected: allSelected,
+                            hasSelectionTarget: hasSelectionTarget,
+                            partiallySelected: partiallySelected,
+                            selectionTargetCount: selectionTargetCount,
+                            onChanged: (value) => _toggleSelectAllCustomers(
+                              customers,
+                              value ?? false,
+                            ),
+                          )
+                        else
+                          _headerCell(headers[i], widths[i]),
                     ],
                   ),
                 ),
@@ -2185,11 +2530,6 @@ class _CustomerPageState extends State<CustomerPage> {
                                 onChanged: (value) {
                                   setState(() {
                                     if (value == true) {
-                                      if (selectedCustomerIds.length >= 50) {
-                                        _showCenterMessage(
-                                            '최대 50명까지 선택할 수 있습니다');
-                                        return;
-                                      }
                                       selectedCustomerIds.add(customerId);
                                     } else {
                                       selectedCustomerIds.remove(customerId);
@@ -2341,6 +2681,47 @@ class _CustomerPageState extends State<CustomerPage> {
     );
   }
 
+  Widget _selectionHeaderCell({
+    required double width,
+    required bool allSelected,
+    required bool hasSelectionTarget,
+    required bool partiallySelected,
+    required int selectionTargetCount,
+    required ValueChanged<bool?> onChanged,
+  }) {
+    return SizedBox(
+      width: width,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        child: Row(
+          children: [
+            Checkbox(
+              value: hasSelectionTarget
+                  ? (allSelected ? true : (partiallySelected ? null : false))
+                  : false,
+              tristate: true,
+              onChanged: hasSelectionTarget ? onChanged : null,
+              visualDensity: VisualDensity.compact,
+            ),
+            Expanded(
+              child: Text(
+                '모두선택\n($selectionTargetCount명)',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Color(0xFF6B7280),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w800,
+                  height: 1.2,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _tableCell(Widget child, double width) {
     return SizedBox(
       width: width,
@@ -2477,6 +2858,11 @@ class _CustomerPageState extends State<CustomerPage> {
   @override
   Widget build(BuildContext context) {
     final totalCustomers = customers.length;
+    final selectedCustomers = _selectedCustomers();
+    final selectedCustomerCount = selectedCustomers.length;
+    final allCustomersSelected = _areAllCustomersSelected(customers);
+    final partiallySelectedCustomers =
+        !allCustomersSelected && selectedCustomerCount > 0;
     final newJoinCount =
         customers.where((e) => _text(e['join_type']).contains('신규')).length;
     final transferCount =
@@ -2662,76 +3048,110 @@ class _CustomerPageState extends State<CustomerPage> {
                               ),
                             ),
                             const SizedBox(height: 10),
-                            Row(
+                            Column(
                               children: [
-                                if (!isOpenView) ...[
-                                  SizedBox(
-                                    width: 36,
-                                    height: 36,
-                                    child: OutlinedButton(
-                                      onPressed:
-                                          selectedCustomerIds.isEmpty ||
-                                                  isSendingKakao
+                                Row(
+                                  children: [
+                                    if (!isOpenView) ...[
+                                      SizedBox(
+                                        width: 36,
+                                        height: 36,
+                                        child: OutlinedButton(
+                                          onPressed:
+                                              selectedCustomerCount == 0 ||
+                                                      isSendingKakao
+                                                  ? null
+                                                  : showKakaoSendDialog,
+                                          style: OutlinedButton.styleFrom(
+                                            minimumSize: const Size(36, 36),
+                                            padding: EdgeInsets.zero,
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                          ),
+                                          child: Icon(
+                                            isSendingKakao
+                                                ? Icons.hourglass_top_rounded
+                                                : Icons.chat_bubble_outline,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      SizedBox(
+                                        width: 36,
+                                        height: 36,
+                                        child: OutlinedButton(
+                                          onPressed: selectedCustomerCount == 0
                                               ? null
-                                              : showKakaoSendDialog,
-                                      style: OutlinedButton.styleFrom(
-                                        minimumSize: const Size(36, 36),
-                                        padding: EdgeInsets.zero,
-                                        visualDensity: VisualDensity.compact,
+                                              : showSmsSendDialog,
+                                          style: OutlinedButton.styleFrom(
+                                            minimumSize: const Size(36, 36),
+                                            padding: EdgeInsets.zero,
+                                            visualDensity:
+                                                VisualDensity.compact,
+                                          ),
+                                          child: const Icon(
+                                            Icons.sms_outlined,
+                                            size: 16,
+                                          ),
+                                        ),
                                       ),
-                                      child: Icon(
-                                        isSendingKakao
-                                            ? Icons.hourglass_top_rounded
-                                            : Icons.chat_bubble_outline,
-                                        size: 16,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  SizedBox(
-                                    width: 36,
-                                    height: 36,
-                                    child: OutlinedButton(
-                                      onPressed: selectedCustomerIds.isEmpty
-                                          ? null
-                                          : showSmsSendDialog,
-                                      style: OutlinedButton.styleFrom(
-                                        minimumSize: const Size(36, 36),
-                                        padding: EdgeInsets.zero,
-                                        visualDensity: VisualDensity.compact,
-                                      ),
-                                      child: const Icon(
-                                        Icons.sms_outlined,
-                                        size: 16,
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                ],
-                                Expanded(
-                                  child: ElevatedButton.icon(
-                                    onPressed: () => fetchCustomers(),
-                                    icon: const Icon(Icons.refresh, size: 14),
-                                    label: const Text(
-                                      '\uC0C8\uB85C\uACE0\uCE68',
-                                    ),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.white,
-                                      foregroundColor: const Color(0xFF6B7280),
-                                      elevation: 0,
-                                      minimumSize: const Size(0, 36),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 8,
-                                        vertical: 0,
-                                      ),
-                                      textStyle:
-                                          const TextStyle(fontSize: 12),
-                                      side: const BorderSide(
-                                        color: Color(0xFFE8E9EF),
+                                      const SizedBox(width: 6),
+                                    ],
+                                    Expanded(
+                                      child: ElevatedButton.icon(
+                                        onPressed: () => fetchCustomers(),
+                                        icon:
+                                            const Icon(Icons.refresh, size: 14),
+                                        label: const Text(
+                                          '\uC0C8\uB85C\uACE0\uCE68',
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.white,
+                                          foregroundColor:
+                                              const Color(0xFF6B7280),
+                                          elevation: 0,
+                                          minimumSize: const Size(0, 36),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 0,
+                                          ),
+                                          textStyle:
+                                              const TextStyle(fontSize: 12),
+                                          side: const BorderSide(
+                                            color: Color(0xFFE8E9EF),
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                  ),
+                                  ],
                                 ),
+                                if (canExportExcel) ...[
+                                  const SizedBox(height: 8),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton.icon(
+                                      onPressed: selectedCustomerCount == 0
+                                          ? null
+                                          : () => _exportCustomersExcel(
+                                                selectedCustomers,
+                                              ),
+                                      icon: const Icon(Icons.table_view_rounded,
+                                          size: 16),
+                                      label: Text(
+                                        '엑셀 출력 ($selectedCustomerCount명)',
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        minimumSize: const Size(0, 36),
+                                        foregroundColor:
+                                            const Color(0xFF2563EB),
+                                        side: const BorderSide(
+                                          color: Color(0xFFBFDBFE),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ],
                             ),
                           ],
@@ -2750,7 +3170,15 @@ class _CustomerPageState extends State<CustomerPage> {
                                 : Scrollbar(
                                     thumbVisibility: true,
                                     child: SingleChildScrollView(
-                                      child: _customerTable(visibleCustomers),
+                                      child: _customerTable(
+                                        visibleCustomers,
+                                        allSelected: allCustomersSelected,
+                                        hasSelectionTarget:
+                                            customers.isNotEmpty,
+                                        selectionTargetCount: customers.length,
+                                        partiallySelected:
+                                            partiallySelectedCustomers,
+                                      ),
                                     ),
                                   ),
                       ),
@@ -2885,14 +3313,14 @@ class _CustomerPageState extends State<CustomerPage> {
                           if (!isOpenView) ...[
                             ElevatedButton.icon(
                               onPressed:
-                                  selectedCustomerIds.isEmpty || isSendingKakao
+                                  selectedCustomerCount == 0 || isSendingKakao
                                       ? null
                                       : showKakaoSendDialog,
                               icon: const Icon(Icons.chat_bubble_outline,
                                   size: 17),
                               label: Text(isSendingKakao
                                   ? '발송 중'
-                                  : '카카오 발송 (${selectedCustomerIds.length})'),
+                                  : '카카오 발송 ($selectedCustomerCount)'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: const Color(0xFFFEE500),
                                 foregroundColor: const Color(0xFF111827),
@@ -2901,12 +3329,11 @@ class _CustomerPageState extends State<CustomerPage> {
                             ),
                             const SizedBox(width: 8),
                             ElevatedButton.icon(
-                              onPressed: selectedCustomerIds.isEmpty
+                              onPressed: selectedCustomerCount == 0
                                   ? null
                                   : showSmsSendDialog,
                               icon: const Icon(Icons.sms_outlined, size: 17),
-                              label:
-                                  Text('문자 발송 (${selectedCustomerIds.length})'),
+                              label: Text('문자 발송 ($selectedCustomerCount)'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.white,
                                 foregroundColor: const Color(0xFF374151),
@@ -2914,6 +3341,24 @@ class _CustomerPageState extends State<CustomerPage> {
                                 side: const BorderSide(
                                   color: Color(0xFFE8E9EF),
                                 ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                          if (canExportExcel) ...[
+                            OutlinedButton.icon(
+                              onPressed: selectedCustomerCount == 0
+                                  ? null
+                                  : () => _exportCustomersExcel(
+                                        selectedCustomers,
+                                      ),
+                              icon: const Icon(Icons.table_view_rounded,
+                                  size: 17),
+                              label: Text('엑셀 ($selectedCustomerCount)'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: const Color(0xFF2563EB),
+                                side:
+                                    const BorderSide(color: Color(0xFFBFDBFE)),
                               ),
                             ),
                             const SizedBox(width: 8),
@@ -2941,7 +3386,14 @@ class _CustomerPageState extends State<CustomerPage> {
                               : Scrollbar(
                                   thumbVisibility: true,
                                   child: SingleChildScrollView(
-                                    child: _customerTable(visibleCustomers),
+                                    child: _customerTable(
+                                      visibleCustomers,
+                                      allSelected: allCustomersSelected,
+                                      hasSelectionTarget: customers.isNotEmpty,
+                                      selectionTargetCount: customers.length,
+                                      partiallySelected:
+                                          partiallySelectedCustomers,
+                                    ),
                                   ),
                                 ),
                     ),
