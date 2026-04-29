@@ -458,28 +458,38 @@ class _AppLayoutState extends State<AppLayout> {
         false;
     if (!confirmed || !mounted) return;
 
-    await noticeService.deleteNotice(notice);
-    final refreshed = await noticeService.fetchNotices();
-    if (!mounted) return;
+    try {
+      await noticeService.deleteNotice(notice);
+      final refreshed = await noticeService.fetchNotices();
+      if (!mounted) return;
 
-    setDialogState(() {
-      notices = refreshed;
-      final totalPages =
-          refreshed.isEmpty ? 1 : ((refreshed.length - 1) ~/ noticePageSize) + 1;
-      if (noticePage >= totalPages) {
-        noticePage = totalPages - 1;
-      }
-      if (noticePage < 0) {
-        noticePage = 0;
-      }
-    });
-    setState(() {});
+      setDialogState(() {
+        notices = refreshed;
+        final totalPages = refreshed.isEmpty
+            ? 1
+            : ((refreshed.length - 1) ~/ noticePageSize) + 1;
+        if (noticePage >= totalPages) {
+          noticePage = totalPages - 1;
+        }
+        if (noticePage < 0) {
+          noticePage = 0;
+        }
+      });
+      setState(() {});
 
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('공지사항이 삭제되었습니다.')),
-    );
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('공지사항이 삭제되었습니다.')),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      final message = e is PostgrestException ? e.message : e.toString();
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('공지사항 삭제 실패: $message')),
+      );
+    }
   }
 
   String _noticeTime(Notice notice) {

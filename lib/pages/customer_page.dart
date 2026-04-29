@@ -2000,7 +2000,7 @@ class _CustomerPageState extends State<CustomerPage> {
                   final margin = currentMargin();
 
                   try {
-                    await supabase.from('customers').update({
+                    final updated = await supabase.from('customers').update({
                       'name': nameController.text.trim(),
                       'phone': phoneController.text.trim(),
                       'carrier': carrierController.text.trim(),
@@ -2033,12 +2033,19 @@ class _CustomerPageState extends State<CustomerPage> {
                       'total_rebate': totalRebate,
                       'tax': tax,
                       'margin': margin,
-                    }).eq('id', customer['id']);
+                    }).eq('id', customer['id']).select('id').maybeSingle();
+
+                    if (updated == null) {
+                      throw StateError('수정 권한이 없거나 대상 고객을 찾을 수 없습니다.');
+                    }
 
                     if (mounted) Navigator.pop(context);
                     _showCenterMessage('고객 수정 완료');
                     fetchCustomers(keyword: searchController.text);
                   } catch (e) {
+                    final message =
+                        e is PostgrestException ? e.message : e.toString();
+                    _showCenterMessage('고객 수정 실패: $message');
                     _logUiError('수정 실패: $e');
                   }
                 },

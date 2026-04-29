@@ -111,14 +111,23 @@ class NoticeService {
   }
 
   Future<void> deleteNotice(Notice notice) async {
+    final updated = await supabase
+        .from('crm_notices')
+        .update({'is_active': false})
+        .eq('id', notice.id)
+        .select('id')
+        .maybeSingle();
+
+    if (updated == null) {
+      throw StateError('삭제 권한이 없거나 대상 공지사항을 찾을 수 없습니다.');
+    }
+
     if (notice.hasImage) {
       try {
         await supabase.storage.from(bucketName).remove([notice.imagePath]);
       } catch (_) {
-        // Ignore missing or already-removed assets and continue deleting the row.
+        // Ignore missing or already-removed assets after the notice is hidden.
       }
     }
-
-    await supabase.from('crm_notices').delete().eq('id', notice.id);
   }
 }
