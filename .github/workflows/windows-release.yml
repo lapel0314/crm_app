@@ -1,0 +1,51 @@
+name: Windows Release Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build Windows app
+        run: |
+          flutter build windows --release --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} --dart-define=INSTALLER_PASSWORD=${{ secrets.INSTALLER_PASSWORD }}
+
+      - name: Build installer
+        shell: powershell
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+          Copy-Item "output\핑크폰 설치 1.0.8.exe" "output\pinkphone-crm-setup-1.0.8.exe" -Force
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: crm-app-windows-installer
+          path: output\pinkphone-crm-setup-1.0.8.exe
+          if-no-files-found: error
