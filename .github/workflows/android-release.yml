@@ -43,11 +43,17 @@ jobs:
 
       - name: Build signed APK
         shell: bash
+        env:
+          GRADLE_OPTS: >-
+            -Xmx4096m
+            -XX:MaxMetaspaceSize=1024m
+            -Dfile.encoding=UTF-8
         run: |
           cd android
           sed -i 's/\r$//' gradlew
           chmod +x gradlew
-          ./gradlew assembleRelease \
+          ./gradlew --no-daemon assembleRelease \
+            -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxMetaspaceSize=1024m -Dfile.encoding=UTF-8" \
             "-Ptarget-platform=android-arm,android-arm64,android-x64" \
             "-Pdart-defines=${{ secrets.FLUTTER_DART_DEFINES }}"
 
