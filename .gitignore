@@ -20,6 +20,9 @@ android/.gradle/
 android/app/debug
 android/app/profile
 android/app/release
+android/.kotlin/
+android/hs_err_pid*.log
+android/replay_pid*.log
 web_server.log
 web_server.err.log
 output/*.tmp
