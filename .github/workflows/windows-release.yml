@@ -41,7 +41,6 @@ jobs:
         shell: powershell
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
-          Copy-Item "output\핑크폰 설치 1.0.8.exe" "output\pinkphone-crm-setup-1.0.8.exe" -Force
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
