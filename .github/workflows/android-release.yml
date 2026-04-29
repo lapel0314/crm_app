@@ -42,8 +42,9 @@ jobs:
           EOF
 
       - name: Build signed APK
-        working-directory: android
+        shell: bash
         run: |
+          cd android
           sed -i 's/\r$//' gradlew
           chmod +x gradlew
           ./gradlew assembleRelease \
