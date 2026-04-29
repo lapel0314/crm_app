@@ -42,15 +42,15 @@ jobs:
           EOF
 
       - name: Build signed APK
+        working-directory: android
         run: |
-          flutter build apk \
-            --release \
-            --target-platform android-arm,android-arm64,android-x64 \
-            --dart-defines="${{ secrets.FLUTTER_DART_DEFINES }}"
+          ./gradlew assembleRelease \
+            "-Ptarget-platform=android-arm,android-arm64,android-x64" \
+            "-Pdart-defines=${{ secrets.FLUTTER_DART_DEFINES }}"
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: crm-app-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/apk/release/app-release.apk
           if-no-files-found: error
