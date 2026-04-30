@@ -104,6 +104,170 @@ class _AdminPageState extends State<AdminPage> {
     }
   }
 
+  Future<void> updateUserPassword({
+    required String userId,
+    required String password,
+  }) async {
+    final response = await supabase.functions.invoke(
+      'auth-policy',
+      body: {
+        'action': 'admin_update_user_password',
+        'access_token': supabase.auth.currentSession?.accessToken,
+        'user_id': userId,
+        'password': password,
+      },
+    );
+
+    final data = response.data is Map<String, dynamic>
+        ? response.data as Map<String, dynamic>
+        : response.data is Map
+            ? (response.data as Map)
+                .map((key, value) => MapEntry(key.toString(), value))
+            : <String, dynamic>{};
+
+    if (response.status >= 400 || data['success'] == false) {
+      throw Exception((data['message'] ?? '비밀번호 변경에 실패했습니다.').toString());
+    }
+  }
+
+  void showPasswordDialog(Map<String, dynamic> user) {
+    final passwordController = TextEditingController();
+    final confirmController = TextEditingController();
+    bool isSaving = false;
+    bool obscure = true;
+
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final compactIos = _isCompactIosDialogContext(context);
+          final dialogWidth =
+              compactIos ? MediaQuery.of(context).size.width - 56 : 420.0;
+
+          return AlertDialog(
+            backgroundColor: Colors.white,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            title: const Text(
+              '비밀번호 변경',
+              style: TextStyle(
+                color: Color(0xFF111827),
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            content: SizedBox(
+              width: dialogWidth,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${_value(user['name'])} / ${_value(user['email'])}',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: passwordController,
+                    obscureText: obscure,
+                    decoration: _inputDecoration('새 비밀번호').copyWith(
+                      suffixIcon: IconButton(
+                        tooltip: obscure ? '비밀번호 표시' : '비밀번호 숨김',
+                        onPressed: () => setDialogState(() {
+                          obscure = !obscure;
+                        }),
+                        icon: Icon(
+                          obscure
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: confirmController,
+                    obscureText: obscure,
+                    decoration: _inputDecoration('새 비밀번호 확인'),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '8자 이상으로 설정하세요. 공개 채널에 비밀번호를 공유하지 마세요.',
+                    style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSaving ? null : () => Navigator.pop(context),
+                child: const Text('취소'),
+              ),
+              ElevatedButton(
+                style: _primaryButtonStyle(),
+                onPressed: isSaving
+                    ? null
+                    : () async {
+                        final password = passwordController.text;
+                        final confirm = confirmController.text;
+                        if (password.length < 8) {
+                          ScaffoldMessenger.of(context).clearSnackBars();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('비밀번호는 8자 이상이어야 합니다.')),
+                          );
+                          return;
+                        }
+                        if (password != confirm) {
+                          ScaffoldMessenger.of(context).clearSnackBars();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                                content: Text('비밀번호 확인이 일치하지 않습니다.')),
+                          );
+                          return;
+                        }
+                        setDialogState(() {
+                          isSaving = true;
+                        });
+                        try {
+                          await updateUserPassword(
+                            userId: user['id'].toString(),
+                            password: password,
+                          );
+                          if (!context.mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(this.context).clearSnackBars();
+                          ScaffoldMessenger.of(this.context).showSnackBar(
+                            const SnackBar(content: Text('비밀번호가 변경되었습니다.')),
+                          );
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          setDialogState(() {
+                            isSaving = false;
+                          });
+                          ScaffoldMessenger.of(context).clearSnackBars();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('비밀번호 변경 실패: $e')),
+                          );
+                        }
+                      },
+                child: isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('변경'),
+              ),
+            ],
+          );
+        },
+      ),
+    ).whenComplete(() {
+      passwordController.dispose();
+      confirmController.dispose();
+    });
+  }
+
   void showNoticeDialog() {
     final titleController = TextEditingController(text: '공지사항');
     final contentController = TextEditingController();
@@ -769,6 +933,14 @@ class _AdminPageState extends State<AdminPage> {
                                                           showEditDialog(u),
                                                       icon: const Icon(
                                                         Icons.edit_outlined,
+                                                      ),
+                                                    ),
+                                                    IconButton(
+                                                      tooltip: '비밀번호 변경',
+                                                      onPressed: () =>
+                                                          showPasswordDialog(u),
+                                                      icon: const Icon(
+                                                        Icons.password_outlined,
                                                       ),
                                                     ),
                                                     if (status != 'approved')

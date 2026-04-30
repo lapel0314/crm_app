@@ -283,6 +283,8 @@ serve(async (req) => {
       }
       case "delete_notice":
         return json(await deleteNotice(adminClient, profile, body));
+      case "admin_update_user_password":
+        return json(await adminUpdateUserPassword(adminClient, profile, body));
       default:
         return json(
           {
@@ -769,6 +771,80 @@ async function bootstrapSignupNetwork(
     wifi_gateway_ip: clientNetwork.wifiGatewayIp,
     wifi_bssid: clientNetwork.wifiBssid,
     can_modify_networks: isPrivileged(profile),
+  };
+}
+
+async function adminUpdateUserPassword(
+  adminClient: ReturnType<typeof createClient>,
+  profile: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  if (!isPrivileged(profile)) {
+    return {
+      success: false,
+      message: "현재 계정은 직원 비밀번호를 변경할 수 없습니다.",
+    };
+  }
+
+  const targetUserId = String(body.user_id ?? "").trim();
+  const password = String(body.password ?? "");
+
+  if (!targetUserId) {
+    return {
+      success: false,
+      message: "비밀번호를 변경할 직원을 선택해 주세요.",
+    };
+  }
+
+  if (password.length < 8) {
+    return {
+      success: false,
+      message: "비밀번호는 8자 이상이어야 합니다.",
+    };
+  }
+
+  const { data: targetProfile, error: profileError } = await adminClient
+    .from("profiles")
+    .select("id, email, name")
+    .eq("id", targetUserId)
+    .maybeSingle();
+
+  if (profileError) {
+    throw new Error("직원 정보를 확인하지 못했습니다.");
+  }
+
+  if (!targetProfile) {
+    return {
+      success: false,
+      message: "직원 정보를 찾을 수 없습니다.",
+    };
+  }
+
+  const { error: updateError } = await adminClient.auth.admin.updateUserById(
+    targetUserId,
+    { password },
+  );
+
+  if (updateError) {
+    throw new Error(`비밀번호 변경 실패: ${updateError.message}`);
+  }
+
+  await adminClient.from("audit_logs").insert({
+    actor_id: String(profile.id ?? ""),
+    action: "admin_update_user_password",
+    target_table: "auth.users",
+    target_id: targetUserId,
+    detail: {
+      target_email: targetProfile.email ?? null,
+      target_name: targetProfile.name ?? null,
+    },
+  }).then(({ error }) => {
+    if (error) console.error("password audit insert failed", error);
+  });
+
+  return {
+    success: true,
+    message: "비밀번호가 변경되었습니다.",
   };
 }
 
