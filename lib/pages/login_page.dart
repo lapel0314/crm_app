@@ -174,7 +174,7 @@ class _LoginPageState extends State<LoginPage>
         await supabase.auth.signOut();
         await showLoginBlockedDialog(e.message);
       } else {
-        showMessage('로그인에 실패했습니다. 이메일과 비밀번호를 확인해 주세요.');
+        showMessage(_loginErrorMessage(e));
       }
     } finally {
       if (mounted) {
@@ -183,6 +183,20 @@ class _LoginPageState extends State<LoginPage>
         });
       }
     }
+  }
+
+  String _loginErrorMessage(Object error) {
+    final text = error.toString().replaceFirst('Exception: ', '').trim();
+    if (error is AuthException) {
+      return '로그인 인증 실패: ${error.message}';
+    }
+    if (error is PostgrestException) {
+      return '프로필 조회 실패: ${error.message}';
+    }
+    if (text.isNotEmpty) {
+      return '로그인 실패: $text';
+    }
+    return '로그인에 실패했습니다. 이메일과 비밀번호를 확인해 주세요.';
   }
 
   Future<void> signup() async {
