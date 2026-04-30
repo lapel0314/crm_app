@@ -25,7 +25,17 @@ Future<void> main() async {
 
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
   if (!kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
-    await Supabase.instance.client.auth.signOut();
+    unawaited(
+      Supabase.instance.client.auth
+          .signOut()
+          .timeout(
+            const Duration(seconds: 3),
+            onTimeout: () {},
+          )
+          .catchError((error) {
+        debugPrint('desktop startup signOut failed: $error');
+      }),
+    );
   }
 
   runApp(const MyApp());
