@@ -93,6 +93,41 @@ class _LoginPageState extends State<LoginPage>
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
   }
 
+  Future<void> showLoginBlockedDialog(String text) async {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).clearSnackBars();
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        title: const Text(
+          '로그인 제한',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+        content: Text(
+          text,
+          style: const TextStyle(
+            color: Color(0xFF374151),
+            height: 1.45,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFC94C6E),
+              foregroundColor: Colors.white,
+              elevation: 0,
+            ),
+            child: const Text('확인'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> login() async {
     if (emailController.text.trim().isEmpty ||
         passwordController.text.trim().isEmpty) {
@@ -137,7 +172,7 @@ class _LoginPageState extends State<LoginPage>
       debugPrint('login failed: $e');
       if (e is LoginPolicyException) {
         await supabase.auth.signOut();
-        showMessage(e.message);
+        await showLoginBlockedDialog(e.message);
       } else {
         showMessage('로그인에 실패했습니다. 이메일과 비밀번호를 확인해 주세요.');
       }
@@ -175,7 +210,8 @@ class _LoginPageState extends State<LoginPage>
     });
 
     try {
-      final normalizedStore = normalizeStoreName(signupStoreController.text.trim());
+      final normalizedStore =
+          normalizeStoreName(signupStoreController.text.trim());
       final authResponse = await supabase.auth.signUp(
         email: signupEmailController.text.trim(),
         password: signupPasswordController.text.trim(),
@@ -641,7 +677,8 @@ class _LoginPageState extends State<LoginPage>
                 fontSize: 16,
               ),
             ),
-            child: Text(isLoading ? '\uCC98\uB9AC \uC911..' : '\uB85C\uADF8\uC778'),
+            child: Text(
+                isLoading ? '\uCC98\uB9AC \uC911..' : '\uB85C\uADF8\uC778'),
           ),
         ),
       ],
@@ -682,7 +719,8 @@ class _LoginPageState extends State<LoginPage>
           controller: signupPhoneController,
           keyboardType: TextInputType.phone,
           inputFormatters: [LengthLimitingTextInputFormatter(13)],
-          decoration: _inputDecoration('\uC804\uD654\uBC88\uD638', prefixIcon: Icons.call_outlined),
+          decoration: _inputDecoration('\uC804\uD654\uBC88\uD638',
+              prefixIcon: Icons.call_outlined),
           onChanged: (value) {
             _applyPhoneFormat(signupPhoneController, value);
           },
@@ -737,7 +775,8 @@ class _LoginPageState extends State<LoginPage>
         const SizedBox(height: 14),
         DropdownButtonFormField<String>(
           initialValue: signupRole,
-          decoration: _inputDecoration('\uC9C1\uAE09', prefixIcon: Icons.badge_outlined),
+          decoration: _inputDecoration('\uC9C1\uAE09',
+              prefixIcon: Icons.badge_outlined),
           items: const [
             DropdownMenuItem(value: roleOwner, child: Text(roleOwner)),
             DropdownMenuItem(value: roleDeveloper, child: Text(roleDeveloper)),
@@ -816,7 +855,9 @@ class _LoginPageState extends State<LoginPage>
                 fontSize: 16,
               ),
             ),
-            child: Text(isLoading ? '\uCC98\uB9AC \uC911..' : '\uAC00\uC785 \uC644\uB8CC'),
+            child: Text(isLoading
+                ? '\uCC98\uB9AC \uC911..'
+                : '\uAC00\uC785 \uC644\uB8CC'),
           ),
         ),
       ],
@@ -868,7 +909,8 @@ class _LoginPageState extends State<LoginPage>
           ),
           const SizedBox(height: 12),
           Text(
-            latestNotice?.content ?? '\uB4F1\uB85D\uB41C \uACF5\uC9C0\uC0AC\uD56D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.',
+            latestNotice?.content ??
+                '\uB4F1\uB85D\uB41C \uACF5\uC9C0\uC0AC\uD56D\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.',
             style: const TextStyle(
               fontSize: 14,
               height: 1.7,

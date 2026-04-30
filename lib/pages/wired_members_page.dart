@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/constants/message_templates.dart';
+import 'package:crm_app/services/audit_log_service.dart';
 import 'package:crm_app/services/contact_action_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:crm_app/widgets/contact_action_buttons.dart';
@@ -34,6 +35,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
   final searchController = TextEditingController();
   final dateSearchController = TextEditingController();
   final NumberFormat moneyFormat = NumberFormat('#,###');
+  final auditLogService = AuditLogService();
 
   bool isLoading = false;
   bool showSummaryDashboard = false;
@@ -308,6 +310,19 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
     }
 
     await File(saveLocation.path).writeAsBytes(bytes, flush: true);
+    await auditLogService.record(
+      action: 'export_wired_members_excel',
+      targetTable: 'wired_members',
+      detail: {
+        'row_count': rows.length,
+        'file_name': suggestedName,
+        'store_filter': _buildExcelStoreLabel(
+          rows.map((row) => row['store']),
+          fallback: '전체매장',
+        ),
+        'date_filter': dateSearchController.text.trim(),
+      },
+    );
     if (!mounted) return;
     showMessage('유선고객 엑셀 저장이 완료되었습니다.');
   }
@@ -820,9 +835,28 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
 
   Future<void> deleteMember(String id) async {
     try {
-      await supabase.from('wired_members').delete().eq('id', id);
+      final user = supabase.auth.currentUser;
+      final before = members.firstWhere(
+        (member) => member['id'].toString() == id,
+        orElse: () => <String, dynamic>{},
+      );
+      await supabase.from('wired_members').update({
+        'is_deleted': true,
+        'deleted_at': DateTime.now().toUtc().toIso8601String(),
+        'deleted_by': user?.id,
+      }).eq('id', id);
+      await auditLogService.record(
+        action: 'soft_delete_wired_member',
+        targetTable: 'wired_members',
+        targetId: id,
+        detail: {
+          'store': before['store'],
+          'subscriber': before['subscriber'],
+          'phone': before['phone'],
+        },
+      );
       if (mounted) Navigator.pop(context);
-      showMessage('유선회원 삭제 완료');
+      showMessage('유선회원을 휴지통으로 이동했습니다.');
       fetchMembers(keyword: searchController.text);
     } catch (e) {
       logUiError('유선회원 삭제 실패: $e');

@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/pages/admin_page.dart';
+import 'package:crm_app/pages/audit_log_page.dart';
 import 'package:crm_app/pages/customer_open_page.dart';
 import 'package:crm_app/pages/customer_page.dart';
 import 'package:crm_app/pages/dashboard_page.dart';
@@ -15,7 +16,9 @@ import 'package:crm_app/pages/home_page.dart';
 import 'package:crm_app/pages/inventory_page.dart';
 import 'package:crm_app/pages/leads_page.dart';
 import 'package:crm_app/pages/rebate_page.dart';
+import 'package:crm_app/pages/recycle_bin_page.dart';
 import 'package:crm_app/pages/settings_page.dart';
+import 'package:crm_app/pages/store_management_page.dart';
 import 'package:crm_app/pages/wired_members_page.dart';
 import 'package:crm_app/services/notice_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
@@ -117,6 +120,27 @@ class _AppLayoutState extends State<AppLayout> {
           title: '직원관리',
           icon: Icons.admin_panel_settings_rounded,
           page: AdminPage(role: widget.role),
+        ),
+      if (isAdminRole)
+        _NavItem(
+          title: '매장관리',
+          icon: Icons.store_mall_directory_rounded,
+          page: StoreManagementPage(
+            role: widget.role,
+            currentStore: widget.store,
+          ),
+        ),
+      if (isAdminRole)
+        _NavItem(
+          title: '휴지통',
+          icon: Icons.restore_from_trash_rounded,
+          page: RecycleBinPage(role: widget.role),
+        ),
+      if (isAdminRole)
+        _NavItem(
+          title: '감사로그',
+          icon: Icons.manage_search_rounded,
+          page: AuditLogPage(role: widget.role),
         ),
       if (canUseSettings(widget.role))
         _NavItem(
@@ -850,7 +874,8 @@ class _AppLayoutState extends State<AppLayout> {
                         width: 22,
                         height: 22,
                         decoration: BoxDecoration(
-                          color: const Color(0xFFC94C6E).withValues(alpha: 0.14),
+                          color:
+                              const Color(0xFFC94C6E).withValues(alpha: 0.14),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Icon(
@@ -1017,9 +1042,8 @@ class _AppLayoutState extends State<AppLayout> {
           children: [
             Icon(
               item.icon,
-              color: selected
-                  ? const Color(0xFFC94C6E)
-                  : const Color(0xFF8A8DA6),
+              color:
+                  selected ? const Color(0xFFC94C6E) : const Color(0xFF8A8DA6),
               size: 18,
             ),
             const SizedBox(width: 12),
@@ -1095,8 +1119,7 @@ class _AppLayoutState extends State<AppLayout> {
       selectedIndex = 0;
     }
 
-    final useCompactLayout =
-        !kIsWeb && MediaQuery.of(context).size.width < 900;
+    final useCompactLayout = !kIsWeb && MediaQuery.of(context).size.width < 900;
     if (useCompactLayout) {
       return _iosCompactLayout(
         context,

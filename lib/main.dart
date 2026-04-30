@@ -6,6 +6,7 @@ import 'package:crm_app/services/login_policy_service.dart';
 import 'package:crm_app/services/update_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:crm_app/widgets/app_layout.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -367,24 +368,101 @@ class AuthGate extends StatefulWidget {
   State<AuthGate> createState() => _AuthGateState();
 }
 
-class _AuthGateState extends State<AuthGate> {
+class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   Session? session;
   late final StreamSubscription<AuthState> _authSubscription;
   final loginPolicyService = LoginPolicyService(supabase);
+  Future<Map<String, dynamic>?>? _profileFuture;
+  Timer? _policyCheckTimer;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
+  Timer? _networkChangeDebounce;
   String? _authErrorMessage;
   bool _logoutScheduled = false;
+  bool _policyCheckInProgress = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     session = supabase.auth.currentSession;
+    if (session != null) {
+      _profileFuture = fetchProfile();
+      _startPolicyCheckTimer();
+      _startNetworkChangeMonitor();
+    }
 
     _authSubscription = supabase.auth.onAuthStateChange.listen((data) {
       if (!mounted) return;
       setState(() {
         session = data.session;
+        _profileFuture = session == null ? null : fetchProfile();
       });
+      if (data.session == null) {
+        _stopPolicyCheckTimer();
+        _stopNetworkChangeMonitor();
+      } else {
+        _startPolicyCheckTimer();
+        _startNetworkChangeMonitor();
+      }
     });
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _checkPolicyWhileActive();
+    }
+  }
+
+  void _startPolicyCheckTimer() {
+    _policyCheckTimer?.cancel();
+    _policyCheckTimer = Timer.periodic(
+      const Duration(minutes: 1),
+      (_) => _checkPolicyWhileActive(),
+    );
+  }
+
+  void _stopPolicyCheckTimer() {
+    _policyCheckTimer?.cancel();
+    _policyCheckTimer = null;
+    _policyCheckInProgress = false;
+  }
+
+  void _startNetworkChangeMonitor() {
+    if (_connectivitySubscription != null) return;
+    _connectivitySubscription = Connectivity().onConnectivityChanged.listen(
+      (results) {
+        if (results.contains(ConnectivityResult.none)) return;
+        debugPrint('network changed: $results');
+        _networkChangeDebounce?.cancel();
+        _networkChangeDebounce = Timer(
+          const Duration(seconds: 2),
+          _checkPolicyWhileActive,
+        );
+      },
+    );
+  }
+
+  void _stopNetworkChangeMonitor() {
+    _networkChangeDebounce?.cancel();
+    _networkChangeDebounce = null;
+    _connectivitySubscription?.cancel();
+    _connectivitySubscription = null;
+  }
+
+  Future<void> _checkPolicyWhileActive() async {
+    if (_policyCheckInProgress || supabase.auth.currentUser == null) return;
+    _policyCheckInProgress = true;
+
+    try {
+      await loginPolicyService.checkLoginPolicy();
+    } catch (e) {
+      debugPrint('active login policy check failed: $e');
+      _authErrorMessage = e.toString().replaceFirst('Exception: ', '');
+      _scheduleSignOutOnce();
+    } finally {
+      _policyCheckInProgress = false;
+    }
   }
 
   Future<Map<String, dynamic>?> fetchProfile() async {
@@ -420,6 +498,8 @@ class _AuthGateState extends State<AuthGate> {
   void _scheduleSignOutOnce() {
     if (_logoutScheduled) return;
     _logoutScheduled = true;
+    _stopPolicyCheckTimer();
+    _stopNetworkChangeMonitor();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await supabase.auth.signOut();
       if (mounted) {
@@ -432,6 +512,9 @@ class _AuthGateState extends State<AuthGate> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stopPolicyCheckTimer();
+    _stopNetworkChangeMonitor();
     _authSubscription.cancel();
     super.dispose();
   }
@@ -443,7 +526,7 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     return FutureBuilder<Map<String, dynamic>?>(
-      future: fetchProfile(),
+      future: _profileFuture ??= fetchProfile(),
       builder: (context, snapshot) {
         if (snapshot.connectionState != ConnectionState.done) {
           return const Scaffold(

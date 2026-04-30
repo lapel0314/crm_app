@@ -205,6 +205,130 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  Future<void> _requestCurrentNetwork() async {
+    final reason = await _showNetworkRequestReasonDialog();
+    if (reason == null) return;
+
+    try {
+      final snapshot = await loginPolicyService.requestCurrentNetwork(
+        storeId: networkSnapshot?.storeId,
+        storeName: widget.currentStore,
+        label: reason,
+      );
+      if (!mounted) return;
+      setState(() {
+        networkSnapshot = snapshot;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('현재 네트워크 등록을 요청했습니다.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('네트워크 등록 요청에 실패했습니다: $e')),
+      );
+    }
+  }
+
+  Future<String?> _showNetworkRequestReasonDialog() async {
+    final controller = TextEditingController();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        title: const Text(
+          '네트워크 등록 요청',
+          style: TextStyle(fontWeight: FontWeight.w900),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '대표/개발자가 승인할 수 있도록 요청 사유를 입력해 주세요.',
+              style: TextStyle(
+                color: Color(0xFF6B7280),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: '요청 사유',
+                hintText: '예: 이대점 공유기 교체 / 매장 Wi-Fi 변경',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final text = controller.text.trim();
+              Navigator.pop(context, text.isEmpty ? '현장 네트워크 등록 요청' : text);
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFC94C6E),
+              foregroundColor: Colors.white,
+              elevation: 0,
+            ),
+            child: const Text('요청'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    return reason;
+  }
+
+  Future<void> _approveNetworkRequest(String requestId) async {
+    try {
+      final snapshot = await loginPolicyService.approveNetworkRequest(
+        requestId: requestId,
+      );
+      if (!mounted) return;
+      setState(() {
+        networkSnapshot = snapshot;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('네트워크 등록 요청을 승인했습니다.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('네트워크 요청 승인에 실패했습니다: $e')),
+      );
+    }
+  }
+
+  Future<void> _rejectNetworkRequest(String requestId) async {
+    try {
+      final snapshot = await loginPolicyService.rejectNetworkRequest(
+        requestId: requestId,
+      );
+      if (!mounted) return;
+      setState(() {
+        networkSnapshot = snapshot;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('네트워크 등록 요청을 거절했습니다.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('네트워크 요청 거절에 실패했습니다: $e')),
+      );
+    }
+  }
+
   Future<void> _deactivateNetwork(String networkId) async {
     try {
       final snapshot = await loginPolicyService.deactivateNetwork(
@@ -526,7 +650,8 @@ class _SettingsPageState extends State<SettingsPage> {
               child: Center(child: Text('표시할 매장 구성원이 없습니다.')),
             )
           else
-            ...grouped.entries.map((entry) => _storeGroup(entry.key, entry.value)),
+            ...grouped.entries
+                .map((entry) => _storeGroup(entry.key, entry.value)),
         ],
       ),
     );
@@ -688,6 +813,9 @@ class _SettingsPageState extends State<SettingsPage> {
   Widget _networkManagementCard() {
     final snapshot = networkSnapshot;
     final networks = snapshot?.networks ?? const <StoreNetworkRecord>[];
+    final pendingRequests =
+        snapshot?.pendingRequests ?? const <StoreNetworkRequestRecord>[];
+    final canModifyNetworks = snapshot?.canModifyNetworks ?? false;
     final compactIos =
         !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
 
@@ -697,17 +825,25 @@ class _SettingsPageState extends State<SettingsPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            '매장 네트워크',
-            style: TextStyle(
-              color: Color(0xFF111827),
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-            ),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  '매장 네트워크',
+                  style: TextStyle(
+                    color: Color(0xFF111827),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (pendingRequests.isNotEmpty)
+                _roleBadge('승인 대기 ${pendingRequests.length}건'),
+            ],
           ),
           const SizedBox(height: 6),
           const Text(
-            '사원 로그인은 모바일 + 등록된 매장 공인 IP에서만 허용됩니다.',
+            '사원 로그인은 모바일 + 등록된 매장 공인 IP에서만 허용됩니다. 점장은 등록 요청만 가능하고 대표·개발자가 승인합니다.',
             style: TextStyle(
               color: Color(0xFF9CA3AF),
               fontSize: 12,
@@ -722,6 +858,8 @@ class _SettingsPageState extends State<SettingsPage> {
               _readonlyField('매장', snapshot?.storeName ?? widget.currentStore),
               _readonlyField('현재 공인 IP', snapshot?.detectedPublicIp ?? '-'),
               _readonlyField('현재 Wi-Fi SSID', snapshot?.ssid ?? '-'),
+              _readonlyField('현재 기기 IP', snapshot?.wifiIp ?? '-'),
+              _readonlyField('현재 라우터', snapshot?.wifiGatewayIp ?? '-'),
             ],
           ),
           const SizedBox(height: 16),
@@ -732,7 +870,11 @@ class _SettingsPageState extends State<SettingsPage> {
               SizedBox(
                 width: compactIos ? double.infinity : null,
                 child: ElevatedButton.icon(
-                  onPressed: isNetworkLoading ? null : _registerCurrentNetwork,
+                  onPressed: isNetworkLoading
+                      ? null
+                      : canModifyNetworks
+                          ? _registerCurrentNetwork
+                          : _requestCurrentNetwork,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFFC94C6E),
                     foregroundColor: Colors.white,
@@ -741,8 +883,11 @@ class _SettingsPageState extends State<SettingsPage> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                   ),
-                  icon: const Icon(Icons.wifi_protected_setup_rounded, size: 18),
-                  label: const Text('현재 네트워크 등록'),
+                  icon:
+                      const Icon(Icons.wifi_protected_setup_rounded, size: 18),
+                  label: Text(
+                    canModifyNetworks ? '현재 네트워크 등록' : '현재 네트워크 등록 요청',
+                  ),
                 ),
               ),
               SizedBox(
@@ -825,7 +970,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     const SizedBox(width: 8),
                     IconButton(
                       tooltip: '비활성화',
-                      onPressed: network.isActive
+                      onPressed: network.isActive && canModifyNetworks
                           ? () => _deactivateNetwork(network.id)
                           : null,
                       icon: const Icon(Icons.block_rounded),
@@ -834,6 +979,90 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
               ),
             ),
+          if (!isNetworkLoading && pendingRequests.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            const Text(
+              '승인 대기 요청',
+              style: TextStyle(
+                color: Color(0xFF111827),
+                fontSize: 14,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 10),
+            ...pendingRequests.map(
+              (request) => Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.pending_actions_rounded,
+                      size: 18,
+                      color: Color(0xFFD97706),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            request.publicIp,
+                            style: const TextStyle(
+                              color: Color(0xFF111827),
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            [
+                              if ((request.requestedByName ?? '')
+                                  .trim()
+                                  .isNotEmpty)
+                                '요청자: ${request.requestedByName!.trim()}',
+                              if ((request.label ?? '').trim().isNotEmpty)
+                                request.label!.trim(),
+                              if ((request.ssidHint ?? '').trim().isNotEmpty)
+                                'SSID: ${request.ssidHint!.trim()}',
+                              if ((request.wifiGatewayIp ?? '')
+                                  .trim()
+                                  .isNotEmpty)
+                                '라우터: ${request.wifiGatewayIp!.trim()}',
+                              if ((request.requestedAt ?? '').trim().isNotEmpty)
+                                '요청일: ${request.requestedAt!.split('T').first}',
+                            ].join(' · '),
+                            style: const TextStyle(
+                              color: Color(0xFF92400E),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    if (canModifyNetworks) ...[
+                      const SizedBox(width: 8),
+                      IconButton(
+                        tooltip: '승인',
+                        onPressed: () => _approveNetworkRequest(request.id),
+                        icon: const Icon(Icons.check_circle_rounded),
+                      ),
+                      IconButton(
+                        tooltip: '거절',
+                        onPressed: () => _rejectNetworkRequest(request.id),
+                        icon: const Icon(Icons.cancel_rounded),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );

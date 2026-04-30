@@ -228,10 +228,15 @@ class _InventoryPageState extends State<InventoryPage> {
 
   Future<void> deleteInventory(Map<String, dynamic> item) async {
     try {
-      await supabase.from('device_inventory').delete().eq('id', item['id']);
+      final user = supabase.auth.currentUser;
+      await supabase.from('device_inventory').update({
+        'is_deleted': true,
+        'deleted_at': DateTime.now().toUtc().toIso8601String(),
+        'deleted_by': user?.id,
+      }).eq('id', item['id']);
 
       await insertAuditLog(
-        action: 'delete_inventory',
+        action: 'soft_delete_inventory',
         targetId: item['id'].toString(),
         detail: {
           'store': item['store'],
@@ -245,7 +250,7 @@ class _InventoryPageState extends State<InventoryPage> {
         Navigator.pop(context);
       }
 
-      showMessage('재고 삭제 완료');
+      showMessage('재고를 휴지통으로 이동했습니다.');
       await fetchInventory(keyword: searchController.text);
     } catch (e) {
       debugPrint('inventory delete failed: $e');
@@ -454,68 +459,68 @@ class _InventoryPageState extends State<InventoryPage> {
         final dialogWidth =
             compactIos ? MediaQuery.of(context).size.width - 56 : 560.0;
         return AlertDialog(
-        backgroundColor: Colors.white,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        title: Text(
-          item['model_name']?.toString().isNotEmpty == true
-              ? item['model_name'].toString()
-              : '재고 상세',
-          style: const TextStyle(
-            color: Color(0xFF111827),
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        content: SizedBox(
-          width: dialogWidth,
-          child: SingleChildScrollView(
-            child: Wrap(
-              spacing: 18,
-              runSpacing: 0,
-              children: [
-                _detail(
-                  '매장',
-                  item['store'],
-                  width: compactIos ? dialogWidth : 250,
-                ),
-                _detail(
-                  '모델명',
-                  item['model_name'],
-                  width: compactIos ? dialogWidth : 250,
-                ),
-                _detail(
-                  '일련번호',
-                  item['serial_number'],
-                  width: compactIos ? dialogWidth : 250,
-                ),
-                _detail(
-                  '상태',
-                  item['status'],
-                  width: compactIos ? dialogWidth : 250,
-                ),
-                _detail(
-                  '메모',
-                  item['memo'],
-                  width: compactIos ? dialogWidth : 250,
-                ),
-              ],
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          title: Text(
+            item['model_name']?.toString().isNotEmpty == true
+                ? item['model_name'].toString()
+                : '재고 상세',
+            style: const TextStyle(
+              color: Color(0xFF111827),
+              fontWeight: FontWeight.w900,
             ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('닫기'),
-          ),
-          if (canEdit())
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                showEditDialog(item);
-              },
-              child: const Text('수정'),
+          content: SizedBox(
+            width: dialogWidth,
+            child: SingleChildScrollView(
+              child: Wrap(
+                spacing: 18,
+                runSpacing: 0,
+                children: [
+                  _detail(
+                    '매장',
+                    item['store'],
+                    width: compactIos ? dialogWidth : 250,
+                  ),
+                  _detail(
+                    '모델명',
+                    item['model_name'],
+                    width: compactIos ? dialogWidth : 250,
+                  ),
+                  _detail(
+                    '일련번호',
+                    item['serial_number'],
+                    width: compactIos ? dialogWidth : 250,
+                  ),
+                  _detail(
+                    '상태',
+                    item['status'],
+                    width: compactIos ? dialogWidth : 250,
+                  ),
+                  _detail(
+                    '메모',
+                    item['memo'],
+                    width: compactIos ? dialogWidth : 250,
+                  ),
+                ],
+              ),
             ),
-        ],
-      );
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('닫기'),
+            ),
+            if (canEdit())
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  showEditDialog(item);
+                },
+                child: const Text('수정'),
+              ),
+          ],
+        );
       },
     );
   }

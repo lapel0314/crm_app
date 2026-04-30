@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
@@ -351,8 +350,7 @@ class _AdminPageState extends State<AdminPage> {
                                         .clearSnackBars();
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content:
-                                            Text('공지사항 삭제 실패: $e'),
+                                        content: Text('공지사항 삭제 실패: $e'),
                                       ),
                                     );
                                   }

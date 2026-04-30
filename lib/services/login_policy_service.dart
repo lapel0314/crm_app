@@ -20,7 +20,11 @@ class LoginPolicyDecision {
   final String? storeName;
   final String? storeId;
   final String? ssid;
+  final String? wifiIp;
+  final String? wifiGatewayIp;
+  final String? wifiBssid;
   final bool canManageNetworks;
+  final bool canModifyNetworks;
 
   const LoginPolicyDecision({
     required this.allowed,
@@ -31,7 +35,11 @@ class LoginPolicyDecision {
     required this.storeName,
     required this.storeId,
     required this.ssid,
+    required this.wifiIp,
+    required this.wifiGatewayIp,
+    required this.wifiBssid,
     required this.canManageNetworks,
+    required this.canModifyNetworks,
   });
 
   factory LoginPolicyDecision.fromJson(Map<String, dynamic> json) {
@@ -44,7 +52,11 @@ class LoginPolicyDecision {
       storeName: json['store_name']?.toString(),
       storeId: json['store_id']?.toString(),
       ssid: json['ssid']?.toString(),
+      wifiIp: json['wifi_ip']?.toString(),
+      wifiGatewayIp: json['wifi_gateway_ip']?.toString(),
+      wifiBssid: json['wifi_bssid']?.toString(),
       canManageNetworks: json['can_manage_networks'] == true,
+      canModifyNetworks: json['can_modify_networks'] == true,
     );
   }
 }
@@ -78,33 +90,175 @@ class StoreNetworkRecord {
   }
 }
 
+class StoreNetworkRequestRecord {
+  final String id;
+  final String publicIp;
+  final String? label;
+  final String? ssidHint;
+  final String? wifiIp;
+  final String? wifiGatewayIp;
+  final String? requestedByName;
+  final String? requestedAt;
+
+  const StoreNetworkRequestRecord({
+    required this.id,
+    required this.publicIp,
+    required this.label,
+    required this.ssidHint,
+    required this.wifiIp,
+    required this.wifiGatewayIp,
+    required this.requestedByName,
+    required this.requestedAt,
+  });
+
+  factory StoreNetworkRequestRecord.fromJson(Map<String, dynamic> json) {
+    return StoreNetworkRequestRecord(
+      id: json['id'].toString(),
+      publicIp: (json['public_ip'] ?? '').toString(),
+      label: json['label']?.toString(),
+      ssidHint: json['ssid_hint']?.toString(),
+      wifiIp: json['wifi_ip']?.toString(),
+      wifiGatewayIp: json['wifi_gateway_ip']?.toString(),
+      requestedByName: json['requested_by_name']?.toString(),
+      requestedAt: json['requested_at']?.toString(),
+    );
+  }
+}
+
+class StoreNetworkHistoryRecord {
+  final String id;
+  final String publicIp;
+  final String status;
+  final String? label;
+  final String? ssidHint;
+  final String? requestedByName;
+  final String? reviewedByName;
+  final String? requestedAt;
+  final String? reviewedAt;
+
+  const StoreNetworkHistoryRecord({
+    required this.id,
+    required this.publicIp,
+    required this.status,
+    required this.label,
+    required this.ssidHint,
+    required this.requestedByName,
+    required this.reviewedByName,
+    required this.requestedAt,
+    required this.reviewedAt,
+  });
+
+  factory StoreNetworkHistoryRecord.fromJson(Map<String, dynamic> json) {
+    return StoreNetworkHistoryRecord(
+      id: json['id'].toString(),
+      publicIp: (json['public_ip'] ?? '').toString(),
+      status: (json['status'] ?? '').toString(),
+      label: json['label']?.toString(),
+      ssidHint: json['ssid_hint']?.toString(),
+      requestedByName: json['requested_by_name']?.toString(),
+      reviewedByName: json['reviewed_by_name']?.toString(),
+      requestedAt: json['requested_at']?.toString(),
+      reviewedAt: json['reviewed_at']?.toString(),
+    );
+  }
+}
+
+class StoreSecuritySummary {
+  final int activeNetworkCount;
+  final int inactiveNetworkCount;
+  final int pendingRequestCount;
+  final int staffCount;
+  final String? recentStaffLoginAt;
+  final String? recentStaffLoginPublicIp;
+  final String? recentStaffLoginName;
+
+  const StoreSecuritySummary({
+    required this.activeNetworkCount,
+    required this.inactiveNetworkCount,
+    required this.pendingRequestCount,
+    required this.staffCount,
+    required this.recentStaffLoginAt,
+    required this.recentStaffLoginPublicIp,
+    required this.recentStaffLoginName,
+  });
+
+  factory StoreSecuritySummary.fromJson(Map<String, dynamic> json) {
+    int number(dynamic value) => int.tryParse((value ?? '0').toString()) ?? 0;
+    return StoreSecuritySummary(
+      activeNetworkCount: number(json['active_network_count']),
+      inactiveNetworkCount: number(json['inactive_network_count']),
+      pendingRequestCount: number(json['pending_request_count']),
+      staffCount: number(json['staff_count']),
+      recentStaffLoginAt: json['recent_staff_login_at']?.toString(),
+      recentStaffLoginPublicIp:
+          json['recent_staff_login_public_ip']?.toString(),
+      recentStaffLoginName: json['recent_staff_login_name']?.toString(),
+    );
+  }
+}
+
 class StoreNetworkSnapshot {
   final String? storeId;
   final String? storeName;
   final String? detectedPublicIp;
   final String? ssid;
+  final String? wifiIp;
+  final String? wifiGatewayIp;
+  final String? wifiBssid;
   final bool canManageNetworks;
+  final bool canModifyNetworks;
+  final StoreSecuritySummary securitySummary;
   final List<StoreNetworkRecord> networks;
+  final List<StoreNetworkRequestRecord> pendingRequests;
+  final List<StoreNetworkHistoryRecord> requestHistory;
 
   const StoreNetworkSnapshot({
     required this.storeId,
     required this.storeName,
     required this.detectedPublicIp,
     required this.ssid,
+    required this.wifiIp,
+    required this.wifiGatewayIp,
+    required this.wifiBssid,
     required this.canManageNetworks,
+    required this.canModifyNetworks,
+    required this.securitySummary,
     required this.networks,
+    required this.pendingRequests,
+    required this.requestHistory,
   });
 
   factory StoreNetworkSnapshot.fromJson(Map<String, dynamic> json) {
     final rawNetworks = (json['networks'] as List?) ?? const [];
+    final rawPendingRequests =
+        (json['pending_network_requests'] as List?) ?? const [];
+    final rawRequestHistory =
+        (json['network_request_history'] as List?) ?? const [];
     return StoreNetworkSnapshot(
       storeId: json['store_id']?.toString(),
       storeName: json['store_name']?.toString(),
       detectedPublicIp: json['detected_public_ip']?.toString(),
       ssid: json['ssid']?.toString(),
+      wifiIp: json['wifi_ip']?.toString(),
+      wifiGatewayIp: json['wifi_gateway_ip']?.toString(),
+      wifiBssid: json['wifi_bssid']?.toString(),
       canManageNetworks: json['can_manage_networks'] == true,
+      canModifyNetworks: json['can_modify_networks'] == true,
+      securitySummary: StoreSecuritySummary.fromJson(
+        Map<String, dynamic>.from((json['security_summary'] as Map?) ?? {}),
+      ),
       networks: rawNetworks
           .map((item) => StoreNetworkRecord.fromJson(
+                Map<String, dynamic>.from(item as Map),
+              ))
+          .toList(),
+      pendingRequests: rawPendingRequests
+          .map((item) => StoreNetworkRequestRecord.fromJson(
+                Map<String, dynamic>.from(item as Map),
+              ))
+          .toList(),
+      requestHistory: rawRequestHistory
+          .map((item) => StoreNetworkHistoryRecord.fromJson(
                 Map<String, dynamic>.from(item as Map),
               ))
           .toList(),
@@ -125,8 +279,7 @@ class LoginPolicyService {
     final context = await deviceContextService.load();
     final data = await _invokePolicy({
       'action': 'check_login_policy',
-      'platform': context.platform,
-      'ssid': context.ssid,
+      ..._networkContext(context),
     });
 
     final decision = LoginPolicyDecision.fromJson(data);
@@ -140,12 +293,16 @@ class LoginPolicyService {
         storeName: decision.storeName,
         storeId: decision.storeId,
         ssid: decision.ssid,
+        wifiIp: decision.wifiIp,
+        wifiGatewayIp: decision.wifiGatewayIp,
+        wifiBssid: decision.wifiBssid,
         canManageNetworks: decision.canManageNetworks,
+        canModifyNetworks: decision.canModifyNetworks,
       );
     }
     if (!decision.allowed) {
       throw LoginPolicyException(
-        decision.message.isEmpty ? '로그인이 허용되지 않습니다.' : decision.message,
+        _policyBlockMessage(decision),
       );
     }
     return decision;
@@ -157,8 +314,7 @@ class LoginPolicyService {
     final context = await deviceContextService.load();
     final data = await _invokePolicy({
       'action': 'bootstrap_signup_network',
-      'platform': context.platform,
-      'ssid': context.ssid,
+      ..._networkContext(context),
       'store_name': storeName,
     });
 
@@ -173,8 +329,7 @@ class LoginPolicyService {
     final context = await deviceContextService.load();
     final data = await _invokePolicy({
       'action': 'list_store_networks',
-      'platform': context.platform,
-      'ssid': context.ssid,
+      ..._networkContext(context),
       if (storeId != null && storeId.isNotEmpty) 'store_id': storeId,
     });
     return StoreNetworkSnapshot.fromJson(data);
@@ -188,11 +343,50 @@ class LoginPolicyService {
     final context = await deviceContextService.load();
     final data = await _invokePolicy({
       'action': 'register_current_network',
-      'platform': context.platform,
-      'ssid': context.ssid,
+      ..._networkContext(context),
       if (storeId != null && storeId.isNotEmpty) 'store_id': storeId,
       if (storeName != null && storeName.isNotEmpty) 'store_name': storeName,
       if (label != null && label.isNotEmpty) 'label': label,
+    });
+    return StoreNetworkSnapshot.fromJson(data);
+  }
+
+  Future<StoreNetworkSnapshot> requestCurrentNetwork({
+    String? storeId,
+    String? storeName,
+    String? label,
+  }) async {
+    final context = await deviceContextService.load();
+    final data = await _invokePolicy({
+      'action': 'request_current_network',
+      ..._networkContext(context),
+      if (storeId != null && storeId.isNotEmpty) 'store_id': storeId,
+      if (storeName != null && storeName.isNotEmpty) 'store_name': storeName,
+      if (label != null && label.isNotEmpty) 'label': label,
+    });
+    return StoreNetworkSnapshot.fromJson(data);
+  }
+
+  Future<StoreNetworkSnapshot> approveNetworkRequest({
+    required String requestId,
+  }) async {
+    final context = await deviceContextService.load();
+    final data = await _invokePolicy({
+      'action': 'approve_network_request',
+      ..._networkContext(context),
+      'request_id': requestId,
+    });
+    return StoreNetworkSnapshot.fromJson(data);
+  }
+
+  Future<StoreNetworkSnapshot> rejectNetworkRequest({
+    required String requestId,
+  }) async {
+    final context = await deviceContextService.load();
+    final data = await _invokePolicy({
+      'action': 'reject_network_request',
+      ..._networkContext(context),
+      'request_id': requestId,
     });
     return StoreNetworkSnapshot.fromJson(data);
   }
@@ -204,9 +398,24 @@ class LoginPolicyService {
     final context = await deviceContextService.load();
     final data = await _invokePolicy({
       'action': 'deactivate_store_network',
-      'platform': context.platform,
-      'ssid': context.ssid,
+      ..._networkContext(context),
       'network_id': networkId,
+      if (storeId != null && storeId.isNotEmpty) 'store_id': storeId,
+    });
+    return StoreNetworkSnapshot.fromJson(data);
+  }
+
+  Future<StoreNetworkSnapshot> updateNetworkLabel({
+    required String networkId,
+    required String label,
+    String? storeId,
+  }) async {
+    final context = await deviceContextService.load();
+    final data = await _invokePolicy({
+      'action': 'update_store_network_label',
+      ..._networkContext(context),
+      'network_id': networkId,
+      'label': label,
       if (storeId != null && storeId.isNotEmpty) 'store_id': storeId,
     });
     return StoreNetworkSnapshot.fromJson(data);
@@ -234,6 +443,37 @@ class LoginPolicyService {
     }
 
     return data;
+  }
+
+  Map<String, dynamic> _networkContext(DeviceContext context) {
+    return {
+      'platform': context.platform,
+      'ssid': context.ssid,
+      'wifi_ip': context.wifiIp,
+      'wifi_gateway_ip': context.wifiGatewayIp,
+      'wifi_bssid': context.wifiBssid,
+    };
+  }
+
+  String _policyBlockMessage(LoginPolicyDecision decision) {
+    final message =
+        decision.message.isEmpty ? '로그인이 허용되지 않습니다.' : decision.message;
+    final details = <String>[
+      if ((decision.storeName ?? '').trim().isNotEmpty)
+        '매장: ${decision.storeName!.trim()}',
+      if ((decision.detectedPublicIp ?? '').trim().isNotEmpty)
+        '현재 공인 IP: ${decision.detectedPublicIp!.trim()}',
+      if ((decision.ssid ?? '').trim().isNotEmpty)
+        '현재 Wi-Fi: ${decision.ssid!.trim()}',
+      if ((decision.wifiGatewayIp ?? '').trim().isNotEmpty)
+        '현재 라우터: ${decision.wifiGatewayIp!.trim()}',
+    ];
+
+    if (decision.reasonCode == 'staff_network_blocked') {
+      details.add('점장에게 현재 네트워크 등록 요청을 진행해 달라고 요청하세요.');
+    }
+
+    return details.isEmpty ? message : '$message\n\n${details.join('\n')}';
   }
 
   Map<String, dynamic> _asMap(dynamic data) {

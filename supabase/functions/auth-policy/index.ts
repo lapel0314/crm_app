@@ -21,6 +21,13 @@ const MANAGE_NETWORK_ROLES = new Set([
 ]);
 const STAFF_ROLE = "\uC0AC\uC6D0";
 
+type ClientNetwork = {
+  ssid: string | null;
+  wifiIp: string | null;
+  wifiGatewayIp: string | null;
+  wifiBssid: string | null;
+};
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -40,10 +47,14 @@ serve(async (req) => {
     const action = String(body.action ?? "check_login_policy");
     const platform = String(body.platform ?? "unknown").toLowerCase();
     const ssid = typeof body.ssid === "string" ? body.ssid.trim() : null;
+    const wifiIp = cleanOptionalString(body.wifi_ip);
+    const wifiGatewayIp = cleanOptionalString(body.wifi_gateway_ip);
+    const wifiBssid = cleanOptionalString(body.wifi_bssid);
     const accessToken = typeof body.access_token === "string"
       ? body.access_token.trim()
       : "";
     const detectedPublicIp = extractClientIp(req);
+    const clientNetwork = { ssid, wifiIp, wifiGatewayIp, wifiBssid };
 
     if (!accessToken) {
       return json(
@@ -87,7 +98,7 @@ serve(async (req) => {
             user.id,
             platform,
             detectedPublicIp,
-            ssid,
+            clientNetwork,
           ),
         );
       case "bootstrap_signup_network":
@@ -97,7 +108,7 @@ serve(async (req) => {
             profile,
             user.id,
             detectedPublicIp,
-            ssid,
+            clientNetwork,
             body,
           ),
         );
@@ -107,19 +118,19 @@ serve(async (req) => {
             adminClient,
             profile,
             detectedPublicIp,
-            ssid,
+            clientNetwork,
             await resolveTargetStore(adminClient, profile, body),
           ),
         );
       case "register_current_network": {
         const store = await resolveTargetStore(adminClient, profile, body, true);
-        ensureCanManageNetworks(profile, String(store.id));
+        ensureCanModifyStoreNetworks(profile);
         await upsertStoreNetwork(
           adminClient,
           String(store.id),
           user.id,
           detectedPublicIp,
-          ssid,
+          clientNetwork,
           typeof body.label === "string" ? body.label.trim() : null,
         );
         return json(
@@ -127,14 +138,94 @@ serve(async (req) => {
             adminClient,
             profile,
             detectedPublicIp,
-            ssid,
+            clientNetwork,
+            store,
+          ),
+        );
+      }
+      case "request_current_network": {
+        const store = await resolveTargetStore(adminClient, profile, body);
+        ensureCanRequestStoreNetwork(profile, String(store.id));
+        await upsertNetworkRequest(
+          adminClient,
+          String(store.id),
+          user.id,
+          detectedPublicIp,
+          clientNetwork,
+          typeof body.label === "string" ? body.label.trim() : null,
+        );
+        return json(
+          await buildNetworkSnapshot(
+            adminClient,
+            profile,
+            detectedPublicIp,
+            clientNetwork,
+            store,
+          ),
+        );
+      }
+      case "approve_network_request": {
+        ensureCanModifyStoreNetworks(profile);
+        const requestId = String(body.request_id ?? "");
+        const request = await loadPendingNetworkRequest(adminClient, requestId);
+        await upsertStoreNetwork(
+          adminClient,
+          String(request.store_id),
+          user.id,
+          String(request.public_ip),
+          {
+            ssid: cleanOptionalString(request.ssid_hint),
+            wifiIp: cleanOptionalString(request.wifi_ip),
+            wifiGatewayIp: cleanOptionalString(request.wifi_gateway_ip),
+            wifiBssid: cleanOptionalString(request.wifi_bssid),
+          },
+          cleanOptionalString(request.label) ?? "\uC2B9\uC778\uB41C \uB124\uD2B8\uC6CC\uD06C \uC694\uCCAD",
+        );
+        await adminClient
+          .from("store_network_requests")
+          .update({
+            status: "approved",
+            reviewed_by: user.id,
+            reviewed_at: new Date().toISOString(),
+          })
+          .eq("id", request.id);
+        const store = await loadStore(adminClient, String(request.store_id));
+        return json(
+          await buildNetworkSnapshot(
+            adminClient,
+            profile,
+            detectedPublicIp,
+            clientNetwork,
+            store,
+          ),
+        );
+      }
+      case "reject_network_request": {
+        ensureCanModifyStoreNetworks(profile);
+        const requestId = String(body.request_id ?? "");
+        const request = await loadPendingNetworkRequest(adminClient, requestId);
+        await adminClient
+          .from("store_network_requests")
+          .update({
+            status: "rejected",
+            reviewed_by: user.id,
+            reviewed_at: new Date().toISOString(),
+          })
+          .eq("id", request.id);
+        const store = await loadStore(adminClient, String(request.store_id));
+        return json(
+          await buildNetworkSnapshot(
+            adminClient,
+            profile,
+            detectedPublicIp,
+            clientNetwork,
             store,
           ),
         );
       }
       case "deactivate_store_network": {
         const store = await resolveTargetStore(adminClient, profile, body);
-        ensureCanManageNetworks(profile, String(store.id));
+        ensureCanModifyStoreNetworks(profile);
         const networkId = String(body.network_id ?? "");
         if (!networkId) {
           return json(
@@ -156,7 +247,36 @@ serve(async (req) => {
             adminClient,
             profile,
             detectedPublicIp,
-            ssid,
+            clientNetwork,
+            store,
+          ),
+        );
+      }
+      case "update_store_network_label": {
+        const store = await resolveTargetStore(adminClient, profile, body);
+        ensureCanModifyStoreNetworks(profile);
+        const networkId = String(body.network_id ?? "");
+        const label = cleanOptionalString(body.label);
+        if (!networkId) {
+          return json(
+            {
+              success: false,
+              message: "\uBCC0\uACBD\uD560 \uB124\uD2B8\uC6CC\uD06C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
+            },
+            400,
+          );
+        }
+        await adminClient
+          .from("store_networks")
+          .update({ label })
+          .eq("id", networkId)
+          .eq("store_id", store.id);
+        return json(
+          await buildNetworkSnapshot(
+            adminClient,
+            profile,
+            detectedPublicIp,
+            clientNetwork,
             store,
           ),
         );
@@ -207,6 +327,21 @@ function extractClientIp(req: Request) {
     req.headers.get("cf-connecting-ip") ??
     "unknown"
   );
+}
+
+function cleanOptionalString(value: unknown) {
+  if (typeof value !== "string") return null;
+  const cleaned = value.trim();
+  return cleaned ? cleaned : null;
+}
+
+function networkPayload(clientNetwork: ClientNetwork) {
+  return {
+    ssid: clientNetwork.ssid,
+    wifi_ip: clientNetwork.wifiIp,
+    wifi_gateway_ip: clientNetwork.wifiGatewayIp,
+    wifi_bssid: clientNetwork.wifiBssid,
+  };
 }
 
 function normalizeStoreName(input: string) {
@@ -343,12 +478,55 @@ function ensureCanManageNetworks(
   }
 }
 
+function ensureCanModifyStoreNetworks(profile: Record<string, unknown>) {
+  if (!isPrivileged(profile)) {
+    throw new Error(
+      "\uB9E4\uC7A5 \uB124\uD2B8\uC6CC\uD06C \uB4F1\uB85D/\uBCC0\uACBD\uC740 \uB300\uD45C \uB610\uB294 \uAC1C\uBC1C\uC790\uB9CC \uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+    );
+  }
+}
+
+function ensureCanRequestStoreNetwork(
+  profile: Record<string, unknown>,
+  storeId: string,
+) {
+  if (!canManageNetworks(profile, storeId)) {
+    throw new Error(
+      "\uD604\uC7AC \uACC4\uC815\uC740 \uB9E4\uC7A5 \uB124\uD2B8\uC6CC\uD06C \uB4F1\uB85D\uC744 \uC694\uCCAD\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    );
+  }
+}
+
+async function loadPendingNetworkRequest(
+  adminClient: ReturnType<typeof createClient>,
+  requestId: string,
+) {
+  if (!requestId) {
+    throw new Error("\uCC98\uB9AC\uD560 \uB124\uD2B8\uC6CC\uD06C \uC694\uCCAD\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.");
+  }
+
+  const { data, error } = await adminClient
+    .from("store_network_requests")
+    .select(
+      "id, store_id, public_ip, label, ssid_hint, wifi_ip, wifi_gateway_ip, wifi_bssid, status",
+    )
+    .eq("id", requestId)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  if (error || !data) {
+    throw new Error("\uB300\uAE30 \uC911\uC778 \uB124\uD2B8\uC6CC\uD06C \uC694\uCCAD\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
+  }
+
+  return data as Record<string, unknown>;
+}
+
 async function upsertStoreNetwork(
   adminClient: ReturnType<typeof createClient>,
   storeId: string,
   userId: string,
   publicIp: string,
-  ssid: string | null,
+  clientNetwork: ClientNetwork,
   label: string | null,
 ) {
   if (!publicIp || publicIp === "unknown") {
@@ -360,8 +538,8 @@ async function upsertStoreNetwork(
   const payload = {
     store_id: storeId,
     public_ip: publicIp,
-    ssid_hint: ssid,
-    label: label || ssid || null,
+    ssid_hint: clientNetwork.ssid,
+    label: label || clientNetwork.ssid || clientNetwork.wifiGatewayIp || null,
     is_active: true,
     registered_by: userId,
     last_seen_at: new Date().toISOString(),
@@ -378,11 +556,74 @@ async function upsertStoreNetwork(
   }
 }
 
+async function upsertNetworkRequest(
+  adminClient: ReturnType<typeof createClient>,
+  storeId: string,
+  userId: string,
+  publicIp: string,
+  clientNetwork: ClientNetwork,
+  label: string | null,
+) {
+  if (!publicIp || publicIp === "unknown") {
+    throw new Error(
+      "\uD604\uC7AC \uACF5\uC778 IP\uB97C \uD655\uC778\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
+    );
+  }
+
+  const { data: existingNetwork } = await adminClient
+    .from("store_networks")
+    .select("id")
+    .eq("store_id", storeId)
+    .eq("public_ip", publicIp)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (existingNetwork) {
+    throw new Error("\uC774\uBBF8 \uD5C8\uC6A9\uB41C \uB9E4\uC7A5 \uB124\uD2B8\uC6CC\uD06C\uC785\uB2C8\uB2E4.");
+  }
+
+  const payload = {
+    store_id: storeId,
+    public_ip: publicIp,
+    label: label || clientNetwork.ssid || clientNetwork.wifiGatewayIp || null,
+    ssid_hint: clientNetwork.ssid,
+    wifi_ip: clientNetwork.wifiIp,
+    wifi_gateway_ip: clientNetwork.wifiGatewayIp,
+    wifi_bssid: clientNetwork.wifiBssid,
+    requested_by: userId,
+    status: "pending",
+    requested_at: new Date().toISOString(),
+    reviewed_by: null,
+    reviewed_at: null,
+  };
+
+  const { data: existingRequest } = await adminClient
+    .from("store_network_requests")
+    .select("id")
+    .eq("store_id", storeId)
+    .eq("public_ip", publicIp)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  const { error } = existingRequest
+    ? await adminClient
+      .from("store_network_requests")
+      .update(payload)
+      .eq("id", existingRequest.id)
+    : await adminClient
+      .from("store_network_requests")
+      .insert(payload);
+
+  if (error) {
+    throw new Error("\uB124\uD2B8\uC6CC\uD06C \uB4F1\uB85D \uC694\uCCAD\uC744 \uC800\uC7A5\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
+  }
+}
+
 async function buildNetworkSnapshot(
   adminClient: ReturnType<typeof createClient>,
   profile: Record<string, unknown>,
   detectedPublicIp: string,
-  ssid: string | null,
+  clientNetwork: ClientNetwork,
   store: Record<string, unknown>,
 ) {
   const { data } = await adminClient
@@ -392,14 +633,91 @@ async function buildNetworkSnapshot(
     .order("is_active", { ascending: false })
     .order("created_at", { ascending: false });
 
+  const { data: pendingRequests } = canManageNetworks(profile, String(store.id))
+    ? await adminClient
+      .from("store_network_requests")
+      .select(
+        "id, public_ip, label, ssid_hint, wifi_ip, wifi_gateway_ip, requested_at, requested_by_profile:profiles!store_network_requests_requested_by_fkey(name)",
+      )
+      .eq("store_id", store.id)
+      .eq("status", "pending")
+      .order("requested_at", { ascending: false })
+    : { data: [] };
+
+  const { data: requestHistory } = canManageNetworks(profile, String(store.id))
+    ? await adminClient
+      .from("store_network_requests")
+      .select(
+        "id, public_ip, label, ssid_hint, status, requested_at, reviewed_at, requested_by_profile:profiles!store_network_requests_requested_by_fkey(name), reviewed_by_profile:profiles!store_network_requests_reviewed_by_fkey(name)",
+      )
+      .eq("store_id", store.id)
+      .neq("status", "pending")
+      .order("reviewed_at", { ascending: false })
+      .limit(20)
+    : { data: [] };
+
+  const { data: staffProfiles } = canManageNetworks(profile, String(store.id))
+    ? await adminClient
+      .from("profiles")
+      .select("name, role, role_code, last_login_at, last_login_public_ip")
+      .eq("store_id", store.id)
+      .eq("approval_status", "approved")
+      .order("last_login_at", { ascending: false, nullsFirst: false })
+    : { data: [] };
+
+  const staffRows = (staffProfiles ?? []).filter((staff) =>
+    String(staff.role_code ?? staff.role ?? "") === STAFF_ROLE
+  );
+  const recentStaff = staffRows.find((staff) => staff.last_login_at);
+
   return {
     success: true,
     store_id: store.id,
     store_name: store.name,
     detected_public_ip: detectedPublicIp,
-    ssid,
+    ssid: clientNetwork.ssid,
+    wifi_ip: clientNetwork.wifiIp,
+    wifi_gateway_ip: clientNetwork.wifiGatewayIp,
+    wifi_bssid: clientNetwork.wifiBssid,
     can_manage_networks: canManageNetworks(profile, String(store.id)),
+    can_modify_networks: isPrivileged(profile),
+    security_summary: {
+      active_network_count: (data ?? []).filter((network) => network.is_active !== false).length,
+      inactive_network_count: (data ?? []).filter((network) => network.is_active === false).length,
+      pending_request_count: (pendingRequests ?? []).length,
+      staff_count: staffRows.length,
+      recent_staff_login_at: recentStaff?.last_login_at ?? null,
+      recent_staff_login_public_ip: recentStaff?.last_login_public_ip ?? null,
+      recent_staff_login_name: recentStaff?.name ?? null,
+    },
     networks: data ?? [],
+    pending_network_requests: (pendingRequests ?? []).map((request) => ({
+      id: request.id,
+      public_ip: request.public_ip,
+      label: request.label,
+      ssid_hint: request.ssid_hint,
+      wifi_ip: request.wifi_ip,
+      wifi_gateway_ip: request.wifi_gateway_ip,
+      requested_at: request.requested_at,
+      requested_by_name: Array.isArray(request.requested_by_profile)
+        ? request.requested_by_profile[0]?.name
+        : request.requested_by_profile?.name,
+    })),
+    network_request_history: (requestHistory ?? []).map((request) => ({
+      id: request.id,
+      public_ip: request.public_ip,
+      label: request.label,
+      ssid_hint: request.ssid_hint,
+      status: request.status,
+      requested_at: request.requested_at,
+      reviewed_at: request.reviewed_at,
+      requested_by_name: Array.isArray(request.requested_by_profile)
+        ? request.requested_by_profile[0]?.name
+        : request.requested_by_profile?.name,
+      reviewed_by_name: Array.isArray(request.reviewed_by_profile)
+        ? request.reviewed_by_profile[0]?.name
+        : request.reviewed_by_profile?.name,
+    })),
   };
 }
 
@@ -408,7 +726,7 @@ async function bootstrapSignupNetwork(
   profile: Record<string, unknown>,
   userId: string,
   detectedPublicIp: string,
-  ssid: string | null,
+  clientNetwork: ClientNetwork,
   body: Record<string, unknown>,
 ) {
   if (!MANAGE_NETWORK_ROLES.has(roleText(profile))) {
@@ -435,7 +753,7 @@ async function bootstrapSignupNetwork(
     String(store.id),
     userId,
     detectedPublicIp,
-    ssid,
+    clientNetwork,
     "\uD68C\uC6D0\uAC00\uC785 \uC790\uB3D9 \uB4F1\uB85D",
   );
 
@@ -446,7 +764,11 @@ async function bootstrapSignupNetwork(
     store_id: store.id,
     store_name: store.name,
     detected_public_ip: detectedPublicIp,
-    ssid,
+    ssid: clientNetwork.ssid,
+    wifi_ip: clientNetwork.wifiIp,
+    wifi_gateway_ip: clientNetwork.wifiGatewayIp,
+    wifi_bssid: clientNetwork.wifiBssid,
+    can_modify_networks: isPrivileged(profile),
   };
 }
 
@@ -518,7 +840,7 @@ async function checkLoginPolicy(
   userId: string,
   platform: string,
   detectedPublicIp: string,
-  ssid: string | null,
+  clientNetwork: ClientNetwork,
 ) {
   const role = roleText(profile);
   const approvalStatus = String(profile.approval_status ?? "pending");
@@ -530,12 +852,13 @@ async function checkLoginPolicy(
       message:
         "\uC2B9\uC778\uB41C \uACC4\uC815\uB9CC \uB85C\uADF8\uC778\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
       role,
-      ssid,
+      ...networkPayload(clientNetwork),
       detected_public_ip: detectedPublicIp,
       can_manage_networks: canManageNetworks(
         profile,
         String(profile.store_id ?? ""),
       ),
+      can_modify_networks: isPrivileged(profile),
     };
   }
 
@@ -546,8 +869,9 @@ async function checkLoginPolicy(
       message:
         "\uC5ED\uD560 \uC815\uBCF4\uAC00 \uC5C6\uC5B4 \uB85C\uADF8\uC778\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.",
       detected_public_ip: detectedPublicIp,
-      ssid,
+      ...networkPayload(clientNetwork),
       can_manage_networks: false,
+      can_modify_networks: false,
     };
   }
 
@@ -565,8 +889,9 @@ async function checkLoginPolicy(
         store_id: store.id,
         store_name: store.name,
         detected_public_ip: detectedPublicIp,
-        ssid,
+        ...networkPayload(clientNetwork),
         can_manage_networks: canManageNetworks(profile, String(store.id)),
+        can_modify_networks: isPrivileged(profile),
       };
     }
   }
@@ -582,8 +907,9 @@ async function checkLoginPolicy(
         store_id: store?.id,
         store_name: store?.name,
         detected_public_ip: detectedPublicIp,
-        ssid,
+        ...networkPayload(clientNetwork),
         can_manage_networks: false,
+        can_modify_networks: false,
       };
     }
 
@@ -595,8 +921,9 @@ async function checkLoginPolicy(
           "\uC0AC\uC6D0 \uACC4\uC815\uC740 \uB9E4\uC7A5 \uC815\uBCF4\uAC00 \uC5F0\uACB0\uB418\uC5B4 \uC788\uC5B4\uC57C \uD569\uB2C8\uB2E4.",
         role,
         detected_public_ip: detectedPublicIp,
-        ssid,
+        ...networkPayload(clientNetwork),
         can_manage_networks: false,
+        can_modify_networks: false,
       };
     }
 
@@ -618,8 +945,9 @@ async function checkLoginPolicy(
         store_id: store.id,
         store_name: store.name,
         detected_public_ip: detectedPublicIp,
-        ssid,
+        ...networkPayload(clientNetwork),
         can_manage_networks: false,
+        can_modify_networks: false,
       };
     }
 
@@ -648,10 +976,11 @@ async function checkLoginPolicy(
     store_id: store?.id ?? profile.store_id ?? null,
     store_name: store?.name ?? profile.store ?? null,
     detected_public_ip: detectedPublicIp,
-    ssid,
+    ...networkPayload(clientNetwork),
     can_manage_networks: canManageNetworks(
       profile,
       String(store?.id ?? profile.store_id ?? ""),
     ),
+    can_modify_networks: isPrivileged(profile),
   };
 }

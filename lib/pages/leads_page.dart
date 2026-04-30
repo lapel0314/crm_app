@@ -1,10 +1,11 @@
-﻿import 'dart:io';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/constants/message_templates.dart';
+import 'package:crm_app/services/audit_log_service.dart';
 import 'package:crm_app/services/contact_action_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:crm_app/widgets/contact_action_buttons.dart';
@@ -31,6 +32,7 @@ class LeadsPage extends StatefulWidget {
 class _LeadsPageState extends State<LeadsPage> {
   final searchController = TextEditingController();
   final dateSearchController = TextEditingController();
+  final auditLogService = AuditLogService();
 
   bool isLoading = true;
   bool showSummaryDashboard = false;
@@ -462,9 +464,28 @@ class _LeadsPageState extends State<LeadsPage> {
 
   Future<void> deleteLead(String id) async {
     try {
-      await supabase.from('leads').delete().eq('id', id);
+      final user = supabase.auth.currentUser;
+      final before = leads.firstWhere(
+        (lead) => lead['id'].toString() == id,
+        orElse: () => <String, dynamic>{},
+      );
+      await supabase.from('leads').update({
+        'is_deleted': true,
+        'deleted_at': DateTime.now().toUtc().toIso8601String(),
+        'deleted_by': user?.id,
+      }).eq('id', id);
+      await auditLogService.record(
+        action: 'soft_delete_lead',
+        targetTable: 'leads',
+        targetId: id,
+        detail: {
+          'store': before['store'],
+          'subscriber': before['subscriber'],
+          'phone': before['phone'],
+        },
+      );
       if (mounted) Navigator.pop(context);
-      showMessage('가망고객 삭제 완료');
+      showMessage('가망고객을 휴지통으로 이동했습니다.');
       fetchLeads(keyword: searchController.text, silent: true);
     } catch (e) {
       logUiError('가망고객 삭제 실패: $e');
@@ -816,32 +837,32 @@ class _LeadsPageState extends State<LeadsPage> {
       builder: (context) {
         final compactIos = _isCompactIosDialogContext(context);
         return AlertDialog(
-        title: Text('문자 발송 (${selected.length}명)'),
-        content: SizedBox(
-          width: compactIos ? MediaQuery.of(context).size.width - 56 : 420,
-          child: TextField(
-            controller: controller,
-            maxLines: 5,
-            decoration: const InputDecoration(
-              labelText: '문자 내용',
-              border: OutlineInputBorder(),
+          title: Text('문자 발송 (${selected.length}명)'),
+          content: SizedBox(
+            width: compactIos ? MediaQuery.of(context).size.width - 56 : 420,
+            child: TextField(
+              controller: controller,
+              maxLines: 5,
+              decoration: const InputDecoration(
+                labelText: '문자 내용',
+                border: OutlineInputBorder(),
+              ),
             ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('취소'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _sendSmsToSelectedLeads(controller.text);
-            },
-            child: const Text('문자 앱 열기'),
-          ),
-        ],
-      );
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('취소'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(context);
+                await _sendSmsToSelectedLeads(controller.text);
+              },
+              child: const Text('문자 앱 열기'),
+            ),
+          ],
+        );
       },
     );
   }
@@ -1546,8 +1567,7 @@ class _LeadsPageState extends State<LeadsPage> {
                                               color: Color(0xFF9CA3AF),
                                             ),
                                             filled: true,
-                                            fillColor:
-                                                const Color(0xFFF9FAFB),
+                                            fillColor: const Color(0xFFF9FAFB),
                                             contentPadding:
                                                 const EdgeInsets.symmetric(
                                                     horizontal: 12),
@@ -1577,12 +1597,7 @@ class _LeadsPageState extends State<LeadsPage> {
                                       ),
                                       const SizedBox(width: 10),
                                       _segmentedFilter(
-                                        options: const [
-                                          '전체',
-                                          '이동',
-                                          '기변',
-                                          '분류'
-                                        ],
+                                        options: const ['전체', '이동', '기변', '분류'],
                                         selected: selectedTypeFilter,
                                         onSelected: (value) {
                                           setState(() {
@@ -1662,7 +1677,8 @@ class _LeadsPageState extends State<LeadsPage> {
                                           keyword: searchController.text,
                                           silent: true,
                                         ),
-                                        icon: const Icon(Icons.refresh, size: 14),
+                                        icon:
+                                            const Icon(Icons.refresh, size: 14),
                                         label: const Text('새로고침'),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor: Colors.white,
@@ -1725,16 +1741,14 @@ class _LeadsPageState extends State<LeadsPage> {
                                                   color: Color(0xFFE8E9EF),
                                                 ),
                                               ),
-                                              enabledBorder:
-                                                  OutlineInputBorder(
+                                              enabledBorder: OutlineInputBorder(
                                                 borderRadius:
                                                     BorderRadius.circular(8),
                                                 borderSide: const BorderSide(
                                                   color: Color(0xFFE8E9EF),
                                                 ),
                                               ),
-                                              focusedBorder:
-                                                  OutlineInputBorder(
+                                              focusedBorder: OutlineInputBorder(
                                                 borderRadius:
                                                     BorderRadius.circular(8),
                                                 borderSide: const BorderSide(
@@ -1770,8 +1784,7 @@ class _LeadsPageState extends State<LeadsPage> {
                                       ? null
                                       : showSmsSendDialog,
                                   icon: const Icon(Icons.sms_rounded, size: 17),
-                                  label:
-                                      Text('문자 (' + selectedLeadIds.length.toString() + ')'),
+                                  label: Text('문자 (${selectedLeadIds.length})'),
                                 ),
                                 const SizedBox(width: 8),
                                 OutlinedButton.icon(
@@ -1781,7 +1794,7 @@ class _LeadsPageState extends State<LeadsPage> {
                                   icon: const Icon(Icons.chat_bubble_rounded,
                                       size: 17),
                                   label:
-                                      Text('카카오 (' + selectedLeadIds.length.toString() + ')'),
+                                      Text('카카오 (${selectedLeadIds.length})'),
                                 ),
                                 const SizedBox(width: 8),
                                 ElevatedButton.icon(
@@ -1804,8 +1817,7 @@ class _LeadsPageState extends State<LeadsPage> {
                                   label: const Text('새로고침'),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: Colors.white,
-                                    foregroundColor:
-                                        const Color(0xFF6B7280),
+                                    foregroundColor: const Color(0xFF6B7280),
                                     elevation: 0,
                                     side: const BorderSide(
                                         color: Color(0xFFE8E9EF)),
@@ -1813,7 +1825,7 @@ class _LeadsPageState extends State<LeadsPage> {
                                 ),
                               ],
                             ),
-                      ),
+                    ),
                     const Divider(height: 1, color: Color(0xFFF3F4F6)),
                     Expanded(
                       child: isLoading

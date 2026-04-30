@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:crm_app/services/kakao_talk_service.dart';
+import 'package:crm_app/services/audit_log_service.dart';
 import 'package:crm_app/services/contact_action_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -43,6 +44,7 @@ class _CustomerPageState extends State<CustomerPage> {
   final NumberFormat moneyFormat = NumberFormat('#,###');
   final kakaoTalkService = KakaoTalkService();
   final contactActionService = const ContactActionService();
+  final auditLogService = AuditLogService();
 
   List<Map<String, dynamic>> customers = [];
   final Set<String> selectedCustomerIds = {};
@@ -228,6 +230,11 @@ class _CustomerPageState extends State<CustomerPage> {
     return '${digits.substring(0, 3)}-${digits.substring(3, 7)}-${digits.substring(7, cut)}';
   }
 
+  String? _normalizedPhoneOrNull(String value) {
+    final formatted = _formatPhone(value).trim();
+    return formatted.isEmpty ? null : formatted;
+  }
+
   String _maskName(String name) {
     if (name.isEmpty) return '';
     if (name.length == 1) return '*';
@@ -388,6 +395,19 @@ class _CustomerPageState extends State<CustomerPage> {
     }
 
     await File(saveLocation.path).writeAsBytes(bytes, flush: true);
+    await auditLogService.record(
+      action: 'export_customers_excel',
+      targetTable: 'customers',
+      detail: {
+        'row_count': rows.length,
+        'file_name': suggestedName,
+        'store_filter': _buildExcelStoreLabel(
+          rows.map((row) => row['store']),
+          fallback: '전체매장',
+        ),
+        'date_filter': dateSearchController.text.trim(),
+      },
+    );
     if (!mounted) return;
     _showCenterMessage('고객DB 엑셀 저장이 완료되었습니다.');
   }
@@ -815,9 +835,28 @@ class _CustomerPageState extends State<CustomerPage> {
 
   Future<void> deleteCustomer(String id) async {
     try {
-      await supabase.from('customers').delete().eq('id', id);
+      final user = supabase.auth.currentUser;
+      final before = customers.firstWhere(
+        (customer) => customer['id'].toString() == id,
+        orElse: () => <String, dynamic>{},
+      );
+      await supabase.from('customers').update({
+        'is_deleted': true,
+        'deleted_at': DateTime.now().toUtc().toIso8601String(),
+        'deleted_by': user?.id,
+      }).eq('id', id);
+      await auditLogService.record(
+        action: 'soft_delete_customer',
+        targetTable: 'customers',
+        targetId: id,
+        detail: {
+          'store': before['store'],
+          'name': before['name'],
+          'phone': before['phone'],
+        },
+      );
       if (mounted) Navigator.pop(context);
-      _showCenterMessage('고객 삭제 완료');
+      _showCenterMessage('고객을 휴지통으로 이동했습니다.');
       fetchCustomers(keyword: searchController.text);
     } catch (e) {
       _logUiError('삭제 실패: $e');
@@ -1165,12 +1204,6 @@ class _CustomerPageState extends State<CustomerPage> {
   Future<void> _saveKakaoTemplates(List<String> templates) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('kakao_message_templates', templates);
-  }
-
-  String _defaultKakaoGreeting(List<Map<String, dynamic>> selected) {
-    final staff = selected.isEmpty ? '' : _text(selected.first['staff']);
-    final manager = staff == '-' ? '담당자' : staff;
-    return '안녕하세요, 고객님 $manager 입니다.';
   }
 
   Future<void> _showTemplateEditor({
@@ -2000,40 +2033,47 @@ class _CustomerPageState extends State<CustomerPage> {
                   final margin = currentMargin();
 
                   try {
-                    final updated = await supabase.from('customers').update({
-                      'name': nameController.text.trim(),
-                      'phone': phoneController.text.trim(),
-                      'carrier': carrierController.text.trim(),
-                      'previous_carrier': previousCarrierController.text.trim(),
-                      'model': modelController.text.trim(),
-                      'plan': planController.text.trim(),
-                      'add_service': addServiceController.text.trim(),
-                      'join_type': joinType,
-                      'contract_type': contractType,
-                      'installment': installment,
-                      'trade_in': tradeIn == null ? null : tradeIn == 'O',
-                      'rebate': _toInt(rebateController.text),
-                      'add_rebate': _toInt(addRebateController.text),
-                      'hidden_rebate': _toInt(hiddenRebateController.text),
-                      'deduction': _toInt(deductionController.text),
-                      'support_money': _toInt(supportMoneyController.text),
-                      'payment': _toInt(paymentController.text),
-                      'deposit': _toInt(depositController.text),
-                      'trade_price': _toInt(tradePriceController.text),
-                      'hidden_note': hiddenNoteController.text.trim(),
-                      'deduction_note': deductionNoteController.text.trim(),
-                      'payment_note': paymentNoteController.text.trim(),
-                      'bank_info': bankInfoController.text.trim(),
-                      'trade_model': tradeModelController.text.trim(),
-                      'memo': memoController.text.trim(),
-                      'store': normalizeStoreName(storeController.text.trim()),
-                      'mobile': mobileController.text.trim(),
-                      'second': secondController.text.trim(),
-                      'staff': staffController.text.trim(),
-                      'total_rebate': totalRebate,
-                      'tax': tax,
-                      'margin': margin,
-                    }).eq('id', customer['id']).select('id').maybeSingle();
+                    final updated = await supabase
+                        .from('customers')
+                        .update({
+                          'name': nameController.text.trim(),
+                          'phone': _normalizedPhoneOrNull(phoneController.text),
+                          'carrier': carrierController.text.trim(),
+                          'previous_carrier':
+                              previousCarrierController.text.trim(),
+                          'model': modelController.text.trim(),
+                          'plan': planController.text.trim(),
+                          'add_service': addServiceController.text.trim(),
+                          'join_type': joinType,
+                          'contract_type': contractType,
+                          'installment': installment,
+                          'trade_in': tradeIn == null ? null : tradeIn == 'O',
+                          'rebate': _toInt(rebateController.text),
+                          'add_rebate': _toInt(addRebateController.text),
+                          'hidden_rebate': _toInt(hiddenRebateController.text),
+                          'deduction': _toInt(deductionController.text),
+                          'support_money': _toInt(supportMoneyController.text),
+                          'payment': _toInt(paymentController.text),
+                          'deposit': _toInt(depositController.text),
+                          'trade_price': _toInt(tradePriceController.text),
+                          'hidden_note': hiddenNoteController.text.trim(),
+                          'deduction_note': deductionNoteController.text.trim(),
+                          'payment_note': paymentNoteController.text.trim(),
+                          'bank_info': bankInfoController.text.trim(),
+                          'trade_model': tradeModelController.text.trim(),
+                          'memo': memoController.text.trim(),
+                          'store':
+                              normalizeStoreName(storeController.text.trim()),
+                          'mobile': mobileController.text.trim(),
+                          'second': secondController.text.trim(),
+                          'staff': staffController.text.trim(),
+                          'total_rebate': totalRebate,
+                          'tax': tax,
+                          'margin': margin,
+                        })
+                        .eq('id', customer['id'])
+                        .select('id')
+                        .maybeSingle();
 
                     if (updated == null) {
                       throw StateError('수정 권한이 없거나 대상 고객을 찾을 수 없습니다.');
