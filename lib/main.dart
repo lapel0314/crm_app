@@ -15,30 +15,136 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-  const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+  runApp(const BootstrapApp());
+}
 
-  if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
-    runApp(const ConfigErrorApp());
-    return;
+class BootstrapApp extends StatefulWidget {
+  const BootstrapApp({super.key});
+
+  @override
+  State<BootstrapApp> createState() => _BootstrapAppState();
+}
+
+class _BootstrapAppState extends State<BootstrapApp> {
+  bool _ready = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_initialize());
   }
 
-  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
-  if (!kIsWeb && (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
-    unawaited(
-      Supabase.instance.client.auth
-          .signOut()
-          .timeout(
-            const Duration(seconds: 3),
-            onTimeout: () {},
-          )
-          .catchError((error) {
-        debugPrint('desktop startup signOut failed: $error');
-      }),
+  Future<void> _initialize() async {
+    const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+    const supabaseAnonKey = String.fromEnvironment('SUPABASE_ANON_KEY');
+
+    if (supabaseUrl.isEmpty || supabaseAnonKey.isEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _error = ConfigErrorApp.configErrorMessage;
+      });
+      return;
+    }
+
+    try {
+      await Supabase.initialize(
+        url: supabaseUrl,
+        anonKey: supabaseAnonKey,
+      ).timeout(const Duration(seconds: 10));
+
+      if (!kIsWeb &&
+          (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
+        unawaited(
+          Supabase.instance.client.auth
+              .signOut()
+              .timeout(
+                const Duration(seconds: 3),
+                onTimeout: () {},
+              )
+              .catchError((error) {
+            debugPrint('desktop startup signOut failed: $error');
+          }),
+        );
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _ready = true;
+      });
+    } catch (e) {
+      debugPrint('startup initialize failed: $e');
+      if (!mounted) return;
+      setState(() {
+        _error = 'CRM 초기화에 실패했습니다.\n네트워크 연결을 확인한 뒤 앱을 다시 실행해 주세요.\n\n$e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_ready) return const MyApp();
+    return StartupStatusApp(message: _error);
+  }
+}
+
+class StartupStatusApp extends StatelessWidget {
+  final String? message;
+
+  const StartupStatusApp({super.key, this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      locale: const Locale('ko', 'KR'),
+      home: Scaffold(
+        backgroundColor: const Color(0xFFF4F5F8),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 420),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        '핑크폰 CRM',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      if (message == null) ...[
+                        const CircularProgressIndicator(),
+                        const SizedBox(height: 16),
+                        const Text('CRM을 시작하고 있습니다.'),
+                      ] else ...[
+                        const Icon(
+                          Icons.error_outline,
+                          color: Colors.redAccent,
+                          size: 40,
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          message!,
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
-
-  runApp(const MyApp());
 }
 
 final supabase = Supabase.instance.client;
@@ -46,7 +152,7 @@ final supabase = Supabase.instance.client;
 class ConfigErrorApp extends StatelessWidget {
   const ConfigErrorApp({super.key});
 
-  static const _configErrorMessage =
+  static const configErrorMessage =
       'Supabase \uC124\uC815\uC774 \uC5C6\uC2B5\uB2C8\uB2E4. '
       'SUPABASE_URL / SUPABASE_ANON_KEY\uB97C dart-define\uC73C\uB85C '
       '\uC804\uB2EC\uD574 \uC8FC\uC138\uC694.';
@@ -60,7 +166,7 @@ class ConfigErrorApp extends StatelessWidget {
           child: Padding(
             padding: EdgeInsets.all(24),
             child: Text(
-              _configErrorMessage,
+              configErrorMessage,
               textAlign: TextAlign.center,
             ),
           ),
