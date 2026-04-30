@@ -141,12 +141,14 @@ class _UpdateGateState extends State<UpdateGate> {
     } catch (e) {
       debugPrint('forced update check failed: $e');
       if (!mounted) return;
+      // 업데이트 서버/RLS/네트워크 일시 오류 때문에 앱 실행 자체가 막히면
+      // 정상 네트워크 사용자도 로그인 화면에 진입하지 못한다.
+      // 실제 네트워크 장애는 로그인/Supabase 요청 단계에서 다시 드러나므로,
+      // 업데이트 확인 실패는 차단하지 않고 앱을 계속 실행한다.
       setState(() {
-        _failed = true;
-        _updateStatus =
-            '\uC5C5\uB370\uC774\uD2B8 \uD655\uC778\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4. '
-            '\uB124\uD2B8\uC6CC\uD06C \uC5F0\uACB0\uC744 \uD655\uC778\uD55C \uB4A4 '
-            '\uB2E4\uC2DC \uC2DC\uB3C4\uD574 \uC8FC\uC138\uC694.';
+        _failed = false;
+        _blockedUpdate = null;
+        _ready = true;
       });
     }
   }
