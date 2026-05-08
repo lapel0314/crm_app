@@ -644,11 +644,13 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
           ? await supabase
               .from('wired_members')
               .select()
+              .eq('is_deleted', false)
               .order('subscription_date', ascending: true)
               .order('created_at', ascending: true)
           : await supabase
               .from('wired_members')
               .select()
+              .eq('is_deleted', false)
               .or(
                 'phone.ilike.%${keyword.trim()}%,seller.ilike.%${keyword.trim()}%,subscriber.ilike.%${keyword.trim()}%,carrier.ilike.%${keyword.trim()}%,activation_center.ilike.%${keyword.trim()}%,internet_type.ilike.%${keyword.trim()}%',
               )

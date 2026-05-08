@@ -193,18 +193,21 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
         supabase
             .from('customers')
             .select()
+            .eq('is_deleted', false)
             .or(customerFilter)
             .order('join_date', ascending: false)
             .limit(20),
         supabase
             .from('wired_members')
             .select()
+            .eq('is_deleted', false)
             .or(wiredFilter)
             .order('subscription_date', ascending: false)
             .limit(20),
         supabase
             .from('leads')
             .select()
+            .eq('is_deleted', false)
             .or(leadsFilter)
             .order('lead_date', ascending: false)
             .limit(20),

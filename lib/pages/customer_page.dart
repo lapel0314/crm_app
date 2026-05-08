@@ -766,6 +766,7 @@ class _CustomerPageState extends State<CustomerPage> {
           : await supabase
               .from('customers')
               .select()
+              .eq('is_deleted', false)
               .order('join_date', ascending: true)
               .order('created_at', ascending: true);
 

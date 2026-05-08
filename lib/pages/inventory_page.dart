@@ -81,10 +81,12 @@ class _InventoryPageState extends State<InventoryPage> {
           ? await supabase
               .from('device_inventory')
               .select()
+              .eq('is_deleted', false)
               .order('created_at', ascending: false)
           : await supabase
               .from('device_inventory')
               .select()
+              .eq('is_deleted', false)
               .or(
                 'store.ilike.%${keyword.trim()}%,model_name.ilike.%${keyword.trim()}%,serial_number.ilike.%${keyword.trim()}%,status.ilike.%${keyword.trim()}%',
               )

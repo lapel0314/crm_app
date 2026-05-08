@@ -335,11 +335,13 @@ class _LeadsPageState extends State<LeadsPage> {
           ? await supabase
               .from('leads')
               .select()
+              .eq('is_deleted', false)
               .order('lead_date', ascending: true)
               .order('created_at', ascending: true)
           : await supabase
               .from('leads')
               .select()
+              .eq('is_deleted', false)
               .or(
                 'manager.ilike.%${keyword.trim()}%,subscriber.ilike.%${keyword.trim()}%,phone.ilike.%${keyword.trim()}%,previous_carrier.ilike.%${keyword.trim()}%,target_carrier.ilike.%${keyword.trim()}%,memo.ilike.%${keyword.trim()}%',
               )

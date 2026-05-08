@@ -228,10 +228,10 @@ class _DashboardPageState extends State<DashboardPage> {
 
     try {
       final result = await Future.wait<List<dynamic>>([
-        supabase.from('customers').select(),
-        supabase.from('device_inventory').select(),
-        supabase.from('wired_members').select(),
-        supabase.from('leads').select(),
+        supabase.from('customers').select().eq('is_deleted', false),
+        supabase.from('device_inventory').select().eq('is_deleted', false),
+        supabase.from('wired_members').select().eq('is_deleted', false),
+        supabase.from('leads').select().eq('is_deleted', false),
       ]);
 
       final customerList = _filterStoreRows(
