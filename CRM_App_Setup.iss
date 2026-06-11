@@ -1,10 +1,12 @@
 #define MyAppName "핑크폰 CRM"
-#define MyAppVersion "1.0.13"
+#define MyAppVersion "1.0.14"
 #define MyAppPublisher "Pink Phone"
 #define MyAppExeName "핑크폰 CRM.exe"
 #define MyBuildExeName "crm_app.exe"
 #define MyBuildDir "build\windows\x64\runner\Release"
+#ifndef InstallerPassword
 #define InstallerPassword "123456"
+#endif
 
 [Setup]
 AppId={{A1B2C3D4-E5F6-47A8-9B10-112233445566}

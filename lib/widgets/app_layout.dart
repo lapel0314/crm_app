@@ -20,6 +20,7 @@ import 'package:crm_app/pages/recycle_bin_page.dart';
 import 'package:crm_app/pages/settings_page.dart';
 import 'package:crm_app/pages/store_management_page.dart';
 import 'package:crm_app/pages/wired_members_page.dart';
+import 'package:crm_app/services/desktop_auth_session_service.dart';
 import 'package:crm_app/services/notice_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
 
@@ -297,7 +298,7 @@ class _AppLayoutState extends State<AppLayout> {
 
     if (!shouldLogout) return;
 
-    await Supabase.instance.client.auth.signOut();
+    await DesktopAuthSessionService.signOutAndClear(Supabase.instance.client);
   }
 
   Future<void> _confirmExit() async {
@@ -337,7 +338,7 @@ class _AppLayoutState extends State<AppLayout> {
 
     if (!shouldExit) return;
 
-    await Supabase.instance.client.auth.signOut();
+    await DesktopAuthSessionService.signOutAndClear(Supabase.instance.client);
 
     if (kIsWeb) return;
 

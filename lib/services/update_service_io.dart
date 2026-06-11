@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -22,7 +23,7 @@ class UpdateService extends UpdateServiceBase {
     final data = await supabase
         .from('app_updates')
         .select(
-          'latest_version, min_required_version, apk_url, update_message, version, installer_url, notes',
+          'latest_version, min_required_version, apk_url, update_message, version, installer_url, installer_sha256, notes',
         )
         .eq('platform', 'android')
         .eq('is_active', true)
@@ -36,6 +37,7 @@ class UpdateService extends UpdateServiceBase {
     final minRequiredVersion =
         _firstText(data, ['min_required_version', 'latest_version', 'version']);
     final apkUrl = _firstText(data, ['apk_url', 'installer_url']);
+    final apkSha256 = _firstText(data, ['installer_sha256']);
     final message = _firstText(data, ['update_message', 'notes']);
 
     if (latestVersion.isEmpty || minRequiredVersion.isEmpty || apkUrl.isEmpty) {
@@ -51,9 +53,8 @@ class UpdateService extends UpdateServiceBase {
       latestVersion: latestVersion,
       minRequiredVersion: minRequiredVersion,
       packageUrl: apkUrl,
-      message: message.isEmpty
-          ? '최신 Android 앱을 설치한 뒤 다시 실행해 주세요.'
-          : message,
+      packageSha256: apkSha256,
+      message: message.isEmpty ? '최신 Android 앱을 설치한 뒤 다시 실행해 주세요.' : message,
       isRequired: true,
     );
   }
@@ -64,7 +65,7 @@ class UpdateService extends UpdateServiceBase {
 
     final data = await supabase
         .from('app_updates')
-        .select('version, installer_url, notes, auto_install')
+        .select('version, installer_url, installer_sha256, notes, auto_install')
         .eq('platform', 'windows')
         .eq('is_active', true)
         .order('created_at', ascending: false)
@@ -75,6 +76,7 @@ class UpdateService extends UpdateServiceBase {
 
     final version = data['version']?.toString().trim() ?? '';
     final installerUrl = data['installer_url']?.toString().trim() ?? '';
+    final installerSha256 = data['installer_sha256']?.toString().trim() ?? '';
     final notes = data['notes']?.toString().trim() ?? '';
     if (version.isEmpty || installerUrl.isEmpty) return null;
 
@@ -86,9 +88,8 @@ class UpdateService extends UpdateServiceBase {
       latestVersion: version,
       minRequiredVersion: version,
       packageUrl: installerUrl,
-      message: notes.isEmpty
-          ? '최신 Windows 버전을 설치한 뒤 다시 실행해 주세요.'
-          : notes,
+      packageSha256: installerSha256,
+      message: notes.isEmpty ? '최신 Windows 버전을 설치한 뒤 다시 실행해 주세요.' : notes,
       isRequired: true,
     );
   }
@@ -106,7 +107,7 @@ class UpdateService extends UpdateServiceBase {
   }
 
   Future<void> _openAndroidApkUrl(String apkUrl) async {
-    final uri = Uri.parse(apkUrl);
+    final uri = _validateUpdateUri(apkUrl);
     final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
     if (!launched) {
       throw StateError('업데이트 다운로드 주소를 열 수 없습니다.');
@@ -114,6 +115,12 @@ class UpdateService extends UpdateServiceBase {
   }
 
   Future<File> _downloadWindowsInstaller(AppUpdateInfo update) async {
+    final packageUri = _validateUpdateUri(update.packageUrl);
+    final expectedSha256 = update.packageSha256.trim().toLowerCase();
+    if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(expectedSha256)) {
+      throw StateError('Windows 설치파일 SHA-256 값이 등록되지 않았습니다.');
+    }
+
     final safeVersion =
         update.latestVersion.replaceAll(RegExp(r'[^0-9A-Za-z._-]'), '_');
     final updateDir =
@@ -129,8 +136,7 @@ class UpdateService extends UpdateServiceBase {
 
     final client = HttpClient();
     try {
-      final request = await client.getUrl(Uri.parse(update.packageUrl));
-      final response = await request.close();
+      final response = await _openValidatedGet(client, packageUri);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw HttpException(
           'installer download failed: ${response.statusCode}',
@@ -138,8 +144,28 @@ class UpdateService extends UpdateServiceBase {
       }
 
       final sink = file.openWrite();
-      await response.pipe(sink);
-      await sink.close();
+      final digestSink = _DigestCollector();
+      final byteSink = crypto.sha256.startChunkedConversion(digestSink);
+      try {
+        await for (final chunk in response) {
+          sink.add(chunk);
+          byteSink.add(chunk);
+        }
+      } finally {
+        byteSink.close();
+        await sink.close();
+      }
+
+      final actualSha256 = digestSink.digest?.toString().toLowerCase();
+      if (actualSha256 == null) {
+        if (file.existsSync()) file.deleteSync();
+        throw StateError('Windows 설치파일 SHA-256 계산에 실패했습니다.');
+      }
+      if (actualSha256 != expectedSha256) {
+        if (file.existsSync()) file.deleteSync();
+        throw StateError('Windows 설치파일 SHA-256 검증에 실패했습니다.');
+      }
+
       return file;
     } finally {
       client.close(force: true);
@@ -170,4 +196,90 @@ class UpdateService extends UpdateServiceBase {
     }
     return '';
   }
+
+  Future<HttpClientResponse> _openValidatedGet(
+    HttpClient client,
+    Uri uri, {
+    int redirectCount = 0,
+  }) async {
+    if (redirectCount > 5) {
+      throw StateError('업데이트 다운로드 리다이렉트가 너무 많습니다.');
+    }
+
+    final request = await client.getUrl(uri);
+    request.followRedirects = false;
+    final response = await request.close();
+    if (_isRedirect(response.statusCode)) {
+      final location = response.headers.value(HttpHeaders.locationHeader);
+      await response.drain<void>();
+      if (location == null || location.trim().isEmpty) {
+        throw StateError('업데이트 다운로드 리다이렉트 주소가 없습니다.');
+      }
+      final nextUri = _validateUpdateUri(uri.resolve(location).toString());
+      return _openValidatedGet(
+        client,
+        nextUri,
+        redirectCount: redirectCount + 1,
+      );
+    }
+    return response;
+  }
+
+  bool _isRedirect(int statusCode) {
+    return statusCode == HttpStatus.movedPermanently ||
+        statusCode == HttpStatus.found ||
+        statusCode == HttpStatus.seeOther ||
+        statusCode == HttpStatus.temporaryRedirect ||
+        statusCode == HttpStatus.permanentRedirect;
+  }
+
+  Uri _validateUpdateUri(String value) {
+    final uri = Uri.tryParse(value.trim());
+    if (uri == null ||
+        !uri.hasScheme ||
+        !uri.hasAuthority ||
+        uri.scheme.toLowerCase() != 'https') {
+      throw StateError('업데이트 다운로드 주소는 HTTPS만 허용됩니다.');
+    }
+
+    if (!_isAllowedUpdateHost(uri.host)) {
+      throw StateError('허용되지 않은 업데이트 다운로드 호스트입니다.');
+    }
+
+    return uri;
+  }
+
+  bool _isAllowedUpdateHost(String host) {
+    final normalizedHost = host.toLowerCase();
+    final allowedHosts = <String>{
+      'github.com',
+      'github-releases.githubusercontent.com',
+      'release-assets.githubusercontent.com',
+      'objects.githubusercontent.com',
+      ...updateAllowedHosts
+          .split(',')
+          .map((host) => host.trim().toLowerCase())
+          .where((host) => host.isNotEmpty),
+    };
+
+    const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
+    final supabaseHost = Uri.tryParse(supabaseUrl)?.host.toLowerCase();
+    if (supabaseHost != null && supabaseHost.isNotEmpty) {
+      allowedHosts.add(supabaseHost);
+    }
+
+    return allowedHosts.contains(normalizedHost);
+  }
+}
+
+class _DigestCollector implements Sink<crypto.Digest> {
+  crypto.Digest? digest;
+
+  @override
+  void add(crypto.Digest data) {
+    digest = data;
+  }
+
+  @override
+  void close() {}
 }

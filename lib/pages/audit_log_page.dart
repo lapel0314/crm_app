@@ -130,6 +130,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
       'serial_number' => '일련번호',
       'status' => '상태',
       'memo' => '메모',
+      'plan_change_add_service_delete' => '요변/부가삭제',
       'name' => '이름',
       'phone' => '연락처',
       'role' => '권한',

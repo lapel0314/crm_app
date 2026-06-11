@@ -2,12 +2,12 @@ import 'dart:async';
 import 'dart:io' show Platform, exit;
 
 import 'package:crm_app/pages/login_page.dart';
+import 'package:crm_app/services/desktop_auth_session_service.dart';
 import 'package:crm_app/services/login_policy_service.dart';
 import 'package:crm_app/services/update_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:crm_app/widgets/app_layout.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -48,25 +48,15 @@ class _BootstrapAppState extends State<BootstrapApp> {
     }
 
     try {
+      await DesktopAuthSessionService.clearPersistedSession();
+
       await Supabase.initialize(
         url: supabaseUrl,
         anonKey: supabaseAnonKey,
+        authOptions: DesktopAuthSessionService.authOptions,
       ).timeout(const Duration(seconds: 10));
 
-      if (!kIsWeb &&
-          (Platform.isWindows || Platform.isMacOS || Platform.isLinux)) {
-        unawaited(
-          Supabase.instance.client.auth
-              .signOut()
-              .timeout(
-                const Duration(seconds: 3),
-                onTimeout: () {},
-              )
-              .catchError((error) {
-            debugPrint('desktop startup signOut failed: $error');
-          }),
-        );
-      }
+      await DesktopAuthSessionService.clearPersistedSession();
 
       if (!mounted) return;
       setState(() {
@@ -619,7 +609,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
     _stopPolicyCheckTimer();
     _stopNetworkChangeMonitor();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await supabase.auth.signOut();
+      await DesktopAuthSessionService.signOutAndClear(supabase);
       if (mounted) {
         setState(() {
           _logoutScheduled = false;

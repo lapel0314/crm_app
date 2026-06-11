@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:crm_app/pages/login_page.dart';
 import 'package:crm_app/services/login_policy_service.dart';
+import 'package:crm_app/services/desktop_auth_session_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -151,7 +152,7 @@ class _SettingsPageState extends State<SettingsPage> {
     if (!shouldLogout || !context.mounted) return;
 
     try {
-      await supabase.auth.signOut();
+      await DesktopAuthSessionService.signOutAndClear(supabase);
       if (!context.mounted) return;
       Navigator.pushAndRemoveUntil(
         context,

@@ -40,11 +40,11 @@ jobs:
       - name: Build installer
         shell: powershell
         run: |
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer.iss
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DInstallerPassword="${{ secrets.INSTALLER_PASSWORD }}" installer.iss
 
       - name: Upload installer artifact
         uses: actions/upload-artifact@v4
         with:
           name: crm-app-windows-installer
-          path: output\pinkphone-crm-setup-1.0.12.exe
+          path: output\pinkphone-crm-setup-1.0.14.exe
           if-no-files-found: error

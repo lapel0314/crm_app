@@ -9,10 +9,7 @@ const corsHeaders = {
 };
 
 const MOBILE_PLATFORMS = new Set(["android", "ios"]);
-const PRIVILEGED_ROLES = new Set([
-  "\uB300\uD45C",
-  "\uAC1C\uBC1C\uC790",
-]);
+const PRIVILEGED_ROLES = new Set(["\uB300\uD45C", "\uAC1C\uBC1C\uC790"]);
 const MANAGER_ROLES = new Set(["\uC810\uC7A5"]);
 const MANAGE_NETWORK_ROLES = new Set([
   "\uB300\uD45C",
@@ -50,15 +47,17 @@ serve(async (req) => {
     const wifiIp = cleanOptionalString(body.wifi_ip);
     const wifiGatewayIp = cleanOptionalString(body.wifi_gateway_ip);
     const wifiBssid = cleanOptionalString(body.wifi_bssid);
-    const accessToken = typeof body.access_token === "string"
-      ? body.access_token.trim()
-      : "";
+    const accessToken =
+      typeof body.access_token === "string" ? body.access_token.trim() : "";
     const detectedPublicIp = extractClientIp(req);
     const clientNetwork = { ssid, wifiIp, wifiGatewayIp, wifiBssid };
 
     if (!accessToken) {
       return json(
-        { success: false, message: "\uC778\uC99D \uD1A0\uD070\uC774 \uC5C6\uC2B5\uB2C8\uB2E4." },
+        {
+          success: false,
+          message: "\uC778\uC99D \uD1A0\uD070\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+        },
         401,
       );
     }
@@ -70,7 +69,10 @@ serve(async (req) => {
 
     if (userError || !user) {
       return json(
-        { success: false, message: "\uC778\uC99D \uC138\uC158\uC774 \uC5C6\uC2B5\uB2C8\uB2E4." },
+        {
+          success: false,
+          message: "\uC778\uC99D \uC138\uC158\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+        },
         401,
       );
     }
@@ -123,7 +125,12 @@ serve(async (req) => {
           ),
         );
       case "register_current_network": {
-        const store = await resolveTargetStore(adminClient, profile, body, true);
+        const store = await resolveTargetStore(
+          adminClient,
+          profile,
+          body,
+          true,
+        );
         ensureCanModifyStoreNetworks(profile);
         await upsertStoreNetwork(
           adminClient,
@@ -179,7 +186,8 @@ serve(async (req) => {
             wifiGatewayIp: cleanOptionalString(request.wifi_gateway_ip),
             wifiBssid: cleanOptionalString(request.wifi_bssid),
           },
-          cleanOptionalString(request.label) ?? "\uC2B9\uC778\uB41C \uB124\uD2B8\uC6CC\uD06C \uC694\uCCAD",
+          cleanOptionalString(request.label) ??
+            "\uC2B9\uC778\uB41C \uB124\uD2B8\uC6CC\uD06C \uC694\uCCAD",
         );
         await adminClient
           .from("store_network_requests")
@@ -261,7 +269,8 @@ serve(async (req) => {
           return json(
             {
               success: false,
-              message: "\uBCC0\uACBD\uD560 \uB124\uD2B8\uC6CC\uD06C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
+              message:
+                "\uBCC0\uACBD\uD560 \uB124\uD2B8\uC6CC\uD06C\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4.",
             },
             400,
           );
@@ -283,13 +292,24 @@ serve(async (req) => {
       }
       case "delete_notice":
         return json(await deleteNotice(adminClient, profile, body));
+      case "record_export_audit_log":
+        return json(await recordExportAuditLog(adminClient, profile, body));
+      case "admin_approve_user":
+        return json(await adminApproveUser(adminClient, profile, body));
+      case "admin_update_user_profile":
+        return json(await adminUpdateUserProfile(adminClient, profile, body));
+      case "admin_delete_user_profile":
+        return json(
+          await adminDeleteUserProfile(adminClient, profile, user.id, body),
+        );
       case "admin_update_user_password":
         return json(await adminUpdateUserPassword(adminClient, profile, body));
       default:
         return json(
           {
             success: false,
-            message: "\uC9C0\uC6D0\uD558\uC9C0 \uC54A\uB294 \uC694\uCCAD\uC785\uB2C8\uB2E4.",
+            message:
+              "\uC9C0\uC6D0\uD558\uC9C0 \uC54A\uB294 \uC694\uCCAD\uC785\uB2C8\uB2E4.",
           },
           400,
         );
@@ -376,8 +396,10 @@ function canManageNetworks(
   targetStoreId?: string,
 ) {
   if (isPrivileged(profile)) return true;
-  return isManager(profile) &&
-    (!targetStoreId || String(profile.store_id ?? "") === targetStoreId);
+  return (
+    isManager(profile) &&
+    (!targetStoreId || String(profile.store_id ?? "") === targetStoreId)
+  );
 }
 
 async function loadProfile(
@@ -461,7 +483,11 @@ async function resolveTargetStore(
   }
 
   if (allowCreate && requestedStoreName) {
-    return await ensureStore(adminClient, requestedStoreName, String(profile.id));
+    return await ensureStore(
+      adminClient,
+      requestedStoreName,
+      String(profile.id),
+    );
   }
 
   throw new Error(
@@ -504,7 +530,9 @@ async function loadPendingNetworkRequest(
   requestId: string,
 ) {
   if (!requestId) {
-    throw new Error("\uCC98\uB9AC\uD560 \uB124\uD2B8\uC6CC\uD06C \uC694\uCCAD\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.");
+    throw new Error(
+      "\uCC98\uB9AC\uD560 \uB124\uD2B8\uC6CC\uD06C \uC694\uCCAD\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    );
   }
 
   const { data, error } = await adminClient
@@ -517,7 +545,9 @@ async function loadPendingNetworkRequest(
     .maybeSingle();
 
   if (error || !data) {
-    throw new Error("\uB300\uAE30 \uC911\uC778 \uB124\uD2B8\uC6CC\uD06C \uC694\uCCAD\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
+    throw new Error(
+      "\uB300\uAE30 \uC911\uC778 \uB124\uD2B8\uC6CC\uD06C \uC694\uCCAD\uC744 \uCC3E\uC744 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    );
   }
 
   return data as Record<string, unknown>;
@@ -581,7 +611,9 @@ async function upsertNetworkRequest(
     .maybeSingle();
 
   if (existingNetwork) {
-    throw new Error("\uC774\uBBF8 \uD5C8\uC6A9\uB41C \uB9E4\uC7A5 \uB124\uD2B8\uC6CC\uD06C\uC785\uB2C8\uB2E4.");
+    throw new Error(
+      "\uC774\uBBF8 \uD5C8\uC6A9\uB41C \uB9E4\uC7A5 \uB124\uD2B8\uC6CC\uD06C\uC785\uB2C8\uB2E4.",
+    );
   }
 
   const payload = {
@@ -609,15 +641,15 @@ async function upsertNetworkRequest(
 
   const { error } = existingRequest
     ? await adminClient
-      .from("store_network_requests")
-      .update(payload)
-      .eq("id", existingRequest.id)
-    : await adminClient
-      .from("store_network_requests")
-      .insert(payload);
+        .from("store_network_requests")
+        .update(payload)
+        .eq("id", existingRequest.id)
+    : await adminClient.from("store_network_requests").insert(payload);
 
   if (error) {
-    throw new Error("\uB124\uD2B8\uC6CC\uD06C \uB4F1\uB85D \uC694\uCCAD\uC744 \uC800\uC7A5\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.");
+    throw new Error(
+      "\uB124\uD2B8\uC6CC\uD06C \uB4F1\uB85D \uC694\uCCAD\uC744 \uC800\uC7A5\uD558\uC9C0 \uBABB\uD588\uC2B5\uB2C8\uB2E4.",
+    );
   }
 }
 
@@ -637,38 +669,38 @@ async function buildNetworkSnapshot(
 
   const { data: pendingRequests } = canManageNetworks(profile, String(store.id))
     ? await adminClient
-      .from("store_network_requests")
-      .select(
-        "id, public_ip, label, ssid_hint, wifi_ip, wifi_gateway_ip, requested_at, requested_by_profile:profiles!store_network_requests_requested_by_fkey(name)",
-      )
-      .eq("store_id", store.id)
-      .eq("status", "pending")
-      .order("requested_at", { ascending: false })
+        .from("store_network_requests")
+        .select(
+          "id, public_ip, label, ssid_hint, wifi_ip, wifi_gateway_ip, requested_at, requested_by_profile:profiles!store_network_requests_requested_by_fkey(name)",
+        )
+        .eq("store_id", store.id)
+        .eq("status", "pending")
+        .order("requested_at", { ascending: false })
     : { data: [] };
 
   const { data: requestHistory } = canManageNetworks(profile, String(store.id))
     ? await adminClient
-      .from("store_network_requests")
-      .select(
-        "id, public_ip, label, ssid_hint, status, requested_at, reviewed_at, requested_by_profile:profiles!store_network_requests_requested_by_fkey(name), reviewed_by_profile:profiles!store_network_requests_reviewed_by_fkey(name)",
-      )
-      .eq("store_id", store.id)
-      .neq("status", "pending")
-      .order("reviewed_at", { ascending: false })
-      .limit(20)
+        .from("store_network_requests")
+        .select(
+          "id, public_ip, label, ssid_hint, status, requested_at, reviewed_at, requested_by_profile:profiles!store_network_requests_requested_by_fkey(name), reviewed_by_profile:profiles!store_network_requests_reviewed_by_fkey(name)",
+        )
+        .eq("store_id", store.id)
+        .neq("status", "pending")
+        .order("reviewed_at", { ascending: false })
+        .limit(20)
     : { data: [] };
 
   const { data: staffProfiles } = canManageNetworks(profile, String(store.id))
     ? await adminClient
-      .from("profiles")
-      .select("name, role, role_code, last_login_at, last_login_public_ip")
-      .eq("store_id", store.id)
-      .eq("approval_status", "approved")
-      .order("last_login_at", { ascending: false, nullsFirst: false })
+        .from("profiles")
+        .select("name, role, role_code, last_login_at, last_login_public_ip")
+        .eq("store_id", store.id)
+        .eq("approval_status", "approved")
+        .order("last_login_at", { ascending: false, nullsFirst: false })
     : { data: [] };
 
-  const staffRows = (staffProfiles ?? []).filter((staff) =>
-    String(staff.role_code ?? staff.role ?? "") === STAFF_ROLE
+  const staffRows = (staffProfiles ?? []).filter(
+    (staff) => String(staff.role_code ?? staff.role ?? "") === STAFF_ROLE,
   );
   const recentStaff = staffRows.find((staff) => staff.last_login_at);
 
@@ -684,8 +716,12 @@ async function buildNetworkSnapshot(
     can_manage_networks: canManageNetworks(profile, String(store.id)),
     can_modify_networks: isPrivileged(profile),
     security_summary: {
-      active_network_count: (data ?? []).filter((network) => network.is_active !== false).length,
-      inactive_network_count: (data ?? []).filter((network) => network.is_active === false).length,
+      active_network_count: (data ?? []).filter(
+        (network) => network.is_active !== false,
+      ).length,
+      inactive_network_count: (data ?? []).filter(
+        (network) => network.is_active === false,
+      ).length,
       pending_request_count: (pendingRequests ?? []).length,
       staff_count: staffRows.length,
       recent_staff_login_at: recentStaff?.last_login_at ?? null,
@@ -774,6 +810,299 @@ async function bootstrapSignupNetwork(
   };
 }
 
+function normalizeAdminRole(input: unknown) {
+  const role = String(input ?? "").trim();
+  if (role === "\uC0AC\uC7A5") return "\uB300\uD45C";
+  if (
+    role === "\uB300\uD45C" ||
+    role === "\uAC1C\uBC1C\uC790" ||
+    role === "\uC810\uC7A5" ||
+    role === "\uC0AC\uC6D0" ||
+    role === "\uC870\uD68C\uC6A9"
+  ) {
+    return role;
+  }
+  return "";
+}
+
+function cleanLimitedString(input: unknown, maxLength: number) {
+  return String(input ?? "")
+    .trim()
+    .slice(0, maxLength);
+}
+
+async function insertAuditLog(
+  adminClient: ReturnType<typeof createClient>,
+  actorId: string,
+  action: string,
+  targetTable: string,
+  targetId: string | null,
+  detail: Record<string, unknown>,
+) {
+  await adminClient
+    .from("audit_logs")
+    .insert({
+      actor_id: actorId,
+      action,
+      target_table: targetTable,
+      target_id: targetId,
+      detail,
+    })
+    .then(({ error }) => {
+      if (error) console.error("audit insert failed", error);
+    });
+}
+
+async function recordExportAuditLog(
+  adminClient: ReturnType<typeof createClient>,
+  profile: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  if (!isPrivileged(profile)) {
+    return {
+      success: false,
+      message:
+        "\uC5D1\uC140 \uB2E4\uC6B4\uB85C\uB4DC \uAE30\uB85D \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    };
+  }
+
+  const targetTable = String(body.target_table ?? "").trim();
+  const actionByTable: Record<string, string> = {
+    customers: "export_customers_excel",
+    wired_members: "export_wired_members_excel",
+  };
+  const action = actionByTable[targetTable];
+  if (!action) {
+    return {
+      success: false,
+      message:
+        "\uAE30\uB85D\uD560 \uC218 \uC5C6\uB294 \uB0B4\uBCF4\uB0B4\uAE30 \uB300\uC0C1\uC785\uB2C8\uB2E4.",
+    };
+  }
+
+  const rawRowCount = Number(body.row_count ?? 0);
+  const rowCount =
+    Number.isFinite(rawRowCount) && rawRowCount >= 0
+      ? Math.floor(rawRowCount)
+      : 0;
+
+  await insertAuditLog(
+    adminClient,
+    String(profile.id ?? ""),
+    action,
+    targetTable,
+    null,
+    {
+      row_count: rowCount,
+      file_name: cleanLimitedString(body.file_name, 160),
+      store_filter: cleanLimitedString(body.store_filter, 120),
+      date_filter: cleanLimitedString(body.date_filter, 80),
+    },
+  );
+
+  return {
+    success: true,
+    message:
+      "\uB2E4\uC6B4\uB85C\uB4DC \uAE30\uB85D\uC774 \uC800\uC7A5\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
+  };
+}
+
+async function adminApproveUser(
+  adminClient: ReturnType<typeof createClient>,
+  profile: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  if (!isPrivileged(profile)) {
+    return {
+      success: false,
+      message:
+        "\uC9C1\uC6D0 \uC2B9\uC778 \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    };
+  }
+
+  const targetUserId = String(body.user_id ?? "").trim();
+  if (!targetUserId) {
+    return {
+      success: false,
+      message:
+        "\uC2B9\uC778\uD560 \uC9C1\uC6D0\uC744 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.",
+    };
+  }
+
+  const { error } = await adminClient
+    .from("profiles")
+    .update({ approval_status: "approved", rejection_reason: null })
+    .eq("id", targetUserId);
+
+  if (error) {
+    throw new Error(`\uC9C1\uC6D0 \uC2B9\uC778 \uC2E4\uD328: ${error.message}`);
+  }
+
+  await insertAuditLog(
+    adminClient,
+    String(profile.id ?? ""),
+    "admin_approve_user",
+    "profiles",
+    targetUserId,
+    {},
+  );
+
+  return {
+    success: true,
+    message: "\uC9C1\uC6D0\uC774 \uC2B9\uC778\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
+  };
+}
+
+async function adminUpdateUserProfile(
+  adminClient: ReturnType<typeof createClient>,
+  profile: Record<string, unknown>,
+  body: Record<string, unknown>,
+) {
+  if (!isPrivileged(profile)) {
+    return {
+      success: false,
+      message:
+        "\uC9C1\uC6D0 \uC815\uBCF4 \uC218\uC815 \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    };
+  }
+
+  const targetUserId = String(body.user_id ?? "").trim();
+  const role = normalizeAdminRole(body.role);
+  const storeName = normalizeStoreName(String(body.store ?? ""));
+
+  if (!targetUserId) {
+    return {
+      success: false,
+      message:
+        "\uC218\uC815\uD560 \uC9C1\uC6D0\uC744 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.",
+    };
+  }
+
+  if (!role) {
+    return {
+      success: false,
+      message:
+        "\uC62C\uBC14\uB978 \uC9C1\uAE09\uC744 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.",
+    };
+  }
+
+  if (
+    targetUserId === String(profile.id ?? "") &&
+    !PRIVILEGED_ROLES.has(role)
+  ) {
+    return {
+      success: false,
+      message:
+        "\uC790\uC2E0\uC758 \uAD00\uB9AC\uC790 \uAD8C\uD55C\uC744 \uD574\uC81C\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    };
+  }
+
+  let storeId: string | null = null;
+  if (storeName) {
+    const store = await ensureStore(
+      adminClient,
+      storeName,
+      String(profile.id ?? ""),
+    );
+    storeId = String(store.id);
+  }
+
+  const payload = {
+    name: cleanLimitedString(body.name, 80),
+    phone: cleanLimitedString(body.phone, 40),
+    store: storeName,
+    normalized_store: storeName,
+    store_id: storeId,
+    role,
+    role_code: role,
+  };
+
+  const { error } = await adminClient
+    .from("profiles")
+    .update(payload)
+    .eq("id", targetUserId);
+
+  if (error) {
+    throw new Error(
+      `\uC9C1\uC6D0 \uC815\uBCF4 \uC218\uC815 \uC2E4\uD328: ${error.message}`,
+    );
+  }
+
+  await insertAuditLog(
+    adminClient,
+    String(profile.id ?? ""),
+    "admin_update_user_profile",
+    "profiles",
+    targetUserId,
+    {
+      role,
+      store: storeName,
+    },
+  );
+
+  return {
+    success: true,
+    message:
+      "\uC9C1\uC6D0 \uC815\uBCF4\uAC00 \uC218\uC815\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
+  };
+}
+
+async function adminDeleteUserProfile(
+  adminClient: ReturnType<typeof createClient>,
+  profile: Record<string, unknown>,
+  currentUserId: string,
+  body: Record<string, unknown>,
+) {
+  if (!isPrivileged(profile)) {
+    return {
+      success: false,
+      message:
+        "\uC9C1\uC6D0 \uC0AD\uC81C \uAD8C\uD55C\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    };
+  }
+
+  const targetUserId = String(body.user_id ?? "").trim();
+  if (!targetUserId) {
+    return {
+      success: false,
+      message:
+        "\uC0AD\uC81C\uD560 \uC9C1\uC6D0\uC744 \uC120\uD0DD\uD574 \uC8FC\uC138\uC694.",
+    };
+  }
+
+  if (targetUserId === currentUserId) {
+    return {
+      success: false,
+      message:
+        "\uC790\uC2E0\uC758 \uACC4\uC815\uC740 \uC0AD\uC81C\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.",
+    };
+  }
+
+  const { error } = await adminClient
+    .from("profiles")
+    .delete()
+    .eq("id", targetUserId);
+
+  if (error) {
+    throw new Error(`\uC9C1\uC6D0 \uC0AD\uC81C \uC2E4\uD328: ${error.message}`);
+  }
+
+  await insertAuditLog(
+    adminClient,
+    String(profile.id ?? ""),
+    "admin_delete_user_profile",
+    "profiles",
+    targetUserId,
+    {},
+  );
+
+  return {
+    success: true,
+    message:
+      "\uC9C1\uC6D0 \uC815\uBCF4\uAC00 \uC0AD\uC81C\uB418\uC5C8\uC2B5\uB2C8\uB2E4.",
+  };
+}
+
 async function adminUpdateUserPassword(
   adminClient: ReturnType<typeof createClient>,
   profile: Record<string, unknown>,
@@ -829,18 +1158,17 @@ async function adminUpdateUserPassword(
     throw new Error(`비밀번호 변경 실패: ${updateError.message}`);
   }
 
-  await adminClient.from("audit_logs").insert({
-    actor_id: String(profile.id ?? ""),
-    action: "admin_update_user_password",
-    target_table: "auth.users",
-    target_id: targetUserId,
-    detail: {
+  await insertAuditLog(
+    adminClient,
+    String(profile.id ?? ""),
+    "admin_update_user_password",
+    "auth.users",
+    targetUserId,
+    {
       target_email: targetProfile.email ?? null,
       target_name: targetProfile.name ?? null,
     },
-  }).then(({ error }) => {
-    if (error) console.error("password audit insert failed", error);
-  });
+  );
 
   return {
     success: true,

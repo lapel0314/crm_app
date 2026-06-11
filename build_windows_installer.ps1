@@ -28,4 +28,4 @@ flutter build windows --release `
   --dart-define=SUPABASE_ANON_KEY=$SupabaseAnonKey `
   --dart-define=INSTALLER_PASSWORD=$InstallerPassword
 
-& $InnoSetupCompiler installer.iss
+& $InnoSetupCompiler "/DInstallerPassword=$InstallerPassword" installer.iss

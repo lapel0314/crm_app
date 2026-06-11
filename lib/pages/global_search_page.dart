@@ -837,6 +837,7 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
         MapEntry('총리베이트', _money(row['total_rebate'])),
         MapEntry('마진', _money(row['margin'])),
         MapEntry('메모', row['memo']),
+        MapEntry('요변/부가삭제', row['plan_change_add_service_delete']),
         MapEntry('모바일', row['mobile']),
         MapEntry('2nd', row['second']),
         MapEntry('히든내용', row['hidden_note']),

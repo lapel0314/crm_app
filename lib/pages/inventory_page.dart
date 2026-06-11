@@ -52,25 +52,6 @@ class _InventoryPageState extends State<InventoryPage> {
     fetchInventory();
   }
 
-  Future<void> insertAuditLog({
-    required String action,
-    String? targetId,
-    Map<String, dynamic>? detail,
-  }) async {
-    final user = supabase.auth.currentUser;
-    if (user == null) return;
-
-    try {
-      await supabase.from('audit_logs').insert({
-        'actor_id': user.id,
-        'action': action,
-        'target_table': 'device_inventory',
-        'target_id': targetId,
-        'detail': detail ?? {},
-      });
-    } catch (_) {}
-  }
-
   Future<void> fetchInventory({String keyword = ''}) async {
     setState(() {
       isLoading = true;
@@ -135,29 +116,14 @@ class _InventoryPageState extends State<InventoryPage> {
     try {
       final user = supabase.auth.currentUser;
 
-      final inserted = await supabase
-          .from('device_inventory')
-          .insert({
-            'store': normalizedStore,
-            'model_name': modelController.text.trim(),
-            'serial_number': serialController.text.trim(),
-            'status': status,
-            'memo': memoController.text.trim(),
-            'created_by': user?.id,
-          })
-          .select('id')
-          .single();
-
-      await insertAuditLog(
-        action: 'create_inventory',
-        targetId: inserted['id'].toString(),
-        detail: {
-          'store': normalizedStore,
-          'model_name': modelController.text.trim(),
-          'serial_number': serialController.text.trim(),
-          'status': status,
-        },
-      );
+      await supabase.from('device_inventory').insert({
+        'store': normalizedStore,
+        'model_name': modelController.text.trim(),
+        'serial_number': serialController.text.trim(),
+        'status': status,
+        'memo': memoController.text.trim(),
+        'created_by': user?.id,
+      });
 
       storeController.clear();
       modelController.clear();
@@ -200,17 +166,6 @@ class _InventoryPageState extends State<InventoryPage> {
         'memo': memo,
       }).eq('id', id);
 
-      await insertAuditLog(
-        action: 'update_inventory',
-        targetId: id,
-        detail: {
-          'store': normalizedStore,
-          'model_name': modelName,
-          'serial_number': serialNumber,
-          'status': status,
-        },
-      );
-
       if (mounted) {
         Navigator.pop(context);
       }
@@ -236,17 +191,6 @@ class _InventoryPageState extends State<InventoryPage> {
         'deleted_at': DateTime.now().toUtc().toIso8601String(),
         'deleted_by': user?.id,
       }).eq('id', item['id']);
-
-      await insertAuditLog(
-        action: 'soft_delete_inventory',
-        targetId: item['id'].toString(),
-        detail: {
-          'store': item['store'],
-          'model_name': item['model_name'],
-          'serial_number': item['serial_number'],
-          'status': item['status'],
-        },
-      );
 
       if (mounted) {
         Navigator.pop(context);

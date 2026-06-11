@@ -801,6 +801,7 @@ class _CustomerPageState extends State<CustomerPage> {
               item['store'],
               item['staff'],
               item['memo'],
+              item['plan_change_add_service_delete'],
             ].any(
                 (value) => _text(value).toLowerCase().contains(legacyKeyword));
 
@@ -1770,6 +1771,8 @@ class _CustomerPageState extends State<CustomerPage> {
         TextEditingController(text: customer['add_service']?.toString() ?? '');
     final memoController =
         TextEditingController(text: customer['memo']?.toString() ?? '');
+    final planChangeAddServiceDeleteController = TextEditingController(
+        text: customer['plan_change_add_service_delete']?.toString() ?? '');
     final hiddenNoteController =
         TextEditingController(text: customer['hidden_note']?.toString() ?? '');
     final deductionNoteController = TextEditingController(
@@ -1982,6 +1985,10 @@ class _CustomerPageState extends State<CustomerPage> {
                     _input('은행/계좌/예금주', bankInfoController),
                     _input('반납모델', tradeModelController),
                     _input('메모', memoController, maxLines: 4),
+                    _input(
+                      '요변/부가삭제',
+                      planChangeAddServiceDeleteController,
+                    ),
                     _input('개통매장', storeController),
                     _input('모바일', mobileController),
                     _input('2nd', secondController),
@@ -2063,6 +2070,8 @@ class _CustomerPageState extends State<CustomerPage> {
                           'bank_info': bankInfoController.text.trim(),
                           'trade_model': tradeModelController.text.trim(),
                           'memo': memoController.text.trim(),
+                          'plan_change_add_service_delete':
+                              planChangeAddServiceDeleteController.text.trim(),
                           'store':
                               normalizeStoreName(storeController.text.trim()),
                           'mobile': mobileController.text.trim(),
@@ -2231,6 +2240,10 @@ class _CustomerPageState extends State<CustomerPage> {
                     title: '추가 / 메모 정보',
                     children: [
                       _detailRow('메모', customer['memo']),
+                      _detailRow(
+                        '요변/부가삭제',
+                        customer['plan_change_add_service_delete'],
+                      ),
                       _detailRow('모바일', customer['mobile']),
                       _detailRow('2nd', customer['second']),
                       _detailRow('히든내용', customer['hidden_note']),

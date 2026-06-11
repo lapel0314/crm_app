@@ -81,40 +81,16 @@ class _AdminPageState extends State<AdminPage> {
     }
   }
 
-  Future<void> approveUser(String id) async {
-    try {
-      await supabase
-          .from('profiles')
-          .update({'approval_status': 'approved', 'rejection_reason': null}).eq(
-              'id', id);
-
-      fetchUsers(keyword: searchController.text);
-    } catch (e) {
-      debugPrint('admin approve failed: $e');
-    }
-  }
-
-  Future<void> deleteUser(String id) async {
-    try {
-      await supabase.from('profiles').delete().eq('id', id);
-      if (mounted) Navigator.pop(context);
-      fetchUsers(keyword: searchController.text);
-    } catch (e) {
-      debugPrint('admin delete failed: $e');
-    }
-  }
-
-  Future<void> updateUserPassword({
-    required String userId,
-    required String password,
-  }) async {
+  Future<Map<String, dynamic>> invokeAuthPolicy(
+    String action,
+    Map<String, dynamic> body,
+  ) async {
     final response = await supabase.functions.invoke(
       'auth-policy',
       body: {
-        'action': 'admin_update_user_password',
+        'action': action,
         'access_token': supabase.auth.currentSession?.accessToken,
-        'user_id': userId,
-        'password': password,
+        ...body,
       },
     );
 
@@ -126,8 +102,49 @@ class _AdminPageState extends State<AdminPage> {
             : <String, dynamic>{};
 
     if (response.status >= 400 || data['success'] == false) {
-      throw Exception((data['message'] ?? '비밀번호 변경에 실패했습니다.').toString());
+      throw Exception((data['message'] ?? '요청 처리에 실패했습니다.').toString());
     }
+
+    return data;
+  }
+
+  Future<void> approveUser(String id) async {
+    try {
+      await invokeAuthPolicy('admin_approve_user', {'user_id': id});
+      fetchUsers(keyword: searchController.text);
+    } catch (e) {
+      debugPrint('admin approve failed: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('직원 승인 실패: $e')),
+      );
+    }
+  }
+
+  Future<void> deleteUser(String id) async {
+    try {
+      await invokeAuthPolicy('admin_delete_user_profile', {'user_id': id});
+      if (mounted) Navigator.pop(context);
+      fetchUsers(keyword: searchController.text);
+    } catch (e) {
+      debugPrint('admin delete failed: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('직원 삭제 실패: $e')),
+      );
+    }
+  }
+
+  Future<void> updateUserPassword({
+    required String userId,
+    required String password,
+  }) async {
+    await invokeAuthPolicy('admin_update_user_password', {
+      'user_id': userId,
+      'password': password,
+    });
   }
 
   void showPasswordDialog(Map<String, dynamic> user) {
@@ -673,19 +690,25 @@ class _AdminPageState extends State<AdminPage> {
                 style: _primaryButtonStyle(),
                 onPressed: () async {
                   try {
-                    await supabase.from('profiles').update({
+                    await invokeAuthPolicy('admin_update_user_profile', {
+                      'user_id': user['id'].toString(),
                       'name': nameController.text.trim(),
                       'phone': phoneController.text.trim(),
                       'store': normalizeStoreName(
                         storeController.text.trim(),
                       ),
                       'role': role,
-                    }).eq('id', user['id']);
+                    });
 
                     if (mounted) Navigator.pop(context);
                     fetchUsers(keyword: searchController.text);
                   } catch (e) {
                     debugPrint('admin update failed: $e');
+                    if (!mounted) return;
+                    ScaffoldMessenger.of(context).clearSnackBars();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('직원 수정 실패: $e')),
+                    );
                   }
                 },
                 child: const Text('저장'),

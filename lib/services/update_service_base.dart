@@ -5,12 +5,17 @@ const String installerPassword = String.fromEnvironment(
   defaultValue: '123456',
 );
 
+const String updateAllowedHosts = String.fromEnvironment(
+  'UPDATE_ALLOWED_HOSTS',
+);
+
 class AppUpdateInfo {
   final String platform;
   final String currentVersion;
   final String latestVersion;
   final String minRequiredVersion;
   final String packageUrl;
+  final String packageSha256;
   final String message;
   final bool isRequired;
 
@@ -20,6 +25,7 @@ class AppUpdateInfo {
     required this.latestVersion,
     required this.minRequiredVersion,
     required this.packageUrl,
+    this.packageSha256 = '',
     required this.message,
     required this.isRequired,
   });
