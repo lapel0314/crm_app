@@ -55,12 +55,18 @@ class _AppLayoutState extends State<AppLayout> {
   List<Notice> notices = [];
   bool isNoticeLoading = false;
   bool isPlanAlertLoading = false;
+  bool isStoreAccordionOpen = false;
+  bool isStoreListLoading = false;
+  bool hasLoadedStoreList = false;
+  bool isAddingStore = false;
   PlanChangeAlertResult? todayPlanAlert;
+  List<_StoreOption> storeOptions = [];
   DateTime? lastNoticeReadAt;
   int noticePage = 0;
   static const int noticePageSize = 10;
 
   bool get isAdminRole => isPrivilegedRole(widget.role);
+  bool get canAddStores => canManageNetworks(widget.role);
 
   List<_NavItem> get items {
     return [
@@ -304,6 +310,155 @@ class _AppLayoutState extends State<AppLayout> {
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _toggleStoreAccordion() async {
+    final willOpen = !isStoreAccordionOpen;
+    setState(() {
+      isStoreAccordionOpen = willOpen;
+    });
+    if (willOpen && !hasLoadedStoreList) {
+      await _loadStores(showError: true);
+    }
+  }
+
+  Future<void> _loadStores({bool showError = false}) async {
+    if (isStoreListLoading) return;
+    setState(() => isStoreListLoading = true);
+
+    try {
+      final rows = await Supabase.instance.client
+          .from('stores')
+          .select('id, name, normalized_name, is_active')
+          .eq('is_active', true)
+          .order('name', ascending: true);
+
+      final stores = rows
+          .map((row) => _StoreOption.fromMap(Map<String, dynamic>.from(row)))
+          .where((store) => store.name.isNotEmpty)
+          .toList()
+        ..sort((a, b) => a.name.compareTo(b.name));
+
+      if (!mounted) return;
+      setState(() {
+        storeOptions = stores;
+        hasLoadedStoreList = true;
+        isStoreListLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => isStoreListLoading = false);
+      if (showError) {
+        _showMessage('매장 목록 조회 실패: $e');
+      }
+    }
+  }
+
+  Future<void> _showAddStoreDialog() async {
+    if (!canAddStores || isAddingStore) return;
+    final controller = TextEditingController();
+    try {
+      final storeName = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          title: const Text(
+            '매장 추가',
+            style: TextStyle(
+              color: Color(0xFF111827),
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          content: SizedBox(
+            width: 360,
+            child: TextField(
+              controller: controller,
+              autofocus: true,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (value) =>
+                  Navigator.pop(dialogContext, value.trim()),
+              decoration: InputDecoration(
+                labelText: '매장명',
+                hintText: '예: 이대점',
+                prefixIcon: const Icon(Icons.storefront_rounded),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('취소'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () =>
+                  Navigator.pop(dialogContext, controller.text.trim()),
+              icon: const Icon(Icons.add_rounded, size: 18),
+              label: const Text('추가'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFC94C6E),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (storeName == null) return;
+      await _createStore(storeName);
+    } finally {
+      controller.dispose();
+    }
+  }
+
+  Future<void> _createStore(String rawName) async {
+    final storeName = normalizeStoreName(rawName);
+    if (storeName.isEmpty) {
+      _showMessage('매장명을 입력해 주세요.');
+      return;
+    }
+
+    setState(() => isAddingStore = true);
+    try {
+      final row = await Supabase.instance.client
+          .from('stores')
+          .upsert(
+            {
+              'name': storeName,
+              'normalized_name': storeName,
+              'is_active': true,
+              'created_by': Supabase.instance.client.auth.currentUser?.id,
+            },
+            onConflict: 'normalized_name',
+          )
+          .select('id, name, normalized_name, is_active')
+          .single();
+
+      final added = _StoreOption.fromMap(Map<String, dynamic>.from(row));
+      if (!mounted) return;
+      setState(() {
+        storeOptions.removeWhere(
+          (store) => normalizeStoreName(store.name) == added.normalizedName,
+        );
+        storeOptions.add(added);
+        storeOptions.sort((a, b) => a.name.compareTo(b.name));
+        hasLoadedStoreList = true;
+        isStoreAccordionOpen = true;
+        isAddingStore = false;
+      });
+      _showMessage('${added.name} 매장을 추가했습니다.');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => isAddingStore = false);
+      final message = e is PostgrestException ? e.message : e.toString();
+      _showMessage('매장 추가 실패: $message');
+    }
   }
 
   Future<void> _loadNoticeReadAt() async {
@@ -944,6 +1099,303 @@ class _AppLayoutState extends State<AppLayout> {
     );
   }
 
+  Widget _sidebarBrandHeader({required EdgeInsets padding}) {
+    return Padding(
+      padding: padding,
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: const Color(0xFFC94C6E),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFC94C6E).withValues(alpha: 0.32),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: const Icon(
+              Icons.phone_iphone_rounded,
+              size: 19,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '핑크폰',
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '권한: ${widget.role}',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Color(0xFF9CA3AF),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _storeAccordion({required EdgeInsets padding}) {
+    final currentStore = widget.store.isEmpty ? '-' : widget.store;
+    return Padding(
+      padding: padding,
+      child: Column(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(8),
+            onTap: _toggleStoreAccordion,
+            child: Container(
+              height: 42,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: isStoreAccordionOpen
+                    ? const Color(0xFFC94C6E).withValues(alpha: 0.12)
+                    : Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isStoreAccordionOpen
+                      ? const Color(0xFFC94C6E).withValues(alpha: 0.38)
+                      : const Color(0xFF252740),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFC94C6E).withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Icon(
+                      Icons.storefront_rounded,
+                      size: 14,
+                      color: Color(0xFFC94C6E),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          '매장',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Color(0xFF7C7F96),
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        Text(
+                          currentStore,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFFE5E7EB),
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  AnimatedRotation(
+                    turns: isStoreAccordionOpen ? 0.5 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: const Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      size: 18,
+                      color: Color(0xFF8A8DA6),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            child: isStoreAccordionOpen
+                ? _storeAccordionBody()
+                : const SizedBox(width: double.infinity, height: 0),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _storeAccordionBody() {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF252740)),
+      ),
+      child: Column(
+        children: [
+          if (isStoreListLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  SizedBox(width: 8),
+                  Text(
+                    '매장 조회 중',
+                    style: TextStyle(
+                      color: Color(0xFFD1D3E0),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (storeOptions.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: Text(
+                '등록된 매장이 없습니다.',
+                style: TextStyle(
+                  color: Color(0xFF8A8DA6),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            )
+          else
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 172),
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                itemCount: storeOptions.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 4),
+                itemBuilder: (context, index) {
+                  final store = storeOptions[index];
+                  final selected = isSameStore(store.name, widget.store);
+                  return _storeListRow(store, selected: selected);
+                },
+              ),
+            ),
+          if (canAddStores) ...[
+            const SizedBox(height: 8),
+            _addStoreButton(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _storeListRow(_StoreOption store, {required bool selected}) {
+    return Container(
+      height: 34,
+      padding: const EdgeInsets.symmetric(horizontal: 9),
+      decoration: BoxDecoration(
+        color: selected
+            ? const Color(0xFFC94C6E).withValues(alpha: 0.16)
+            : Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(7),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            selected ? Icons.radio_button_checked : Icons.storefront_outlined,
+            size: 15,
+            color: selected ? const Color(0xFFC94C6E) : const Color(0xFF8A8DA6),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              store.name,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: selected ? Colors.white : const Color(0xFFD1D3E0),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _addStoreButton() {
+    return InkWell(
+      borderRadius: BorderRadius.circular(7),
+      onTap: isAddingStore ? null : _showAddStoreDialog,
+      child: Container(
+        height: 36,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFC94C6E).withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(7),
+          border: Border.all(
+            color: const Color(0xFFC94C6E).withValues(alpha: 0.34),
+          ),
+        ),
+        child: Row(
+          children: [
+            if (isAddingStore)
+              const SizedBox(
+                width: 15,
+                height: 15,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              const Icon(
+                Icons.add_business_rounded,
+                size: 16,
+                color: Color(0xFFC94C6E),
+              ),
+            const SizedBox(width: 8),
+            const Expanded(
+              child: Text(
+                '매장 추가',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _iosCompactLayout(
     BuildContext context,
     List<_NavItem> navItems,
@@ -959,88 +1411,11 @@ class _AppLayoutState extends State<AppLayout> {
         child: SafeArea(
           child: Column(
             children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFC94C6E),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.phone_rounded,
-                        size: 16,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          '핑크폰',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w800,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          '권한: ${widget.role}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF7C7F96),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+              _sidebarBrandHeader(
+                padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
               ),
-              Padding(
+              _storeAccordion(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                child: Container(
-                  height: 38,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.05),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 22,
-                        height: 22,
-                        decoration: BoxDecoration(
-                          color:
-                              const Color(0xFFC94C6E).withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Icon(
-                          Icons.bolt_rounded,
-                          size: 12,
-                          color: Color(0xFFC94C6E),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          widget.store.isEmpty ? '-' : widget.store,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFFD1D3E0),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
               ),
               const Divider(height: 1, color: Color(0xFF252740)),
               Expanded(
@@ -1308,94 +1683,11 @@ class _AppLayoutState extends State<AppLayout> {
               ),
               child: Column(
                 children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 18),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 34,
-                          height: 34,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFC94C6E),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: const Icon(
-                            Icons.phone_rounded,
-                            size: 16,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              '핑크폰',
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w800,
-                                color: Colors.white,
-                              ),
-                            ),
-                            Text(
-                              '권한: ${widget.role}',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF7C7F96),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                  _sidebarBrandHeader(
+                    padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
                   ),
-                  Padding(
+                  _storeAccordion(
                     padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                    child: Container(
-                      height: 38,
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.05),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 22,
-                            height: 22,
-                            decoration: BoxDecoration(
-                              color: const Color(
-                                0xFFC94C6E,
-                              ).withValues(alpha: 0.14),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Icon(
-                              Icons.bolt_rounded,
-                              size: 12,
-                              color: Color(0xFFC94C6E),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              widget.store.isEmpty ? '-' : widget.store,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFFD1D3E0),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                          const Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            size: 14,
-                            color: Color(0xFF7C7F96),
-                          ),
-                        ],
-                      ),
-                    ),
                   ),
                   const Divider(height: 1, color: Color(0xFF252740)),
                   Expanded(
@@ -1634,4 +1926,28 @@ class _NavItem {
     required this.page,
     this.quickOnly = false,
   });
+}
+
+class _StoreOption {
+  final String id;
+  final String name;
+  final String normalizedName;
+  final bool isActive;
+
+  const _StoreOption({
+    required this.id,
+    required this.name,
+    required this.normalizedName,
+    required this.isActive,
+  });
+
+  factory _StoreOption.fromMap(Map<String, dynamic> data) {
+    final name = normalizeStoreName(data['name'] ?? data['normalized_name']);
+    return _StoreOption(
+      id: data['id']?.toString() ?? '',
+      name: name,
+      normalizedName: normalizeStoreName(data['normalized_name'] ?? name),
+      isActive: data['is_active'] != false,
+    );
+  }
 }
