@@ -1,0 +1,87 @@
+name: iOS Unsigned Sideload Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios-unsigned:
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Resolve build metadata
+        id: meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION_LINE=$(grep '^version:' pubspec.yaml | head -1 | awk '{print $2}')
+          VERSION_NAME=${VERSION_LINE%%+*}
+          IPA_NAME="pinkphone-crm-ios-unsigned-$VERSION_NAME.ipa"
+          OUT_DIR="dist/sideload-ios-$VERSION_NAME"
+          {
+            echo "version_name=$VERSION_NAME"
+            echo "ipa_name=$IPA_NAME"
+            echo "out_dir=$OUT_DIR"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build unsigned iOS app
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build ios \
+            --release \
+            --no-codesign \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+
+      - name: Package unsigned IPA
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUT_DIR="${{ steps.meta.outputs.out_dir }}"
+          IPA_PATH="$OUT_DIR/${{ steps.meta.outputs.ipa_name }}"
+          mkdir -p "$OUT_DIR"
+
+          APP_PATH=$(find build/ios/iphoneos -maxdepth 1 -name '*.app' -type d | head -1)
+          if [[ -z "$APP_PATH" ]]; then
+            echo "Unsigned .app was not found." >&2
+            exit 1
+          fi
+
+          WORK_DIR="$RUNNER_TEMP/unsigned-ipa"
+          rm -rf "$WORK_DIR"
+          mkdir -p "$WORK_DIR/Payload"
+          cp -R "$APP_PATH" "$WORK_DIR/Payload/Runner.app"
+
+          (cd "$WORK_DIR" && zip -qry "$GITHUB_WORKSPACE/$IPA_PATH" Payload)
+          shasum -a 256 "$IPA_PATH" > "$OUT_DIR/${{ steps.meta.outputs.ipa_name }}.sha256"
+
+          {
+            echo "ipa_path=$IPA_PATH"
+            echo "checksum_path=$OUT_DIR/${{ steps.meta.outputs.ipa_name }}.sha256"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload unsigned IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: crm-app-ios-unsigned-sideload
+          path: |
+            ${{ steps.package.outputs.ipa_path }}
+            ${{ steps.package.outputs.checksum_path }}
+          if-no-files-found: error
