@@ -1,0 +1,309 @@
+name: iOS Internal Release Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Release tag to upload assets to. Empty uses v<pubspec version>.'
+        required: false
+        default: ''
+      publish_release:
+        description: 'Upload IPA and install files to GitHub Release.'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      export_method:
+        description: 'Use ad-hoc for internal link install. development is only for registered test devices.'
+        required: true
+        default: ad-hoc
+        type: choice
+        options:
+          - ad-hoc
+          - development
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  BUNDLE_ID: com.lapel.crmapp
+  APP_TITLE: '핑크폰 CRM'
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Resolve build metadata
+        id: meta
+        shell: bash
+        env:
+          INPUT_RELEASE_TAG: ${{ github.event.inputs.release_tag || '' }}
+          INPUT_PUBLISH_RELEASE: ${{ github.event.inputs.publish_release || 'true' }}
+          INPUT_EXPORT_METHOD: ${{ github.event.inputs.export_method || 'ad-hoc' }}
+        run: |
+          set -euo pipefail
+          VERSION_LINE=$(grep '^version:' pubspec.yaml | head -1 | awk '{print $2}')
+          VERSION_NAME=${VERSION_LINE%%+*}
+          VERSION_CODE=${VERSION_LINE##*+}
+
+          if [[ -n "$INPUT_RELEASE_TAG" ]]; then
+            RELEASE_TAG="$INPUT_RELEASE_TAG"
+          elif [[ "${GITHUB_REF_TYPE:-}" == "tag" ]]; then
+            RELEASE_TAG="$GITHUB_REF_NAME"
+          else
+            RELEASE_TAG="v$VERSION_NAME"
+          fi
+
+          IPA_NAME="pinkphone-crm-$VERSION_NAME.ipa"
+          MANIFEST_NAME="pinkphone-crm-$VERSION_NAME-manifest.plist"
+          INSTALL_HTML_NAME="pinkphone-crm-$VERSION_NAME-install.html"
+          INSTALL_LINK_NAME="pinkphone-crm-$VERSION_NAME-install-link.txt"
+
+          {
+            echo "version_name=$VERSION_NAME"
+            echo "version_code=$VERSION_CODE"
+            echo "release_tag=$RELEASE_TAG"
+            echo "publish_release=$INPUT_PUBLISH_RELEASE"
+            echo "export_method=$INPUT_EXPORT_METHOD"
+            echo "ipa_name=$IPA_NAME"
+            echo "manifest_name=$MANIFEST_NAME"
+            echo "install_html_name=$INSTALL_HTML_NAME"
+            echo "install_link_name=$INSTALL_LINK_NAME"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install Apple signing assets
+        shell: bash
+        env:
+          IOS_CERTIFICATE_BASE64: ${{ secrets.IOS_CERTIFICATE_BASE64 }}
+          IOS_CERTIFICATE_PASSWORD: ${{ secrets.IOS_CERTIFICATE_PASSWORD }}
+          IOS_PROVISION_PROFILE_BASE64: ${{ secrets.IOS_PROVISION_PROFILE_BASE64 }}
+          IOS_KEYCHAIN_PASSWORD: ${{ secrets.IOS_KEYCHAIN_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$IOS_CERTIFICATE_BASE64" || -z "$IOS_PROVISION_PROFILE_BASE64" ]]; then
+            echo "Missing iOS signing secrets." >&2
+            exit 1
+          fi
+
+          CERTIFICATE_PATH="$RUNNER_TEMP/ios_certificate.p12"
+          PROFILE_PATH="$RUNNER_TEMP/ios_profile.mobileprovision"
+          PROFILE_PLIST="$RUNNER_TEMP/ios_profile.plist"
+          KEYCHAIN_PATH="$RUNNER_TEMP/app-signing.keychain-db"
+
+          echo "$IOS_CERTIFICATE_BASE64" | base64 --decode > "$CERTIFICATE_PATH"
+          echo "$IOS_PROVISION_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
+
+          security create-keychain -p "$IOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$IOS_KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security import "$CERTIFICATE_PATH" \
+            -P "$IOS_CERTIFICATE_PASSWORD" \
+            -A \
+            -t cert \
+            -f pkcs12 \
+            -k "$KEYCHAIN_PATH"
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s \
+            -k "$IOS_KEYCHAIN_PASSWORD" \
+            "$KEYCHAIN_PATH"
+
+          security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
+          PROFILE_UUID=$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$PROFILE_PLIST")
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c 'Print :Name' "$PROFILE_PLIST")
+          TEAM_ID=$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$PROFILE_PLIST")
+
+          mkdir -p "$HOME/Library/MobileDevice/Provisioning Profiles"
+          cp "$PROFILE_PATH" "$HOME/Library/MobileDevice/Provisioning Profiles/$PROFILE_UUID.mobileprovision"
+
+          {
+            echo "IOS_PROFILE_NAME=$PROFILE_NAME"
+            echo "IOS_TEAM_ID=$TEAM_ID"
+            echo "IOS_KEYCHAIN_PATH=$KEYCHAIN_PATH"
+          } >> "$GITHUB_ENV"
+
+      - name: Generate export options
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>${{ steps.meta.outputs.export_method }}</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>teamID</key>
+            <string>$IOS_TEAM_ID</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>$BUNDLE_ID</key>
+              <string>$IOS_PROFILE_NAME</string>
+            </dict>
+            <key>compileBitcode</key>
+            <false/>
+            <key>manageAppVersionAndBuildNumber</key>
+            <false/>
+            <key>stripSwiftSymbols</key>
+            <true/>
+            <key>thinning</key>
+            <string>&lt;none&gt;</string>
+          </dict>
+          </plist>
+          EOF
+
+      - name: Build signed IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build ipa \
+            --release \
+            --export-options-plist="$RUNNER_TEMP/ExportOptions.plist" \
+            --dart-define=SUPABASE_URL=${{ secrets.SUPABASE_URL }} \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+
+      - name: Prepare OTA install assets
+        id: assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION_NAME="${{ steps.meta.outputs.version_name }}"
+          RELEASE_TAG="${{ steps.meta.outputs.release_tag }}"
+          OUT_DIR="dist/release-$VERSION_NAME/ios"
+          mkdir -p "$OUT_DIR"
+
+          IPA_PATH="$OUT_DIR/${{ steps.meta.outputs.ipa_name }}"
+          MANIFEST_PATH="$OUT_DIR/${{ steps.meta.outputs.manifest_name }}"
+          INSTALL_HTML_PATH="$OUT_DIR/${{ steps.meta.outputs.install_html_name }}"
+          INSTALL_LINK_PATH="$OUT_DIR/${{ steps.meta.outputs.install_link_name }}"
+
+          cp build/ios/ipa/*.ipa "$IPA_PATH"
+
+          IPA_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/${{ steps.meta.outputs.ipa_name }}"
+          MANIFEST_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${RELEASE_TAG}/${{ steps.meta.outputs.manifest_name }}"
+          INSTALL_URL="itms-services://?action=download-manifest&url=$MANIFEST_URL"
+
+          cat > "$MANIFEST_PATH" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>items</key>
+            <array>
+              <dict>
+                <key>assets</key>
+                <array>
+                  <dict>
+                    <key>kind</key>
+                    <string>software-package</string>
+                    <key>url</key>
+                    <string>$IPA_URL</string>
+                  </dict>
+                </array>
+                <key>metadata</key>
+                <dict>
+                  <key>bundle-identifier</key>
+                  <string>$BUNDLE_ID</string>
+                  <key>bundle-version</key>
+                  <string>$VERSION_NAME</string>
+                  <key>kind</key>
+                  <string>software</string>
+                  <key>title</key>
+                  <string>$APP_TITLE</string>
+                </dict>
+              </dict>
+            </array>
+          </dict>
+          </plist>
+          EOF
+
+          cat > "$INSTALL_HTML_PATH" <<EOF
+          <!doctype html>
+          <html lang="ko">
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <title>$APP_TITLE iOS 설치</title>
+          </head>
+          <body>
+            <h1>$APP_TITLE iOS 설치</h1>
+            <p>Safari에서 아래 링크를 열어 설치하세요.</p>
+            <p><a href="$INSTALL_URL">iOS 앱 설치</a></p>
+            <p>설치가 시작되지 않으면 아래 링크를 복사해 Safari 주소창에 붙여넣으세요.</p>
+            <pre>$INSTALL_URL</pre>
+          </body>
+          </html>
+          EOF
+
+          {
+            echo "$APP_TITLE iOS 설치 링크"
+            echo "$INSTALL_URL"
+            echo
+            echo "IPA SHA-256:"
+            shasum -a 256 "$IPA_PATH"
+          } > "$INSTALL_LINK_PATH"
+
+          {
+            echo "ipa_path=$IPA_PATH"
+            echo "manifest_path=$MANIFEST_PATH"
+            echo "install_html_path=$INSTALL_HTML_PATH"
+            echo "install_link_path=$INSTALL_LINK_PATH"
+            echo "install_url=$INSTALL_URL"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload iOS build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: crm-app-ios-internal
+          path: dist/release-${{ steps.meta.outputs.version_name }}/ios/
+          if-no-files-found: error
+
+      - name: Publish release assets
+        if: steps.meta.outputs.publish_release == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          RELEASE_TAG="${{ steps.meta.outputs.release_tag }}"
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --title "$RELEASE_TAG" \
+              --notes "Internal iOS build for ${{ steps.meta.outputs.version_name }}"
+          fi
+          gh release upload "$RELEASE_TAG" \
+            "${{ steps.assets.outputs.ipa_path }}" \
+            "${{ steps.assets.outputs.manifest_path }}" \
+            "${{ steps.assets.outputs.install_html_path }}" \
+            "${{ steps.assets.outputs.install_link_path }}" \
+            --clobber
+
+      - name: Cleanup signing keychain
+        if: always()
+        shell: bash
+        run: |
+          if [[ -n "${IOS_KEYCHAIN_PATH:-}" ]]; then
+            security delete-keychain "$IOS_KEYCHAIN_PATH" || true
+          fi

@@ -1,10 +1,9 @@
 import 'dart:io';
 
-import 'package:excel/excel.dart' as xls;
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:crm_app/services/customer_excel_export_service.dart';
 import 'package:crm_app/services/kakao_talk_service.dart';
 import 'package:crm_app/services/audit_log_service.dart';
 import 'package:crm_app/services/contact_action_service.dart';
@@ -287,324 +286,28 @@ class _CustomerPageState extends State<CustomerPage> {
   }
 
   Future<void> _exportCustomersExcel(List<Map<String, dynamic>> rows) async {
-    if (rows.isEmpty) {
-      _showCenterMessage('내보낼 고객 데이터가 없습니다.');
-      return;
-    }
-    if (kIsWeb) {
-      _showCenterMessage('웹에서는 아직 엑셀 저장을 지원하지 않습니다.');
-      return;
-    }
-    if (!Platform.isWindows && !Platform.isMacOS && !Platform.isLinux) {
-      _showCenterMessage('엑셀 저장은 PC에서만 지원됩니다.');
-      return;
-    }
-
-    const typeGroup = XTypeGroup(label: 'Excel', extensions: ['xlsx']);
-    final suggestedName = _buildCustomerExcelFileName(rows);
-    final saveLocation = await getSaveLocation(
-      acceptedTypeGroups: const [typeGroup],
-      suggestedName: suggestedName,
-      confirmButtonText: '저장',
+    final result = await const CustomerExcelExportService().exportCustomers(
+      rows: rows,
+      selectedDateText: dateSearchController.text,
     );
-    if (saveLocation == null) return;
-
-    final excel = xls.Excel.createExcel();
-    final defaultSheet = excel.getDefaultSheet();
-    final sheetName = '고객DB';
-    if (defaultSheet != null && defaultSheet != sheetName) {
-      excel.rename(defaultSheet, sheetName);
-    }
-    final sheet = excel[sheetName];
-
-    excel.appendRow(sheetName, [
-      xls.TextCellValue('가입일'),
-      xls.TextCellValue('매장'),
-      xls.TextCellValue('담당자'),
-      xls.TextCellValue('고객명'),
-      xls.TextCellValue('휴대폰번호'),
-      xls.TextCellValue('통신사'),
-      xls.TextCellValue('가입유형'),
-      xls.TextCellValue('모델명'),
-      xls.TextCellValue('요금제'),
-      xls.TextCellValue('리베이트'),
-      xls.TextCellValue('부가리베이트'),
-      xls.TextCellValue('히든리베이트'),
-      xls.TextCellValue('총리베이트'),
-      xls.TextCellValue('유통망지원금'),
-      xls.TextCellValue('결제'),
-      xls.TextCellValue('입금'),
-      xls.TextCellValue('마진'),
-      xls.TextCellValue('은행정보'),
-      xls.TextCellValue('메모'),
-    ]);
-
-    for (final customer in rows) {
-      final rebate = _toInt(customer['rebate']);
-      final addRebate = _toInt(customer['add_rebate']);
-      final hiddenRebate = _toInt(customer['hidden_rebate']);
-      final supportMoney = _toInt(customer['support_money']);
-      final payment = _toInt(customer['payment']);
-      final deposit = _toInt(customer['deposit']);
-      final totalRebate = _calcTotalRebate(
-        rebate: rebate,
-        addRebate: addRebate,
-        hiddenRebate: hiddenRebate,
-        deduction: _toInt(customer['deduction']),
-        supportMoney: supportMoney,
-        payment: payment,
-        deposit: deposit,
-        tradePrice: _toInt(customer['trade_price']),
-      );
-      final margin = _calcMargin(
-        totalRebate: totalRebate,
-        supportMoney: supportMoney,
-        payment: payment,
-        deposit: deposit,
-      );
-
-      excel.appendRow(sheetName, [
-        xls.TextCellValue(_date(customer['join_date'])),
-        xls.TextCellValue(customer['store']?.toString() ?? ''),
-        xls.TextCellValue(customer['staff']?.toString() ?? ''),
-        xls.TextCellValue(customer['name']?.toString() ?? ''),
-        xls.TextCellValue(customer['phone']?.toString() ?? ''),
-        xls.TextCellValue(customer['carrier']?.toString() ?? ''),
-        xls.TextCellValue(customer['join_type']?.toString() ?? ''),
-        xls.TextCellValue(customer['model']?.toString() ?? ''),
-        xls.TextCellValue(customer['plan']?.toString() ?? ''),
-        xls.IntCellValue(rebate),
-        xls.IntCellValue(addRebate),
-        xls.IntCellValue(hiddenRebate),
-        xls.IntCellValue(totalRebate),
-        xls.IntCellValue(supportMoney),
-        xls.IntCellValue(payment),
-        xls.IntCellValue(deposit),
-        xls.IntCellValue(margin),
-        xls.TextCellValue(customer['bank_info']?.toString() ?? ''),
-        xls.TextCellValue(customer['memo']?.toString() ?? ''),
-      ]);
-    }
-
-    _styleCustomerExcelSheet(sheet, rows);
-
-    final bytes = excel.save(fileName: suggestedName);
-    if (bytes == null || bytes.isEmpty) {
-      _showCenterMessage('엑셀 파일 생성에 실패했습니다.');
+    if (result.cancelled) return;
+    if (!result.success) {
+      _showCenterMessage(result.message);
       return;
     }
 
-    await File(saveLocation.path).writeAsBytes(bytes, flush: true);
     await auditLogService.record(
       action: 'export_customers_excel',
       targetTable: 'customers',
       detail: {
         'row_count': rows.length,
-        'file_name': suggestedName,
-        'store_filter': _buildExcelStoreLabel(
-          rows.map((row) => row['store']),
-          fallback: '전체매장',
-        ),
-        'date_filter': dateSearchController.text.trim(),
+        'file_name': result.fileName,
+        'store_filter': result.storeLabel,
+        'date_filter': result.dateLabel,
       },
     );
     if (!mounted) return;
-    _showCenterMessage('고객DB 엑셀 저장이 완료되었습니다.');
-  }
-
-  String _buildCustomerExcelFileName(List<Map<String, dynamic>> rows) {
-    final storeLabel = _buildExcelStoreLabel(
-      rows.map((row) => row['store']),
-      fallback: '전체매장',
-    );
-    final dateLabel = _buildExcelDateLabel(
-      selectedText: dateSearchController.text,
-      dates: rows.map((row) => _date(row['join_date'])),
-      fallback: '전체기간',
-    );
-    return '고객DB_${_sanitizeExcelFilePart(storeLabel)}_${_sanitizeExcelFilePart(dateLabel)}.xlsx';
-  }
-
-  void _styleCustomerExcelSheet(
-    xls.Sheet sheet,
-    List<Map<String, dynamic>> rows,
-  ) {
-    final headerStyle = xls.CellStyle(
-      bold: true,
-      fontColorHex: xls.ExcelColor.white,
-      backgroundColorHex: xls.ExcelColor.blueGrey600,
-      horizontalAlign: xls.HorizontalAlign.Center,
-      verticalAlign: xls.VerticalAlign.Center,
-      leftBorder: xls.Border(borderStyle: xls.BorderStyle.Thin),
-      rightBorder: xls.Border(borderStyle: xls.BorderStyle.Thin),
-      topBorder: xls.Border(borderStyle: xls.BorderStyle.Thin),
-      bottomBorder: xls.Border(borderStyle: xls.BorderStyle.Thin),
-    );
-    final moneyStyle = xls.CellStyle(
-      numberFormat: xls.NumFormat.standard_3,
-      horizontalAlign: xls.HorizontalAlign.Right,
-      verticalAlign: xls.VerticalAlign.Center,
-    );
-    final totalRebateStyle = xls.CellStyle(
-      bold: true,
-      numberFormat: xls.NumFormat.standard_3,
-      fontColorHex: xls.ExcelColor.blue800,
-      backgroundColorHex: xls.ExcelColor.blue50,
-      horizontalAlign: xls.HorizontalAlign.Right,
-      verticalAlign: xls.VerticalAlign.Center,
-    );
-    final marginPositiveStyle = xls.CellStyle(
-      bold: true,
-      numberFormat: xls.NumFormat.standard_3,
-      fontColorHex: xls.ExcelColor.green800,
-      backgroundColorHex: xls.ExcelColor.green50,
-      horizontalAlign: xls.HorizontalAlign.Right,
-      verticalAlign: xls.VerticalAlign.Center,
-    );
-    final marginNegativeStyle = xls.CellStyle(
-      bold: true,
-      numberFormat: xls.NumFormat.standard_3,
-      fontColorHex: xls.ExcelColor.red800,
-      backgroundColorHex: xls.ExcelColor.red50,
-      horizontalAlign: xls.HorizontalAlign.Right,
-      verticalAlign: xls.VerticalAlign.Center,
-    );
-    final marginZeroStyle = xls.CellStyle(
-      bold: true,
-      numberFormat: xls.NumFormat.standard_3,
-      fontColorHex: xls.ExcelColor.orange800,
-      backgroundColorHex: xls.ExcelColor.orange50,
-      horizontalAlign: xls.HorizontalAlign.Right,
-      verticalAlign: xls.VerticalAlign.Center,
-    );
-
-    const widths = <double>[
-      12,
-      14,
-      12,
-      12,
-      16,
-      10,
-      12,
-      16,
-      14,
-      14,
-      14,
-      14,
-      14,
-      14,
-      14,
-      14,
-      14,
-      24,
-      28,
-    ];
-    for (var i = 0; i < widths.length; i++) {
-      sheet.setColumnWidth(i, widths[i]);
-      sheet
-          .cell(xls.CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0))
-          .cellStyle = headerStyle;
-    }
-
-    const moneyColumns = <int>[9, 10, 11, 12, 13, 14, 15, 16];
-    for (var rowIndex = 1; rowIndex <= rows.length; rowIndex++) {
-      for (final columnIndex in moneyColumns) {
-        sheet
-            .cell(
-              xls.CellIndex.indexByColumnRow(
-                columnIndex: columnIndex,
-                rowIndex: rowIndex,
-              ),
-            )
-            .cellStyle = moneyStyle;
-      }
-
-      sheet
-          .cell(
-            xls.CellIndex.indexByColumnRow(columnIndex: 15, rowIndex: rowIndex),
-          )
-          .cellStyle = totalRebateStyle;
-
-      final row = rows[rowIndex - 1];
-      final rebate = _toInt(row['rebate']);
-      final addRebate = _toInt(row['add_rebate']);
-      final hiddenRebate = _toInt(row['hidden_rebate']);
-      final supportMoney = _toInt(row['support_money']);
-      final payment = _toInt(row['payment']);
-      final deposit = _toInt(row['deposit']);
-      final totalRebate = _calcTotalRebate(
-        rebate: rebate,
-        addRebate: addRebate,
-        hiddenRebate: hiddenRebate,
-        deduction: _toInt(row['deduction']),
-        supportMoney: supportMoney,
-        payment: payment,
-        deposit: deposit,
-        tradePrice: _toInt(row['trade_price']),
-      );
-      final margin = _calcMargin(
-        totalRebate: totalRebate,
-        supportMoney: supportMoney,
-        payment: payment,
-        deposit: deposit,
-      );
-
-      sheet
-          .cell(
-            xls.CellIndex.indexByColumnRow(columnIndex: 16, rowIndex: rowIndex),
-          )
-          .cellStyle = margin > 0
-          ? marginPositiveStyle
-          : margin < 0
-              ? marginNegativeStyle
-              : marginZeroStyle;
-    }
-  }
-
-  String _buildExcelStoreLabel(
-    Iterable<dynamic> stores, {
-    required String fallback,
-  }) {
-    final uniqueStores = stores
-        .map((store) => store?.toString().trim() ?? '')
-        .where((store) => store.isNotEmpty && store != '-')
-        .toSet()
-        .toList()
-      ..sort();
-
-    if (uniqueStores.isEmpty) return fallback;
-    if (uniqueStores.length == 1) return uniqueStores.first;
-    return '${uniqueStores.first} 외${uniqueStores.length - 1}개';
-  }
-
-  String _buildExcelDateLabel({
-    required String selectedText,
-    required Iterable<String> dates,
-    required String fallback,
-  }) {
-    final normalizedSelected = selectedText.trim().replaceAll(' ~ ', '~');
-    if (normalizedSelected.isNotEmpty) {
-      return normalizedSelected;
-    }
-
-    final uniqueDates = dates
-        .map((date) => date.trim())
-        .where((date) => date.isNotEmpty && date != '-')
-        .toSet()
-        .toList()
-      ..sort();
-
-    if (uniqueDates.isEmpty) return fallback;
-    if (uniqueDates.length == 1) return uniqueDates.first;
-    return '${uniqueDates.first} 외${uniqueDates.length - 1}일';
-  }
-
-  String _sanitizeExcelFilePart(String value) {
-    final cleaned = value
-        .replaceAll(RegExp(r'[<>:"/\\|?*]'), ' ')
-        .replaceAll(RegExp(r'\s+'), ' ')
-        .trim();
-    return cleaned.isEmpty ? '미지정' : cleaned;
+    _showCenterMessage(result.message);
   }
 
   int _calcTotalRebate({

@@ -20,9 +20,13 @@ import 'package:crm_app/pages/recycle_bin_page.dart';
 import 'package:crm_app/pages/settings_page.dart';
 import 'package:crm_app/pages/store_management_page.dart';
 import 'package:crm_app/pages/wired_members_page.dart';
+import 'package:crm_app/services/audit_log_service.dart';
+import 'package:crm_app/services/customer_excel_export_service.dart';
 import 'package:crm_app/services/desktop_auth_session_service.dart';
 import 'package:crm_app/services/notice_service.dart';
+import 'package:crm_app/services/plan_change_alert_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
+import 'package:crm_app/widgets/plan_change_alert_dialog.dart';
 
 class AppLayout extends StatefulWidget {
   final String role;
@@ -44,9 +48,14 @@ class _AppLayoutState extends State<AppLayout> {
   String pageSearchPhoneQuery = '';
   String pageSearchKeyword = '';
   final noticeService = NoticeService(Supabase.instance.client);
+  final planAlertService = PlanChangeAlertService(Supabase.instance.client);
+  final customerExcelExportService = const CustomerExcelExportService();
+  final auditLogService = AuditLogService();
   Notice? latestNotice;
   List<Notice> notices = [];
   bool isNoticeLoading = false;
+  bool isPlanAlertLoading = false;
+  PlanChangeAlertResult? todayPlanAlert;
   DateTime? lastNoticeReadAt;
   int noticePage = 0;
   static const int noticePageSize = 10;
@@ -173,6 +182,128 @@ class _AppLayoutState extends State<AppLayout> {
     super.initState();
     _loadNoticeReadAt();
     _loadLatestNotice();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeShowTodayPlanAlert();
+    });
+  }
+
+  String _planAlertUserKey() {
+    final user = Supabase.instance.client.auth.currentUser;
+    return user?.id ?? user?.email ?? 'anonymous';
+  }
+
+  String _planAlertDateKey(DateTime date) {
+    return DateFormat('yyyyMMdd').format(date);
+  }
+
+  String _planAlertAutoShownKey(DateTime date) {
+    return 'plan_alert_auto_shown_${_planAlertUserKey()}_${_planAlertDateKey(date)}';
+  }
+
+  String _planAlertHideTodayKey(DateTime date) {
+    return 'plan_alert_hide_today_${_planAlertUserKey()}_${_planAlertDateKey(date)}';
+  }
+
+  Future<void> _maybeShowTodayPlanAlert() async {
+    if (!canUseCustomerDb(widget.role)) return;
+    final today = DateTime.now();
+    final prefs = await SharedPreferences.getInstance();
+    final autoShown = prefs.getBool(_planAlertAutoShownKey(today)) ?? false;
+    final hideToday = prefs.getBool(_planAlertHideTodayKey(today)) ?? false;
+    if (autoShown || hideToday) return;
+    if (!mounted) return;
+    await _openTodayPlanAlert(automatic: true);
+  }
+
+  Future<PlanChangeAlertResult?> _fetchTodayPlanAlert({
+    bool showError = false,
+  }) async {
+    if (isPlanAlertLoading) return todayPlanAlert;
+    if (mounted) {
+      setState(() => isPlanAlertLoading = true);
+    }
+
+    try {
+      final result = await planAlertService.fetchTodayAlerts(
+        role: widget.role,
+        currentStore: widget.store,
+      );
+      if (!mounted) return result;
+      setState(() {
+        todayPlanAlert = result;
+        isPlanAlertLoading = false;
+      });
+      return result;
+    } catch (e) {
+      if (!mounted) return null;
+      setState(() => isPlanAlertLoading = false);
+      if (showError) {
+        _showMessage('오늘 알림 조회 실패: $e');
+      }
+      return null;
+    }
+  }
+
+  Future<void> _openTodayPlanAlert({bool automatic = false}) async {
+    if (!canUseCustomerDb(widget.role)) return;
+    final result = await _fetchTodayPlanAlert(showError: !automatic);
+    if (result == null || !mounted) return;
+
+    if (automatic) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_planAlertAutoShownKey(result.date), true);
+    }
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (_) => PlanChangeAlertDialog(
+        result: result,
+        onHideToday: () => _hideTodayPlanAlert(result.date),
+        onExport: () => _exportPlanAlertExcel(result),
+      ),
+    );
+  }
+
+  Future<void> _hideTodayPlanAlert(DateTime date) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_planAlertHideTodayKey(date), true);
+    await prefs.setBool(_planAlertAutoShownKey(date), true);
+  }
+
+  Future<void> _exportPlanAlertExcel(PlanChangeAlertResult result) async {
+    final exportResult = await customerExcelExportService.exportCustomers(
+      rows: result.uniqueCustomers,
+      prefix: '오늘알림',
+      selectedDateText: DateFormat('yyyy-MM-dd').format(result.date),
+      fallbackDateLabel: '오늘',
+    );
+    if (!mounted || exportResult.cancelled) return;
+    if (!exportResult.success) {
+      _showMessage(exportResult.message);
+      return;
+    }
+
+    await auditLogService.record(
+      action: 'export_customers_excel',
+      targetTable: 'customers',
+      detail: {
+        'row_count': result.uniqueCustomers.length,
+        'alert_count': result.totalEntries,
+        'target_date': DateFormat('yyyy-MM-dd').format(result.date),
+        'file_name': exportResult.fileName,
+        'store_filter': exportResult.storeLabel,
+        'date_filter': exportResult.dateLabel,
+      },
+    );
+    if (!mounted) return;
+    _showMessage(exportResult.message);
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).clearSnackBars();
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _loadNoticeReadAt() async {
@@ -659,6 +790,16 @@ class _AppLayoutState extends State<AppLayout> {
             onTap: isNoticeLoading ? null : _showNoticePopup,
             width: 150,
           ),
+          if (canUseCustomerDb(widget.role)) ...[
+            const SizedBox(width: 8),
+            _quickButton(
+              icon: Icons.event_available_rounded,
+              label: '오늘 알림',
+              accent: todayPlanAlert?.entries.isNotEmpty == true,
+              onTap: isPlanAlertLoading ? null : () => _openTodayPlanAlert(),
+              width: 124,
+            ),
+          ],
           if (rebateIndex >= 0) ...[
             const SizedBox(width: 8),
             _quickButton(
@@ -990,6 +1131,30 @@ class _AppLayoutState extends State<AppLayout> {
           ],
         ),
         actions: [
+          if (canUseCustomerDb(widget.role))
+            IconButton(
+              tooltip: '오늘 알림',
+              onPressed:
+                  isPlanAlertLoading ? null : () => _openTodayPlanAlert(),
+              icon: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  const Icon(Icons.event_available_rounded),
+                  if (todayPlanAlert?.entries.isNotEmpty == true)
+                    const Positioned(
+                      right: -1,
+                      top: -1,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Color(0xFFC94C6E),
+                          shape: BoxShape.circle,
+                        ),
+                        child: SizedBox(width: 8, height: 8),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           IconButton(
             onPressed: isNoticeLoading ? null : _showNoticePopup,
             icon: Stack(

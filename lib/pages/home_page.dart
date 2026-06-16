@@ -107,7 +107,7 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
-  String formatMonth(DateTime date) => DateFormat('yy-MM').format(date);
+  String formatMonth(DateTime date) => DateFormat('yyyy-MM').format(date);
 
   DateTime _settlementMonth(DateTime joinDate, int offsetMonths) {
     return DateTime(joinDate.year, joinDate.month + offsetMonths, 1);
