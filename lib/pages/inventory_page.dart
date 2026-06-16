@@ -52,6 +52,14 @@ class _InventoryPageState extends State<InventoryPage> {
     fetchInventory();
   }
 
+  @override
+  void didUpdateWidget(covariant InventoryPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentStore != widget.currentStore) {
+      fetchInventory(keyword: searchController.text);
+    }
+  }
+
   Future<void> fetchInventory({String keyword = ''}) async {
     setState(() {
       isLoading = true;
@@ -75,8 +83,11 @@ class _InventoryPageState extends State<InventoryPage> {
 
       final inventoryItems =
           data.map((e) => Map<String, dynamic>.from(e)).where((item) {
-        return canViewAllStores ||
-            isSameStore(item['store'], widget.currentStore);
+        return includesStoreForRole(
+          role: widget.role,
+          currentStore: widget.currentStore,
+          rowStore: item['store'],
+        );
       }).toList();
 
       setState(() {

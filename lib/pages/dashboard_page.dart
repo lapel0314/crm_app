@@ -46,6 +46,14 @@ class _DashboardPageState extends State<DashboardPage> {
     loadDashboard();
   }
 
+  @override
+  void didUpdateWidget(covariant DashboardPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.currentStore != widget.currentStore) {
+      loadDashboard();
+    }
+  }
+
   int _toInt(dynamic value) {
     if (value == null) return 0;
     if (value is int) return value;
@@ -165,9 +173,14 @@ class _DashboardPageState extends State<DashboardPage> {
   bool get canViewAllStores => isPrivilegedRole(widget.role);
 
   List<Map<String, dynamic>> _filterStoreRows(List<Map<String, dynamic>> rows) {
-    if (canViewAllStores) return rows;
     return rows
-        .where((row) => isSameStore(row['store'], widget.currentStore))
+        .where(
+          (row) => includesStoreForRole(
+            role: widget.role,
+            currentStore: widget.currentStore,
+            rowStore: row['store'],
+          ),
+        )
         .toList();
   }
 

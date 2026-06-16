@@ -124,3 +124,13 @@ bool isSameStore(dynamic a, dynamic b) {
   final right = normalizeStoreName(b);
   return left.isNotEmpty && left == right;
 }
+
+bool includesStoreForRole({
+  required dynamic role,
+  required dynamic currentStore,
+  required dynamic rowStore,
+}) {
+  final selectedStore = normalizeStoreName(currentStore);
+  if (isPrivilegedRole(role) && selectedStore.isEmpty) return true;
+  return isSameStore(rowStore, selectedStore);
+}

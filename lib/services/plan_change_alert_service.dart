@@ -105,13 +105,14 @@ class PlanChangeAlertService {
         .order('join_date', ascending: true)
         .order('created_at', ascending: true);
 
-    final canViewAllStores = isPrivilegedRole(role);
-    final currentStoreName = normalizeStoreName(currentStore);
     final entries = <PlanChangeAlertEntry>[];
     for (final row in rows) {
       final customer = Map<String, dynamic>.from(row as Map);
-      if (!canViewAllStores &&
-          !isSameStore(customer['store'], currentStoreName)) {
+      if (!includesStoreForRole(
+        role: role,
+        currentStore: currentStore,
+        rowStore: customer['store'],
+      )) {
         continue;
       }
       entries.addAll(entriesForCustomer(customer: customer, today: today));

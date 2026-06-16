@@ -77,7 +77,8 @@ class _CustomerPageState extends State<CustomerPage> {
   void didUpdateWidget(covariant CustomerPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.initialNameQuery != widget.initialNameQuery ||
-        oldWidget.initialPhoneQuery != widget.initialPhoneQuery) {
+        oldWidget.initialPhoneQuery != widget.initialPhoneQuery ||
+        oldWidget.currentStore != widget.currentStore) {
       searchController.text = widget.initialNameQuery;
       phoneSearchController.text = widget.initialPhoneQuery;
       fetchCustomers();
@@ -480,8 +481,11 @@ class _CustomerPageState extends State<CustomerPage> {
       final legacyKeyword = keyword.trim().toLowerCase();
 
       bool matches(Map<String, dynamic> item) {
-        final matchesStore =
-            canViewAllStores || isSameStore(item['store'], widget.currentStore);
+        final matchesStore = includesStoreForRole(
+          role: widget.role,
+          currentStore: widget.currentStore,
+          rowStore: item['store'],
+        );
         final nameText = _text(item['name']).toLowerCase();
         final phoneText = _text(item['phone']);
         final phoneDigits = phoneText.replaceAll(RegExp(r'[^0-9]'), '');

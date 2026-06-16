@@ -8,11 +8,13 @@ final supabase = Supabase.instance.client;
 class StoreManagementPage extends StatefulWidget {
   final String role;
   final String currentStore;
+  final ValueChanged<String>? onStoreDeleted;
 
   const StoreManagementPage({
     super.key,
     required this.role,
     required this.currentStore,
+    this.onStoreDeleted,
   });
 
   @override
@@ -26,6 +28,7 @@ class _StoreManagementPageState extends State<StoreManagementPage> {
   String? selectedStoreId;
   bool isLoadingStores = true;
   bool isLoadingNetworks = false;
+  bool isDeletingStore = false;
 
   bool get canModifyNetworks => isPrivilegedRole(widget.role);
 
@@ -33,6 +36,22 @@ class _StoreManagementPageState extends State<StoreManagementPage> {
   void initState() {
     super.initState();
     _loadStores();
+  }
+
+  @override
+  void didUpdateWidget(covariant StoreManagementPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!isSameStore(oldWidget.currentStore, widget.currentStore)) {
+      final currentNormalized = normalizeStoreName(widget.currentStore);
+      final hasCurrentStore = stores.any(
+        (store) => normalizeStoreName(store['name']) == currentNormalized,
+      );
+      if (currentNormalized.isNotEmpty && !hasCurrentStore) {
+        _loadStores();
+      } else {
+        _selectCurrentStoreFromList();
+      }
+    }
   }
 
   Future<void> _loadStores() async {
@@ -44,6 +63,7 @@ class _StoreManagementPageState extends State<StoreManagementPage> {
       final rows = await supabase
           .from('stores')
           .select('id, name, normalized_name, is_active')
+          .eq('is_active', true)
           .order('name');
       final storeRows =
           rows.map((row) => Map<String, dynamic>.from(row)).toList();
@@ -53,14 +73,7 @@ class _StoreManagementPageState extends State<StoreManagementPage> {
         isLoadingStores = false;
       });
 
-      if (storeRows.isNotEmpty) {
-        final currentNormalized = normalizeStoreName(widget.currentStore);
-        final currentStore = storeRows.firstWhere(
-          (store) => normalizeStoreName(store['name']) == currentNormalized,
-          orElse: () => storeRows.first,
-        );
-        await _selectStore(currentStore['id'].toString());
-      }
+      _selectCurrentStoreFromList();
     } catch (e) {
       debugPrint('store management load stores failed: $e');
       if (!mounted) return;
@@ -69,6 +82,25 @@ class _StoreManagementPageState extends State<StoreManagementPage> {
       });
       _showSnack('매장 목록을 불러오지 못했습니다: $e');
     }
+  }
+
+  void _selectCurrentStoreFromList() {
+    if (stores.isEmpty) {
+      setState(() {
+        selectedStoreId = null;
+        selectedSnapshot = null;
+      });
+      return;
+    }
+
+    final currentNormalized = normalizeStoreName(widget.currentStore);
+    final currentStore = stores.firstWhere(
+      (store) => normalizeStoreName(store['name']) == currentNormalized,
+      orElse: () => stores.first,
+    );
+    final nextStoreId = currentStore['id'].toString();
+    if (nextStoreId == selectedStoreId && selectedSnapshot != null) return;
+    _selectStore(nextStoreId);
   }
 
   Future<void> _selectStore(String storeId) async {
@@ -157,6 +189,81 @@ class _StoreManagementPageState extends State<StoreManagementPage> {
       _showSnack('허용 네트워크를 비활성화했습니다.');
     } catch (e) {
       _showSnack('네트워크 비활성화에 실패했습니다: $e');
+    }
+  }
+
+  Future<void> _confirmDeleteStore(Map<String, dynamic> store) async {
+    if (!canModifyNetworks || isDeletingStore) return;
+    final id = store['id']?.toString() ?? '';
+    final name = normalizeStoreName(store['name']);
+    if (id.isEmpty || name.isEmpty) return;
+
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            backgroundColor: Colors.white,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            title: const Text(
+              '매장 삭제',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+            content: Text(
+              '$name 매장을 목록에서 삭제하시겠습니까?\n기존 고객/재고 데이터는 삭제하지 않고 매장만 비활성화합니다.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('취소'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFDC2626),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                ),
+                child: const Text('삭제'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!confirmed) return;
+    await _deleteStore(id, name);
+  }
+
+  Future<void> _deleteStore(String storeId, String storeName) async {
+    setState(() => isDeletingStore = true);
+
+    try {
+      await supabase
+          .from('stores')
+          .update({'is_active': false}).eq('id', storeId);
+
+      if (!mounted) return;
+      final remaining =
+          stores.where((store) => store['id']?.toString() != storeId).toList();
+      setState(() {
+        stores = remaining;
+        isDeletingStore = false;
+        if (selectedStoreId == storeId) {
+          selectedStoreId = null;
+          selectedSnapshot = null;
+        }
+      });
+
+      if (selectedStoreId == null && remaining.isNotEmpty) {
+        await _selectStore(remaining.first['id'].toString());
+      }
+      widget.onStoreDeleted?.call(storeName);
+      _showSnack('$storeName 매장을 삭제했습니다.');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => isDeletingStore = false);
+      final message = e is PostgrestException ? e.message : e.toString();
+      _showSnack('매장 삭제에 실패했습니다: $message');
     }
   }
 
@@ -277,14 +384,26 @@ class _StoreManagementPageState extends State<StoreManagementPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Padding(
-            padding: EdgeInsets.all(8),
-            child: Text(
-              '매장 목록',
-              style: TextStyle(
-                color: Color(0xFF111827),
-                fontWeight: FontWeight.w900,
-              ),
+          Padding(
+            padding: const EdgeInsets.all(8),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    '매장 목록',
+                    style: TextStyle(
+                      color: Color(0xFF111827),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: '매장 목록 새로고침',
+                  visualDensity: VisualDensity.compact,
+                  onPressed: isLoadingStores ? null : _loadStores,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 6),
@@ -321,8 +440,18 @@ class _StoreManagementPageState extends State<StoreManagementPage> {
                           ),
                         ),
                       ),
-                      if (store['is_active'] == false)
-                        _badge('비활성', color: const Color(0xFF9CA3AF)),
+                      IconButton(
+                        tooltip: '매장 삭제',
+                        visualDensity: VisualDensity.compact,
+                        onPressed: canModifyNetworks && !isDeletingStore
+                            ? () => _confirmDeleteStore(store)
+                            : null,
+                        icon: const Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                          color: Color(0xFFDC2626),
+                        ),
+                      ),
                     ],
                   ),
                 ),

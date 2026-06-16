@@ -40,6 +40,7 @@ class AppLayout extends StatefulWidget {
 
 class _AppLayoutState extends State<AppLayout> {
   int selectedIndex = 0;
+  late String activeStore;
   final globalNameSearchController = TextEditingController();
   final globalPhoneSearchController = TextEditingController();
   String globalNameQuery = '';
@@ -66,14 +67,15 @@ class _AppLayoutState extends State<AppLayout> {
   static const int noticePageSize = 10;
 
   bool get isAdminRole => isPrivilegedRole(widget.role);
-  bool get canAddStores => canManageNetworks(widget.role);
+  bool get canAddStores => isPrivilegedRole(widget.role);
+  String get displayStore => activeStore.isEmpty ? '전체 매장' : activeStore;
 
   List<_NavItem> get items {
     return [
       _NavItem(
         title: '고객등록',
         icon: Icons.edit_note_rounded,
-        page: HomePage(role: widget.role, currentStore: widget.store),
+        page: HomePage(role: widget.role, currentStore: activeStore),
       ),
       if (canUseCustomerDb(widget.role))
         _NavItem(
@@ -81,7 +83,7 @@ class _AppLayoutState extends State<AppLayout> {
           icon: Icons.people_alt_rounded,
           page: CustomerPage(
             role: widget.role,
-            currentStore: widget.store,
+            currentStore: activeStore,
             initialNameQuery: pageSearchNameQuery,
             initialPhoneQuery: pageSearchPhoneQuery,
           ),
@@ -90,7 +92,7 @@ class _AppLayoutState extends State<AppLayout> {
         _NavItem(
           title: '고객DBS',
           icon: Icons.people_alt_rounded,
-          page: CustomerOpenPage(role: widget.role, currentStore: widget.store),
+          page: CustomerOpenPage(role: widget.role, currentStore: activeStore),
         ),
       if (canUseLeads(widget.role))
         _NavItem(
@@ -98,7 +100,7 @@ class _AppLayoutState extends State<AppLayout> {
           icon: Icons.person_search_rounded,
           page: LeadsPage(
             role: widget.role,
-            currentStore: widget.store,
+            currentStore: activeStore,
             initialSearchQuery: pageSearchKeyword,
           ),
         ),
@@ -108,7 +110,7 @@ class _AppLayoutState extends State<AppLayout> {
           icon: Icons.cable_rounded,
           page: WiredMembersPage(
             role: widget.role,
-            currentStore: widget.store,
+            currentStore: activeStore,
             initialSearchQuery: pageSearchKeyword,
           ),
         ),
@@ -116,13 +118,13 @@ class _AppLayoutState extends State<AppLayout> {
         _NavItem(
           title: '대시보드',
           icon: Icons.dashboard_rounded,
-          page: DashboardPage(role: widget.role, currentStore: widget.store),
+          page: DashboardPage(role: widget.role, currentStore: activeStore),
         ),
       if (canUseInventory(widget.role))
         _NavItem(
           title: '재고관리',
           icon: Icons.inventory_2_rounded,
-          page: InventoryPage(role: widget.role, currentStore: widget.store),
+          page: InventoryPage(role: widget.role, currentStore: activeStore),
         ),
       if (canViewRebate(widget.role))
         _NavItem(
@@ -143,7 +145,8 @@ class _AppLayoutState extends State<AppLayout> {
           icon: Icons.store_mall_directory_rounded,
           page: StoreManagementPage(
             role: widget.role,
-            currentStore: widget.store,
+            currentStore: activeStore,
+            onStoreDeleted: _handleStoreDeleted,
           ),
         ),
       if (isAdminRole)
@@ -162,18 +165,18 @@ class _AppLayoutState extends State<AppLayout> {
         _NavItem(
           title: '설정',
           icon: Icons.settings_rounded,
-          page: SettingsPage(role: widget.role, currentStore: widget.store),
+          page: SettingsPage(role: widget.role, currentStore: activeStore),
         ),
       if (canUseGlobalSearch(widget.role))
         _NavItem(
           title: '통합검색',
           icon: Icons.search_rounded,
           page: GlobalSearchPage(
-            key: ValueKey('$globalNameQuery|$globalPhoneQuery'),
+            key: ValueKey('$globalNameQuery|$globalPhoneQuery|$activeStore'),
             nameQuery: globalNameQuery,
             phoneQuery: globalPhoneQuery,
             role: widget.role,
-            currentStore: widget.store,
+            currentStore: activeStore,
             onNavigateToPage: _selectPageByTitle,
           ),
           quickOnly: true,
@@ -186,11 +189,23 @@ class _AppLayoutState extends State<AppLayout> {
   @override
   void initState() {
     super.initState();
+    activeStore =
+        isPrivilegedRole(widget.role) ? '' : normalizeStoreName(widget.store);
     _loadNoticeReadAt();
     _loadLatestNotice();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _maybeShowTodayPlanAlert();
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant AppLayout oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!isPrivilegedRole(widget.role) &&
+        !isSameStore(oldWidget.store, widget.store) &&
+        activeStore.isEmpty) {
+      activeStore = normalizeStoreName(widget.store);
+    }
   }
 
   String _planAlertUserKey() {
@@ -232,7 +247,7 @@ class _AppLayoutState extends State<AppLayout> {
     try {
       final result = await planAlertService.fetchTodayAlerts(
         role: widget.role,
-        currentStore: widget.store,
+        currentStore: activeStore,
       );
       if (!mounted) return result;
       setState(() {
@@ -320,6 +335,46 @@ class _AppLayoutState extends State<AppLayout> {
     if (willOpen && !hasLoadedStoreList) {
       await _loadStores(showError: true);
     }
+  }
+
+  void _selectActiveStore(_StoreOption store) {
+    final nextStore = normalizeStoreName(store.name);
+    if (!store.allStores && isSameStore(nextStore, activeStore)) return;
+    if (!isPrivilegedRole(widget.role)) {
+      _showMessage('다른 매장 데이터 조회는 대표 또는 개발자만 가능합니다.');
+      return;
+    }
+    if (store.allStores) {
+      if (activeStore.isEmpty) return;
+      setState(() {
+        activeStore = '';
+        pageSearchNameQuery = '';
+        pageSearchPhoneQuery = '';
+        pageSearchKeyword = '';
+      });
+      _showMessage('전체 매장 데이터로 전환했습니다.');
+      return;
+    }
+    if (nextStore.isEmpty || isSameStore(nextStore, activeStore)) return;
+    setState(() {
+      activeStore = nextStore;
+      pageSearchNameQuery = '';
+      pageSearchPhoneQuery = '';
+      pageSearchKeyword = '';
+    });
+    _showMessage('$nextStore 매장 데이터로 전환했습니다.');
+  }
+
+  void _handleStoreDeleted(String storeName) {
+    final normalizedStore = normalizeStoreName(storeName);
+    setState(() {
+      storeOptions.removeWhere(
+        (store) => normalizeStoreName(store.name) == normalizedStore,
+      );
+      if (isSameStore(activeStore, normalizedStore)) {
+        activeStore = '';
+      }
+    });
   }
 
   Future<void> _loadStores({bool showError = false}) async {
@@ -448,6 +503,7 @@ class _AppLayoutState extends State<AppLayout> {
         );
         storeOptions.add(added);
         storeOptions.sort((a, b) => a.name.compareTo(b.name));
+        activeStore = added.name;
         hasLoadedStoreList = true;
         isStoreAccordionOpen = true;
         isAddingStore = false;
@@ -1157,7 +1213,6 @@ class _AppLayoutState extends State<AppLayout> {
   }
 
   Widget _storeAccordion({required EdgeInsets padding}) {
-    final currentStore = widget.store.isEmpty ? '-' : widget.store;
     return Padding(
       padding: padding,
       child: Column(
@@ -1209,7 +1264,7 @@ class _AppLayoutState extends State<AppLayout> {
                           ),
                         ),
                         Text(
-                          currentStore,
+                          displayStore,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             fontSize: 12,
@@ -1298,12 +1353,22 @@ class _AppLayoutState extends State<AppLayout> {
               child: ListView.separated(
                 shrinkWrap: true,
                 padding: EdgeInsets.zero,
-                itemCount: storeOptions.length,
+                itemCount: storeOptions.length +
+                    (isPrivilegedRole(widget.role) ? 1 : 0),
                 separatorBuilder: (_, __) => const SizedBox(height: 4),
                 itemBuilder: (context, index) {
-                  final store = storeOptions[index];
-                  final selected = isSameStore(store.name, widget.store);
-                  return _storeListRow(store, selected: selected);
+                  final hasAllStores = isPrivilegedRole(widget.role);
+                  final store = hasAllStores && index == 0
+                      ? const _StoreOption.all()
+                      : storeOptions[index - (hasAllStores ? 1 : 0)];
+                  final selected = store.allStores
+                      ? activeStore.isEmpty
+                      : isSameStore(store.name, activeStore);
+                  return _storeListRow(
+                    store,
+                    selected: selected,
+                    onTap: () => _selectActiveStore(store),
+                  );
                 },
               ),
             ),
@@ -1316,36 +1381,49 @@ class _AppLayoutState extends State<AppLayout> {
     );
   }
 
-  Widget _storeListRow(_StoreOption store, {required bool selected}) {
-    return Container(
-      height: 34,
-      padding: const EdgeInsets.symmetric(horizontal: 9),
-      decoration: BoxDecoration(
-        color: selected
-            ? const Color(0xFFC94C6E).withValues(alpha: 0.16)
-            : Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(7),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            selected ? Icons.radio_button_checked : Icons.storefront_outlined,
-            size: 15,
-            color: selected ? const Color(0xFFC94C6E) : const Color(0xFF8A8DA6),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              store.name,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: selected ? Colors.white : const Color(0xFFD1D3E0),
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
+  Widget _storeListRow(
+    _StoreOption store, {
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(7),
+      onTap: onTap,
+      child: Container(
+        height: 34,
+        padding: const EdgeInsets.symmetric(horizontal: 9),
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xFFC94C6E).withValues(alpha: 0.16)
+              : Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(7),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              store.allStores
+                  ? Icons.all_inbox_rounded
+                  : selected
+                      ? Icons.radio_button_checked
+                      : Icons.storefront_outlined,
+              size: 15,
+              color:
+                  selected ? const Color(0xFFC94C6E) : const Color(0xFF8A8DA6),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                store.name,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected ? Colors.white : const Color(0xFFD1D3E0),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1496,7 +1574,7 @@ class _AppLayoutState extends State<AppLayout> {
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900),
             ),
             Text(
-              widget.store.isEmpty ? '-' : widget.store,
+              displayStore,
               style: const TextStyle(
                 fontSize: 11,
                 color: Color(0xFFB5B8C9),
@@ -1933,13 +2011,22 @@ class _StoreOption {
   final String name;
   final String normalizedName;
   final bool isActive;
+  final bool allStores;
 
   const _StoreOption({
     required this.id,
     required this.name,
     required this.normalizedName,
     required this.isActive,
+    required this.allStores,
   });
+
+  const _StoreOption.all()
+      : id = '',
+        name = '전체 매장',
+        normalizedName = '',
+        isActive = true,
+        allStores = true;
 
   factory _StoreOption.fromMap(Map<String, dynamic> data) {
     final name = normalizeStoreName(data['name'] ?? data['normalized_name']);
@@ -1948,6 +2035,7 @@ class _StoreOption {
       name: name,
       normalizedName: normalizeStoreName(data['normalized_name'] ?? name),
       isActive: data['is_active'] != false,
+      allStores: false,
     );
   }
 }

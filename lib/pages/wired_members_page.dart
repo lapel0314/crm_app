@@ -64,7 +64,8 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
   @override
   void didUpdateWidget(covariant WiredMembersPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.initialSearchQuery != widget.initialSearchQuery) {
+    if (oldWidget.initialSearchQuery != widget.initialSearchQuery ||
+        oldWidget.currentStore != widget.currentStore) {
       searchController.text = widget.initialSearchQuery;
       fetchMembers(keyword: searchController.text);
     }
@@ -661,13 +662,15 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
         members = data
             .map((e) => withCalculatedSettlement(Map<String, dynamic>.from(e)))
             .toList();
-        if (!canViewAllStores) {
-          members = members
-              .where(
-                (member) => isSameStore(member['store'], widget.currentStore),
-              )
-              .toList();
-        }
+        members = members
+            .where(
+              (member) => includesStoreForRole(
+                role: widget.role,
+                currentStore: widget.currentStore,
+                rowStore: member['store'],
+              ),
+            )
+            .toList();
         final dateFilter = dateSearchController.text.trim();
         if (dateFilter.isNotEmpty) {
           members = members

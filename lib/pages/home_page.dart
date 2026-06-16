@@ -340,6 +340,15 @@ class _HomePageState extends State<HomePage> {
 
     final tax = 0;
     final margin = totalRebate - supportMoney - payment - deposit;
+    final normalizedStore = normalizeStoreName(
+      storeController.text.trim().isEmpty
+          ? widget.currentStore
+          : storeController.text.trim(),
+    );
+    if (normalizedStore.isEmpty) {
+      showMessage('개통매장을 선택하거나 입력해 주세요.');
+      return;
+    }
 
     try {
       await supabase.from('customers').insert({
@@ -379,9 +388,7 @@ class _HomePageState extends State<HomePage> {
         'tax': tax,
         'margin': margin,
         'memo': memoController.text.trim(),
-        'store': normalizeStoreName(storeController.text.trim().isEmpty
-            ? widget.currentStore
-            : storeController.text.trim()),
+        'store': normalizedStore,
         'mobile': mobileController.text.trim(),
         'second': secondController.text.trim(),
         'created_by': user.id,

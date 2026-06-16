@@ -51,7 +51,8 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
   void didUpdateWidget(covariant GlobalSearchPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.nameQuery != widget.nameQuery ||
-        oldWidget.phoneQuery != widget.phoneQuery) {
+        oldWidget.phoneQuery != widget.phoneQuery ||
+        oldWidget.currentStore != widget.currentStore) {
       _search();
     }
   }
@@ -219,8 +220,11 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
             .map((e) => Map<String, dynamic>.from(e))
             .where(
               (row) =>
-                  (canViewAllStores ||
-                      isSameStore(row['store'], widget.currentStore)) &&
+                  includesStoreForRole(
+                    role: widget.role,
+                    currentStore: widget.currentStore,
+                    rowStore: row['store'],
+                  ) &&
                   _matchesRow(
                     row: row,
                     nameColumns: ['name'],
@@ -232,8 +236,11 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
             .map((e) => Map<String, dynamic>.from(e))
             .where(
               (row) =>
-                  (canViewAllStores ||
-                      isSameStore(row['store'], widget.currentStore)) &&
+                  includesStoreForRole(
+                    role: widget.role,
+                    currentStore: widget.currentStore,
+                    rowStore: row['store'],
+                  ) &&
                   _matchesRow(
                     row: row,
                     nameColumns: ['subscriber', 'customer_name'],
@@ -245,8 +252,11 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
             .map((e) => Map<String, dynamic>.from(e))
             .where(
               (row) =>
-                  (canViewAllStores ||
-                      isSameStore(row['store'], widget.currentStore)) &&
+                  includesStoreForRole(
+                    role: widget.role,
+                    currentStore: widget.currentStore,
+                    rowStore: row['store'],
+                  ) &&
                   _matchesRow(
                     row: row,
                     nameColumns: ['subscriber'],

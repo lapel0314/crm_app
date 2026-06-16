@@ -65,7 +65,8 @@ class _LeadsPageState extends State<LeadsPage> {
   @override
   void didUpdateWidget(covariant LeadsPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.initialSearchQuery != widget.initialSearchQuery) {
+    if (oldWidget.initialSearchQuery != widget.initialSearchQuery ||
+        oldWidget.currentStore != widget.currentStore) {
       searchController.text = widget.initialSearchQuery;
       if (canView) {
         fetchLeads(keyword: searchController.text, silent: true);
@@ -350,11 +351,15 @@ class _LeadsPageState extends State<LeadsPage> {
 
       setState(() {
         leads = data.map((e) => Map<String, dynamic>.from(e)).toList();
-        if (!canViewAllStores) {
-          leads = leads
-              .where((lead) => isSameStore(lead['store'], widget.currentStore))
-              .toList();
-        }
+        leads = leads
+            .where(
+              (lead) => includesStoreForRole(
+                role: widget.role,
+                currentStore: widget.currentStore,
+                rowStore: lead['store'],
+              ),
+            )
+            .toList();
         final dateFilter = dateSearchController.text.trim();
         if (dateFilter.isNotEmpty) {
           leads = leads
