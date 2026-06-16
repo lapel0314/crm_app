@@ -11,6 +11,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/constants/message_templates.dart';
 import 'package:crm_app/utils/store_utils.dart';
+import 'package:crm_app/utils/debouncer.dart';
 import 'package:crm_app/widgets/contact_action_buttons.dart';
 import 'package:crm_app/widgets/compact_date_range_picker.dart';
 
@@ -44,6 +45,8 @@ class _CustomerPageState extends State<CustomerPage> {
   final kakaoTalkService = KakaoTalkService();
   final contactActionService = const ContactActionService();
   final auditLogService = AuditLogService();
+  final Debouncer _searchDebouncer =
+      Debouncer(const Duration(milliseconds: 250));
 
   List<Map<String, dynamic>> customers = [];
   final Set<String> selectedCustomerIds = {};
@@ -83,6 +86,13 @@ class _CustomerPageState extends State<CustomerPage> {
       phoneSearchController.text = widget.initialPhoneQuery;
       fetchCustomers();
     }
+  }
+
+  void _scheduleCustomerFetch({String keyword = ''}) {
+    _searchDebouncer.run(() {
+      if (!mounted) return;
+      fetchCustomers(keyword: keyword);
+    });
   }
 
   int _toInt(dynamic value) {
@@ -211,7 +221,7 @@ class _CustomerPageState extends State<CustomerPage> {
       }
     }
 
-    fetchCustomers();
+    _scheduleCustomerFetch();
   }
 
   String _text(dynamic value) {
@@ -521,23 +531,22 @@ class _CustomerPageState extends State<CustomerPage> {
             matchesLegacy;
       }
 
+      final nextCustomers =
+          data.map((e) => Map<String, dynamic>.from(e)).where(matches).toList();
+      final nextCustomerIds =
+          nextCustomers.map((customer) => customer['id'].toString()).toSet();
+
+      if (!mounted) return;
       setState(() {
-        customers = data
-            .map((e) => Map<String, dynamic>.from(e))
-            .where(matches)
-            .toList();
-        selectedCustomerIds.removeWhere(
-          (id) => !customers.any((customer) => customer['id'].toString() == id),
-        );
+        customers = nextCustomers;
+        selectedCustomerIds.removeWhere((id) => !nextCustomerIds.contains(id));
         currentPage = 0;
+        isLoading = false;
       });
     } catch (e) {
       _logUiError('고객 조회 실패: $e');
-    } finally {
       if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
+        setState(() => isLoading = false);
       }
     }
   }
@@ -2098,7 +2107,7 @@ class _CustomerPageState extends State<CustomerPage> {
       height: 38,
       child: TextField(
         controller: controller,
-        onChanged: onChanged ?? (_) => fetchCustomers(),
+        onChanged: onChanged ?? (_) => _scheduleCustomerFetch(),
         style: const TextStyle(fontSize: 13),
         decoration: InputDecoration(
           hintText: hint,
@@ -2617,6 +2626,7 @@ class _CustomerPageState extends State<CustomerPage> {
 
   @override
   void dispose() {
+    _searchDebouncer.dispose();
     searchController.dispose();
     dateSearchController.dispose();
     phoneSearchController.dispose();

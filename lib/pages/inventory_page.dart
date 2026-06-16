@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:crm_app/utils/debouncer.dart';
 import 'package:crm_app/utils/store_utils.dart';
 
 final supabase = Supabase.instance.client;
@@ -27,6 +28,8 @@ class _InventoryPageState extends State<InventoryPage> {
   final serialController = TextEditingController();
   final memoController = TextEditingController();
   final searchController = TextEditingController();
+  final Debouncer _searchDebouncer =
+      Debouncer(const Duration(milliseconds: 250));
 
   String status = '보유';
   bool isLoading = false;
@@ -60,6 +63,13 @@ class _InventoryPageState extends State<InventoryPage> {
     }
   }
 
+  void _scheduleFetchInventory(String keyword) {
+    _searchDebouncer.run(() {
+      if (!mounted) return;
+      fetchInventory(keyword: keyword);
+    });
+  }
+
   Future<void> fetchInventory({String keyword = ''}) async {
     setState(() {
       isLoading = true;
@@ -90,16 +100,15 @@ class _InventoryPageState extends State<InventoryPage> {
         );
       }).toList();
 
+      if (!mounted) return;
       setState(() {
         items = inventoryItems;
+        isLoading = false;
       });
     } catch (e) {
       debugPrint('inventory load failed: $e');
-    } finally {
       if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
+        setState(() => isLoading = false);
       }
     }
   }
@@ -807,6 +816,7 @@ class _InventoryPageState extends State<InventoryPage> {
 
   @override
   void dispose() {
+    _searchDebouncer.dispose();
     storeController.dispose();
     modelController.dispose();
     serialController.dispose();
@@ -855,7 +865,7 @@ class _InventoryPageState extends State<InventoryPage> {
                         borderSide: const BorderSide(color: Color(0xFF6B7280)),
                       ),
                     ),
-                    onChanged: (value) => fetchInventory(keyword: value),
+                    onChanged: _scheduleFetchInventory,
                   ),
                 ),
                 const Spacer(),

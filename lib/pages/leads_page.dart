@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/constants/message_templates.dart';
 import 'package:crm_app/services/audit_log_service.dart';
 import 'package:crm_app/services/contact_action_service.dart';
+import 'package:crm_app/utils/debouncer.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:crm_app/widgets/contact_action_buttons.dart';
 import 'package:crm_app/widgets/compact_date_range_picker.dart';
@@ -33,6 +34,8 @@ class _LeadsPageState extends State<LeadsPage> {
   final searchController = TextEditingController();
   final dateSearchController = TextEditingController();
   final auditLogService = AuditLogService();
+  final Debouncer _searchDebouncer =
+      Debouncer(const Duration(milliseconds: 250));
 
   bool isLoading = true;
   bool showSummaryDashboard = false;
@@ -72,6 +75,13 @@ class _LeadsPageState extends State<LeadsPage> {
         fetchLeads(keyword: searchController.text, silent: true);
       }
     }
+  }
+
+  void _scheduleFetchLeads(String keyword) {
+    _searchDebouncer.run(() {
+      if (!mounted) return;
+      fetchLeads(keyword: keyword, silent: true);
+    });
   }
 
   String formatPhone(String value) {
@@ -192,7 +202,7 @@ class _LeadsPageState extends State<LeadsPage> {
       }
     }
 
-    fetchLeads(keyword: searchController.text, silent: true);
+    _scheduleFetchLeads(searchController.text);
   }
 
   Future<void> pickSearchDate() async {
@@ -349,38 +359,39 @@ class _LeadsPageState extends State<LeadsPage> {
               .order('lead_date', ascending: true)
               .order('created_at', ascending: true);
 
-      setState(() {
-        leads = data.map((e) => Map<String, dynamic>.from(e)).toList();
-        leads = leads
-            .where(
-              (lead) => includesStoreForRole(
-                role: widget.role,
-                currentStore: widget.currentStore,
-                rowStore: lead['store'],
-              ),
-            )
+      final dateFilter = dateSearchController.text.trim();
+      var nextLeads = data
+          .map((e) => Map<String, dynamic>.from(e))
+          .where(
+            (lead) => includesStoreForRole(
+              role: widget.role,
+              currentStore: widget.currentStore,
+              rowStore: lead['store'],
+            ),
+          )
+          .toList();
+      if (dateFilter.isNotEmpty) {
+        nextLeads = nextLeads
+            .where((lead) => matchesDateSearch(lead['lead_date'], dateFilter))
             .toList();
-        final dateFilter = dateSearchController.text.trim();
-        if (dateFilter.isNotEmpty) {
-          leads = leads
-              .where((lead) => matchesDateSearch(lead['lead_date'], dateFilter))
-              .toList();
-        }
-        selectedLeadIds.removeWhere(
-          (id) => !leads.any((lead) => textValue(lead['id']) == id),
-        );
+      }
+      final nextLeadIds =
+          nextLeads.map((lead) => textValue(lead['id'])).toSet();
+
+      if (!mounted) return;
+      setState(() {
+        leads = nextLeads;
+        selectedLeadIds.removeWhere((id) => !nextLeadIds.contains(id));
         currentPage = 0;
+        isLoading = false;
       });
     } catch (e) {
       if (!silent) {
         logUiError('가망고객 조회 실패: $e');
       }
-      setState(() {
-        leads = [];
-      });
-    } finally {
       if (mounted) {
         setState(() {
+          leads = [];
           isLoading = false;
         });
       }
@@ -1379,6 +1390,7 @@ class _LeadsPageState extends State<LeadsPage> {
 
   @override
   void dispose() {
+    _searchDebouncer.dispose();
     searchController.dispose();
     dateSearchController.dispose();
     super.dispose();
@@ -1562,8 +1574,7 @@ class _LeadsPageState extends State<LeadsPage> {
                                         height: 38,
                                         child: TextField(
                                           controller: searchController,
-                                          onChanged: (value) => fetchLeads(
-                                              keyword: value, silent: true),
+                                          onChanged: _scheduleFetchLeads,
                                           style: const TextStyle(fontSize: 13),
                                           decoration: InputDecoration(
                                             hintText:
@@ -1723,8 +1734,7 @@ class _LeadsPageState extends State<LeadsPage> {
                                           height: 38,
                                           child: TextField(
                                             controller: searchController,
-                                            onChanged: (value) => fetchLeads(
-                                                keyword: value, silent: true),
+                                            onChanged: _scheduleFetchLeads,
                                             style:
                                                 const TextStyle(fontSize: 13),
                                             decoration: InputDecoration(

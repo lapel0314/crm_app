@@ -9,6 +9,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/constants/message_templates.dart';
 import 'package:crm_app/services/audit_log_service.dart';
 import 'package:crm_app/services/contact_action_service.dart';
+import 'package:crm_app/utils/debouncer.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:crm_app/widgets/contact_action_buttons.dart';
 import 'package:crm_app/widgets/compact_date_range_picker.dart';
@@ -36,6 +37,8 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
   final dateSearchController = TextEditingController();
   final NumberFormat moneyFormat = NumberFormat('#,###');
   final auditLogService = AuditLogService();
+  final Debouncer _searchDebouncer =
+      Debouncer(const Duration(milliseconds: 250));
 
   bool isLoading = false;
   bool showSummaryDashboard = false;
@@ -69,6 +72,13 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
       searchController.text = widget.initialSearchQuery;
       fetchMembers(keyword: searchController.text);
     }
+  }
+
+  void _scheduleFetchMembers(String keyword) {
+    _searchDebouncer.run(() {
+      if (!mounted) return;
+      fetchMembers(keyword: keyword);
+    });
   }
 
   String formatPhone(String value) {
@@ -189,7 +199,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
       }
     }
 
-    fetchMembers(keyword: searchController.text);
+    _scheduleFetchMembers(searchController.text);
   }
 
   Future<void> pickSearchDate() async {
@@ -658,38 +668,37 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
               .order('subscription_date', ascending: true)
               .order('created_at', ascending: true);
 
+      final dateFilter = dateSearchController.text.trim();
+      var nextMembers = data
+          .map((e) => withCalculatedSettlement(Map<String, dynamic>.from(e)))
+          .where(
+            (member) => includesStoreForRole(
+              role: widget.role,
+              currentStore: widget.currentStore,
+              rowStore: member['store'],
+            ),
+          )
+          .toList();
+      if (dateFilter.isNotEmpty) {
+        nextMembers = nextMembers
+            .where((member) =>
+                matchesDateSearch(member['subscription_date'], dateFilter))
+            .toList();
+      }
+      final nextMemberIds =
+          nextMembers.map((member) => textValue(member['id'])).toSet();
+
+      if (!mounted) return;
       setState(() {
-        members = data
-            .map((e) => withCalculatedSettlement(Map<String, dynamic>.from(e)))
-            .toList();
-        members = members
-            .where(
-              (member) => includesStoreForRole(
-                role: widget.role,
-                currentStore: widget.currentStore,
-                rowStore: member['store'],
-              ),
-            )
-            .toList();
-        final dateFilter = dateSearchController.text.trim();
-        if (dateFilter.isNotEmpty) {
-          members = members
-              .where((member) =>
-                  matchesDateSearch(member['subscription_date'], dateFilter))
-              .toList();
-        }
-        selectedMemberIds.removeWhere(
-          (id) => !members.any((member) => textValue(member['id']) == id),
-        );
+        members = nextMembers;
+        selectedMemberIds.removeWhere((id) => !nextMemberIds.contains(id));
         currentPage = 0;
+        isLoading = false;
       });
     } catch (e) {
       logUiError('유선회원 조회 실패: $e');
-    } finally {
       if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
+        setState(() => isLoading = false);
       }
     }
   }
@@ -2359,6 +2368,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
 
   @override
   void dispose() {
+    _searchDebouncer.dispose();
     searchController.dispose();
     dateSearchController.dispose();
     super.dispose();
@@ -2533,8 +2543,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                                         height: 38,
                                         child: TextField(
                                           controller: searchController,
-                                          onChanged: (value) =>
-                                              fetchMembers(keyword: value),
+                                          onChanged: _scheduleFetchMembers,
                                           style: const TextStyle(fontSize: 13),
                                           decoration: InputDecoration(
                                             hintText:
@@ -2739,8 +2748,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                                           height: 38,
                                           child: TextField(
                                             controller: searchController,
-                                            onChanged: (value) =>
-                                                fetchMembers(keyword: value),
+                                            onChanged: _scheduleFetchMembers,
                                             style:
                                                 const TextStyle(fontSize: 13),
                                             decoration: InputDecoration(
