@@ -23,9 +23,6 @@ on:
         options:
           - ad-hoc
           - development
-  push:
-    tags:
-      - 'v*'
 
 permissions:
   contents: write
