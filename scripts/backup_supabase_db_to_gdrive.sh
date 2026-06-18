@@ -7,6 +7,7 @@ export LANG=C
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_ROOT"
 
 PROJECT_REF="${CRM_SUPABASE_PROJECT_REF:-ysafjyubntkeorriywmu}"
 LOCAL_BACKUP_ROOT="${CRM_BACKUP_LOCAL_ROOT:-$HOME/CRM_Backups/crm_app/db}"
@@ -133,9 +134,9 @@ if [ "$KEEP_DAILY_DAYS" -gt 0 ]; then
   log "Applying daily retention: ${KEEP_DAILY_DAYS} days"
   rclone delete "$GDRIVE_REMOTE/daily" \
     --min-age "${KEEP_DAILY_DAYS}d" \
-    --include "*.tar.gz" \
-    --include "*.tar.gz.sha256" \
-    --exclude "*" >>"$LOG_PATH" 2>&1 || true
+    --filter "+ *.tar.gz" \
+    --filter "+ *.tar.gz.sha256" \
+    --filter "- *" >>"$LOG_PATH" 2>&1 || true
 fi
 
 log "Cleaning local work directory"
