@@ -1011,7 +1011,6 @@ async function adminUpdateUserProfile(
     name: cleanLimitedString(body.name, 80),
     phone: cleanLimitedString(body.phone, 40),
     store: storeName,
-    normalized_store: storeName,
     store_id: storeId,
     role,
     role_code: role,
