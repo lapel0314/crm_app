@@ -1,7 +1,4 @@
-import 'dart:io';
-
 import 'package:file_selector/file_selector.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -34,7 +31,7 @@ class _RebatePageState extends State<RebatePage> {
   bool get canManage => isPrivilegedRole(widget.role);
 
   bool _isCompactIosDialogContext(BuildContext context) {
-    return !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
+    return MediaQuery.of(context).size.width < 900;
   }
 
   @override
@@ -611,6 +608,7 @@ class _RebatePageState extends State<RebatePage> {
               top: 18,
               right: 18,
               child: IconButton(
+                tooltip: '닫기',
                 onPressed: () => Navigator.pop(context),
                 icon: const Icon(Icons.close_rounded, color: Colors.white),
               ),
@@ -859,10 +857,9 @@ class _CompactMonthPickerState extends State<_CompactMonthPicker> {
         ],
       ),
       content: SizedBox(
-        width:
-            (!kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900)
-                ? MediaQuery.of(context).size.width - 56
-                : 360,
+        width: MediaQuery.of(context).size.width < 900
+            ? MediaQuery.of(context).size.width - 56
+            : 360,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

@@ -103,6 +103,15 @@ class RateCardRulesPanelState extends State<RateCardRulesPanel> {
     final deductionController =
         TextEditingController(text: rule == null ? '' : money(rule.deduction));
     final memoController = TextEditingController(text: rule?.memo ?? '');
+    final controllers = [
+      modelController,
+      planController,
+      addServiceController,
+      baseRebateController,
+      addRebateController,
+      deductionController,
+      memoController,
+    ];
     var joinType = rule?.joinType ?? '';
     var contractType = rule?.contractType ?? '';
     var isActive = rule?.isActive ?? true;
@@ -112,6 +121,8 @@ class RateCardRulesPanelState extends State<RateCardRulesPanel> {
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
           final planItems = officialPlanCandidates[carrier] ?? const <String>[];
+          final screenWidth = MediaQuery.of(context).size.width;
+          final dialogWidth = screenWidth < 816 ? screenWidth - 56 : 760.0;
           return AlertDialog(
             backgroundColor: Colors.white,
             shape:
@@ -124,7 +135,7 @@ class RateCardRulesPanelState extends State<RateCardRulesPanel> {
               ),
             ),
             content: SizedBox(
-              width: 760,
+              width: dialogWidth,
               child: SingleChildScrollView(
                 child: Wrap(
                   spacing: 12,
@@ -258,7 +269,11 @@ class RateCardRulesPanelState extends State<RateCardRulesPanel> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      for (final controller in controllers) {
+        controller.dispose();
+      }
+    });
   }
 
   Future<void> showGoogleSheetLinkDialog() async {
@@ -289,6 +304,8 @@ class RateCardRulesPanelState extends State<RateCardRulesPanel> {
       context: context,
       builder: (_) => StatefulBuilder(
         builder: (context, setDialogState) {
+          final screenWidth = MediaQuery.of(context).size.width;
+          final dialogWidth = screenWidth < 736 ? screenWidth - 56 : 680.0;
           Future<void> save() async {
             setDialogState(() => dialogSaving = true);
             try {
@@ -326,7 +343,7 @@ class RateCardRulesPanelState extends State<RateCardRulesPanel> {
               style: const TextStyle(fontWeight: FontWeight.w900),
             ),
             content: SizedBox(
-              width: 680,
+              width: dialogWidth,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -366,7 +383,12 @@ class RateCardRulesPanelState extends State<RateCardRulesPanel> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      dialogClosed = true;
+      for (final controller in controllers.values) {
+        controller.dispose();
+      }
+    });
   }
 
   Widget _sheetLinkInput({

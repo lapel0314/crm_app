@@ -282,6 +282,7 @@ class _AppLayoutState extends State<AppLayout> {
         result: result,
         onHideToday: () => _hideTodayPlanAlert(result.date),
         onExport: () => _exportPlanAlertExcel(result),
+        canExport: isPrivilegedRole(widget.role),
       ),
     );
   }
@@ -293,6 +294,8 @@ class _AppLayoutState extends State<AppLayout> {
   }
 
   Future<void> _exportPlanAlertExcel(PlanChangeAlertResult result) async {
+    if (!isPrivilegedRole(widget.role)) return;
+
     final exportResult = await customerExcelExportService.exportCustomers(
       rows: result.uniqueCustomers,
       prefix: '오늘알림',

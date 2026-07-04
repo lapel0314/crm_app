@@ -1,10 +1,7 @@
-import 'dart:io' show Platform;
-
 import 'package:crm_app/pages/login_page.dart';
 import 'package:crm_app/services/login_policy_service.dart';
 import 'package:crm_app/services/desktop_auth_session_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -817,8 +814,7 @@ class _SettingsPageState extends State<SettingsPage> {
     final pendingRequests =
         snapshot?.pendingRequests ?? const <StoreNetworkRequestRecord>[];
     final canModifyNetworks = snapshot?.canModifyNetworks ?? false;
-    final compactIos =
-        !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
+    final compactIos = MediaQuery.of(context).size.width < 900;
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -1072,7 +1068,7 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final mobile = MediaQuery.of(context).size.width < 900;
-    final compactIos = !kIsWeb && Platform.isIOS && mobile;
+    final compactIos = mobile;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F8),

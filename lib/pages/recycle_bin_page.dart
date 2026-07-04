@@ -87,7 +87,13 @@ class _RecycleBinPageState extends State<RecycleBinPage> {
     return date == null ? '-' : dateTimeFormat.format(date);
   }
 
-  Widget _recordTile(Map<String, dynamic> record) {
+  Widget _recordTile(Map<String, dynamic> record, {required bool mobile}) {
+    final restoreButton = OutlinedButton.icon(
+      onPressed: isRestoring ? null : () => restoreRecord(record),
+      icon: const Icon(Icons.restore_rounded, size: 18),
+      label: const Text('복구'),
+    );
+
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(14),
@@ -97,6 +103,7 @@ class _RecycleBinPageState extends State<RecycleBinPage> {
         border: Border.all(color: const Color(0xFFE8E9EF)),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Icon(Icons.restore_from_trash_rounded,
               color: Color(0xFFC94C6E)),
@@ -107,6 +114,7 @@ class _RecycleBinPageState extends State<RecycleBinPage> {
               children: [
                 Text(
                   '${_tableLabel(record['target_table'])} · ${record['title'] ?? '-'}',
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Color(0xFF111827),
                     fontWeight: FontWeight.w900,
@@ -122,20 +130,28 @@ class _RecycleBinPageState extends State<RecycleBinPage> {
                       record['subtitle'].toString(),
                     '삭제일: ${_dateLabel(record['deleted_at'])}',
                   ].join(' · '),
+                  maxLines: mobile ? 3 : 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Color(0xFF6B7280),
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
+                if (mobile) ...[
+                  const SizedBox(height: 10),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: restoreButton,
+                  ),
+                ],
               ],
             ),
           ),
-          OutlinedButton.icon(
-            onPressed: isRestoring ? null : () => restoreRecord(record),
-            icon: const Icon(Icons.restore_rounded, size: 18),
-            label: const Text('복구'),
-          ),
+          if (!mobile) ...[
+            const SizedBox(width: 12),
+            restoreButton,
+          ],
         ],
       ),
     );
@@ -211,7 +227,10 @@ class _RecycleBinPageState extends State<RecycleBinPage> {
                       ),
                     )
                   else
-                    ...records.map(_recordTile),
+                    ...records.map((record) => _recordTile(
+                          record,
+                          mobile: mobile,
+                        )),
                 ],
               ),
             ),

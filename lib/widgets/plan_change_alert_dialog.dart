@@ -7,12 +7,14 @@ class PlanChangeAlertDialog extends StatefulWidget {
   final PlanChangeAlertResult result;
   final Future<void> Function() onHideToday;
   final Future<void> Function() onExport;
+  final bool canExport;
 
   const PlanChangeAlertDialog({
     super.key,
     required this.result,
     required this.onHideToday,
     required this.onExport,
+    required this.canExport,
   });
 
   @override
@@ -109,25 +111,26 @@ class _PlanChangeAlertDialogState extends State<PlanChangeAlertDialog> {
           onPressed: () => Navigator.pop(context),
           child: const Text('닫기'),
         ),
-        ElevatedButton.icon(
-          onPressed:
-              widget.result.entries.isEmpty || isExporting ? null : _export,
-          icon: isExporting
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.table_view_rounded, size: 17),
-          label: Text(isExporting ? '출력 중' : '엑셀 출력'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFFC94C6E),
-            foregroundColor: Colors.white,
-            elevation: 0,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        if (widget.canExport)
+          ElevatedButton.icon(
+            onPressed:
+                widget.result.entries.isEmpty || isExporting ? null : _export,
+            icon: isExporting
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.table_view_rounded, size: 17),
+            label: Text(isExporting ? '출력 중' : '엑셀 출력'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFC94C6E),
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+            ),
           ),
-        ),
       ],
     );
   }

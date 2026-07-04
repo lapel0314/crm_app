@@ -1,10 +1,10 @@
-import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/services/notice_service.dart';
+import 'package:crm_app/utils/postgrest_filter_utils.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'audit_log_page.dart';
 
@@ -33,7 +33,7 @@ class _AdminPageState extends State<AdminPage> {
   bool get canDeleteNotices => isPrivilegedRole(widget.role);
 
   bool _isCompactIosDialogContext(BuildContext context) {
-    return !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
+    return MediaQuery.of(context).size.width < 900;
   }
 
   @override
@@ -63,9 +63,10 @@ class _AdminPageState extends State<AdminPage> {
           : await supabase
               .from('profiles')
               .select()
-              .or(
-                'name.ilike.%${keyword.trim()}%,email.ilike.%${keyword.trim()}%,phone.ilike.%${keyword.trim()}%,role.ilike.%${keyword.trim()}%,store.ilike.%${keyword.trim()}%',
-              )
+              .or(postgrestIlikeAnyFilter(
+                const ['name', 'email', 'phone', 'role', 'store'],
+                keyword,
+              ))
               .order('created_at', ascending: true);
 
       setState(() {
@@ -395,7 +396,10 @@ class _AdminPageState extends State<AdminPage> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      titleController.dispose();
+      contentController.dispose();
+    });
   }
 
   void showNoticeManagementDialog() {
@@ -717,7 +721,11 @@ class _AdminPageState extends State<AdminPage> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      nameController.dispose();
+      phoneController.dispose();
+      storeController.dispose();
+    });
   }
 
   DataColumn _column(String label) {

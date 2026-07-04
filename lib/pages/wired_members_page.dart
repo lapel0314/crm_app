@@ -10,6 +10,8 @@ import 'package:crm_app/constants/message_templates.dart';
 import 'package:crm_app/services/audit_log_service.dart';
 import 'package:crm_app/services/contact_action_service.dart';
 import 'package:crm_app/utils/debouncer.dart';
+import 'package:crm_app/utils/phone_utils.dart';
+import 'package:crm_app/utils/postgrest_filter_utils.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:crm_app/widgets/contact_action_buttons.dart';
 import 'package:crm_app/widgets/compact_date_range_picker.dart';
@@ -54,7 +56,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
   bool get canExportExcel => isPrivilegedRole(widget.role);
 
   bool _isCompactIosDialogContext(BuildContext context) {
-    return !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
+    return MediaQuery.of(context).size.width < 900;
   }
 
   @override
@@ -79,20 +81,6 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
       if (!mounted) return;
       fetchMembers(keyword: keyword);
     });
-  }
-
-  String formatPhone(String value) {
-    final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.length <= 3) return digits;
-    if (digits.length <= 7) {
-      return '${digits.substring(0, 3)}-${digits.substring(3)}';
-    }
-    final cut = digits.length > 11 ? 11 : digits.length;
-    return '${digits.substring(0, 3)}-${digits.substring(3, 7)}-${digits.substring(7, cut)}';
-  }
-
-  bool isValidPhone(String value) {
-    return RegExp(r'^01[0-9]-\d{3,4}-\d{4}$').hasMatch(value.trim());
   }
 
   String shortDate(dynamic value) {
@@ -662,9 +650,17 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
               .from('wired_members')
               .select()
               .eq('is_deleted', false)
-              .or(
-                'phone.ilike.%${keyword.trim()}%,seller.ilike.%${keyword.trim()}%,subscriber.ilike.%${keyword.trim()}%,carrier.ilike.%${keyword.trim()}%,activation_center.ilike.%${keyword.trim()}%,internet_type.ilike.%${keyword.trim()}%',
-              )
+              .or(postgrestIlikeAnyFilter(
+                const [
+                  'phone',
+                  'seller',
+                  'subscriber',
+                  'carrier',
+                  'activation_center',
+                  'internet_type',
+                ],
+                keyword,
+              ))
               .order('subscription_date', ascending: true)
               .order('created_at', ascending: true);
 
@@ -726,7 +722,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
       return;
     }
 
-    if (phone.trim().isNotEmpty && !isValidPhone(phone)) {
+    if (phone.trim().isNotEmpty && !isValidKoreanMobilePhoneNumber(phone)) {
       showMessage('번호 형식은 010-1234-1234 입니다.');
       return;
     }
@@ -798,7 +794,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
       return;
     }
 
-    if (phone.trim().isNotEmpty && !isValidPhone(phone)) {
+    if (phone.trim().isNotEmpty && !isValidKoreanMobilePhoneNumber(phone)) {
       showMessage('번호 형식은 010-1234-1234 입니다.');
       return;
     }
@@ -1018,6 +1014,23 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
     final accountHolderController = TextEditingController();
     final accountNumberController = TextEditingController();
     final memoController = TextEditingController();
+    final controllers = [
+      carrierController,
+      activationCenterController,
+      sellerController,
+      subscriberController,
+      phoneController,
+      internetTypeController,
+      giftCardController,
+      prepaidAmountController,
+      postpaidAmountController,
+      rebateController,
+      extraRebateController,
+      bankNameController,
+      accountHolderController,
+      accountNumberController,
+      memoController,
+    ];
 
     DateTime? subscriptionDate;
 
@@ -1096,7 +1109,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                       controller: phoneController,
                       keyboardType: TextInputType.phone,
                       onChanged: (value) {
-                        final formatted = formatPhone(value);
+                        final formatted = formatPartialPhoneNumber(value);
                         phoneController.value = TextEditingValue(
                           text: formatted,
                           selection:
@@ -1216,7 +1229,11 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      for (final controller in controllers) {
+        controller.dispose();
+      }
+    });
   }
 
   void showEditDialog(Map<String, dynamic> item) {
@@ -1252,6 +1269,23 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
         TextEditingController(text: item['account_number']?.toString() ?? '');
     final memoController =
         TextEditingController(text: item['memo']?.toString() ?? '');
+    final controllers = [
+      carrierController,
+      activationCenterController,
+      sellerController,
+      subscriberController,
+      phoneController,
+      internetTypeController,
+      giftCardController,
+      prepaidAmountController,
+      postpaidAmountController,
+      rebateController,
+      extraRebateController,
+      bankNameController,
+      accountHolderController,
+      accountNumberController,
+      memoController,
+    ];
 
     DateTime? subscriptionDate = item['subscription_date'] != null
         ? DateTime.tryParse(item['subscription_date'].toString())
@@ -1332,7 +1366,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                       controller: phoneController,
                       keyboardType: TextInputType.phone,
                       onChanged: (value) {
-                        final formatted = formatPhone(value);
+                        final formatted = formatPartialPhoneNumber(value);
                         phoneController.value = TextEditingValue(
                           text: formatted,
                           selection:
@@ -1454,7 +1488,11 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      for (final controller in controllers) {
+        controller.dispose();
+      }
+    });
   }
 
   void showDeleteDialog(Map<String, dynamic> item) {

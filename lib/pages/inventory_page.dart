@@ -1,9 +1,7 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/utils/debouncer.dart';
+import 'package:crm_app/utils/postgrest_filter_utils.dart';
 import 'package:crm_app/utils/store_utils.dart';
 
 final supabase = Supabase.instance.client;
@@ -46,7 +44,7 @@ class _InventoryPageState extends State<InventoryPage> {
   bool get canViewAllStores => isPrivilegedRole(widget.role);
 
   bool _isCompactIosDialogContext(BuildContext context) {
-    return !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
+    return MediaQuery.of(context).size.width < 900;
   }
 
   @override
@@ -86,9 +84,10 @@ class _InventoryPageState extends State<InventoryPage> {
               .from('device_inventory')
               .select()
               .eq('is_deleted', false)
-              .or(
-                'store.ilike.%${keyword.trim()}%,model_name.ilike.%${keyword.trim()}%,serial_number.ilike.%${keyword.trim()}%,status.ilike.%${keyword.trim()}%',
-              )
+              .or(postgrestIlikeAnyFilter(
+                const ['store', 'model_name', 'serial_number', 'status'],
+                keyword,
+              ))
               .order('created_at', ascending: false);
 
       final inventoryItems =
@@ -308,7 +307,12 @@ class _InventoryPageState extends State<InventoryPage> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      createStoreController.dispose();
+      createModelController.dispose();
+      createSerialController.dispose();
+      createMemoController.dispose();
+    });
   }
 
   void showEditDialog(Map<String, dynamic> item) {
@@ -394,7 +398,12 @@ class _InventoryPageState extends State<InventoryPage> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      editStoreController.dispose();
+      editModelController.dispose();
+      editSerialController.dispose();
+      editMemoController.dispose();
+    });
   }
 
   void showDeleteDialog(Map<String, dynamic> item) {

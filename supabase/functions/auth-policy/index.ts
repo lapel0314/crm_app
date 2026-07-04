@@ -114,16 +114,19 @@ serve(async (req) => {
             body,
           ),
         );
-      case "list_store_networks":
+      case "list_store_networks": {
+        const store = await resolveTargetStore(adminClient, profile, body);
+        ensureCanManageNetworks(profile, String(store.id));
         return json(
           await buildNetworkSnapshot(
             adminClient,
             profile,
             detectedPublicIp,
             clientNetwork,
-            await resolveTargetStore(adminClient, profile, body),
+            store,
           ),
         );
+      }
       case "register_current_network": {
         const store = await resolveTargetStore(
           adminClient,
@@ -349,6 +352,10 @@ function extractClientIp(req: Request) {
     req.headers.get("cf-connecting-ip") ??
     "unknown"
   );
+}
+
+function hasDetectedPublicIp(publicIp: string) {
+  return publicIp.trim().length > 0 && publicIp !== "unknown";
 }
 
 function cleanOptionalString(value: unknown) {
@@ -1323,6 +1330,22 @@ async function checkLoginPolicy(
         message:
           "\uC0AC\uC6D0 \uACC4\uC815\uC740 \uB9E4\uC7A5 \uC815\uBCF4\uAC00 \uC5F0\uACB0\uB418\uC5B4 \uC788\uC5B4\uC57C \uD569\uB2C8\uB2E4.",
         role,
+        detected_public_ip: detectedPublicIp,
+        ...networkPayload(clientNetwork),
+        can_manage_networks: false,
+        can_modify_networks: false,
+      };
+    }
+
+    if (!hasDetectedPublicIp(detectedPublicIp)) {
+      return {
+        allowed: false,
+        reason_code: "staff_network_ip_missing",
+        message:
+          "\uC0AC\uC6D0 \uACC4\uC815\uC758 \uACF5\uC778 IP\uB97C \uD655\uC778\uD560 \uC218 \uC5C6\uC5B4 \uB85C\uADF8\uC778\uC744 \uCC28\uB2E8\uD588\uC2B5\uB2C8\uB2E4.",
+        role,
+        store_id: store.id,
+        store_name: store.name,
         detected_public_ip: detectedPublicIp,
         ...networkPayload(clientNetwork),
         can_manage_networks: false,

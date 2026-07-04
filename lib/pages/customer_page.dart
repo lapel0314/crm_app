@@ -1524,6 +1524,34 @@ class _CustomerPageState extends State<CustomerPage> {
         text: _formatMoneyInput('${_toInt(customer['deposit'])}'));
     final tradePriceController = TextEditingController(
         text: _formatMoneyInput('${_toInt(customer['trade_price'])}'));
+    final controllers = [
+      nameController,
+      phoneController,
+      carrierController,
+      previousCarrierController,
+      modelController,
+      planController,
+      addServiceController,
+      memoController,
+      planChangeAddServiceDeleteController,
+      hiddenNoteController,
+      deductionNoteController,
+      paymentNoteController,
+      bankInfoController,
+      tradeModelController,
+      storeController,
+      mobileController,
+      secondController,
+      staffController,
+      rebateController,
+      addRebateController,
+      hiddenRebateController,
+      deductionController,
+      supportMoneyController,
+      paymentController,
+      depositController,
+      tradePriceController,
+    ];
 
     String? joinType = customer['join_type']?.toString().isNotEmpty == true
         ? customer['join_type'].toString()
@@ -1821,7 +1849,11 @@ class _CustomerPageState extends State<CustomerPage> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      for (final controller in controllers) {
+        controller.dispose();
+      }
+    });
   }
 
   void showDetail(Map<String, dynamic> customer) {

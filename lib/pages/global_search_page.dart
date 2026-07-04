@@ -1,9 +1,7 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:crm_app/utils/postgrest_filter_utils.dart';
 import 'package:crm_app/utils/store_utils.dart';
 
 final supabase = Supabase.instance.client;
@@ -38,7 +36,7 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
   bool get canViewAllStores => isPrivilegedRole(widget.role);
 
   bool _isCompactIosDialogContext(BuildContext context) {
-    return !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
+    return MediaQuery.of(context).size.width < 900;
   }
 
   @override
@@ -130,12 +128,12 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
     final filters = <String>[];
     for (final column in nameColumns) {
       if (name.isNotEmpty) {
-        filters.add('$column.ilike.%$name%');
+        filters.add(postgrestIlikeFilter(column, name));
       }
     }
     for (final column in phoneColumns) {
       for (final value in phoneValues.where((e) => e.isNotEmpty)) {
-        filters.add('$column.ilike.%$value%');
+        filters.add(postgrestIlikeFilter(column, value));
       }
     }
     return filters.join(',');

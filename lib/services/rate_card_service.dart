@@ -1,5 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:crm_app/utils/postgrest_filter_utils.dart';
+
 const samsungAppleModels2024Plus = [
   'SM-S921N',
   'SM-S926N',
@@ -236,9 +238,16 @@ class RateCardService {
     final rows = trimmedKeyword.isEmpty
         ? await query.order('carrier').order('model_name').order('plan_name')
         : await query
-            .or(
-              'carrier.ilike.%$trimmedKeyword%,model_name.ilike.%$trimmedKeyword%,plan_name.ilike.%$trimmedKeyword%,add_service_name.ilike.%$trimmedKeyword%,memo.ilike.%$trimmedKeyword%',
-            )
+            .or(postgrestIlikeAnyFilter(
+              const [
+                'carrier',
+                'model_name',
+                'plan_name',
+                'add_service_name',
+                'memo',
+              ],
+              trimmedKeyword,
+            ))
             .order('carrier')
             .order('model_name')
             .order('plan_name');

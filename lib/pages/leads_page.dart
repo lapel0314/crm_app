@@ -1,6 +1,3 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -8,6 +5,8 @@ import 'package:crm_app/constants/message_templates.dart';
 import 'package:crm_app/services/audit_log_service.dart';
 import 'package:crm_app/services/contact_action_service.dart';
 import 'package:crm_app/utils/debouncer.dart';
+import 'package:crm_app/utils/phone_utils.dart';
+import 'package:crm_app/utils/postgrest_filter_utils.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:crm_app/widgets/contact_action_buttons.dart';
 import 'package:crm_app/widgets/compact_date_range_picker.dart';
@@ -51,7 +50,7 @@ class _LeadsPageState extends State<LeadsPage> {
   bool get canViewAllStores => isPrivilegedRole(widget.role);
 
   bool _isCompactIosDialogContext(BuildContext context) {
-    return !kIsWeb && Platform.isIOS && MediaQuery.of(context).size.width < 900;
+    return MediaQuery.of(context).size.width < 900;
   }
 
   @override
@@ -82,20 +81,6 @@ class _LeadsPageState extends State<LeadsPage> {
       if (!mounted) return;
       fetchLeads(keyword: keyword, silent: true);
     });
-  }
-
-  String formatPhone(String value) {
-    final digits = value.replaceAll(RegExp(r'[^0-9]'), '');
-    if (digits.length <= 3) return digits;
-    if (digits.length <= 7) {
-      return '${digits.substring(0, 3)}-${digits.substring(3)}';
-    }
-    final cut = digits.length > 11 ? 11 : digits.length;
-    return '${digits.substring(0, 3)}-${digits.substring(3, 7)}-${digits.substring(7, cut)}';
-  }
-
-  bool isValidPhone(String value) {
-    return RegExp(r'^01[0-9]-\d{3,4}-\d{4}$').hasMatch(value.trim());
   }
 
   String shortDate(dynamic value) {
@@ -353,9 +338,17 @@ class _LeadsPageState extends State<LeadsPage> {
               .from('leads')
               .select()
               .eq('is_deleted', false)
-              .or(
-                'manager.ilike.%${keyword.trim()}%,subscriber.ilike.%${keyword.trim()}%,phone.ilike.%${keyword.trim()}%,previous_carrier.ilike.%${keyword.trim()}%,target_carrier.ilike.%${keyword.trim()}%,memo.ilike.%${keyword.trim()}%',
-              )
+              .or(postgrestIlikeAnyFilter(
+                const [
+                  'manager',
+                  'subscriber',
+                  'phone',
+                  'previous_carrier',
+                  'target_carrier',
+                  'memo',
+                ],
+                keyword,
+              ))
               .order('lead_date', ascending: true)
               .order('created_at', ascending: true);
 
@@ -412,7 +405,7 @@ class _LeadsPageState extends State<LeadsPage> {
       return;
     }
 
-    if (phone.trim().isNotEmpty && !isValidPhone(phone)) {
+    if (phone.trim().isNotEmpty && !isValidKoreanMobilePhoneNumber(phone)) {
       showMessage('휴대폰번호 형식은 010-1234-1234 입니다.');
       return;
     }
@@ -453,7 +446,7 @@ class _LeadsPageState extends State<LeadsPage> {
       return;
     }
 
-    if (phone.trim().isNotEmpty && !isValidPhone(phone)) {
+    if (phone.trim().isNotEmpty && !isValidKoreanMobilePhoneNumber(phone)) {
       showMessage('휴대폰번호 형식은 010-1234-1234 입니다.');
       return;
     }
@@ -590,7 +583,7 @@ class _LeadsPageState extends State<LeadsPage> {
                       label: '휴대폰번호',
                       controller: phoneController,
                       onChanged: (value) {
-                        final formatted = formatPhone(value);
+                        final formatted = formatPartialPhoneNumber(value);
                         phoneController.value = TextEditingValue(
                           text: formatted,
                           selection:
@@ -645,7 +638,14 @@ class _LeadsPageState extends State<LeadsPage> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      managerController.dispose();
+      subscriberController.dispose();
+      phoneController.dispose();
+      previousCarrierController.dispose();
+      targetCarrierController.dispose();
+      memoController.dispose();
+    });
   }
 
   void showEditDialog(Map<String, dynamic> item) {
@@ -737,7 +737,7 @@ class _LeadsPageState extends State<LeadsPage> {
                       label: '휴대폰번호',
                       controller: phoneController,
                       onChanged: (value) {
-                        final formatted = formatPhone(value);
+                        final formatted = formatPartialPhoneNumber(value);
                         phoneController.value = TextEditingValue(
                           text: formatted,
                           selection:
@@ -794,7 +794,14 @@ class _LeadsPageState extends State<LeadsPage> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      managerController.dispose();
+      subscriberController.dispose();
+      phoneController.dispose();
+      previousCarrierController.dispose();
+      targetCarrierController.dispose();
+      memoController.dispose();
+    });
   }
 
   void showDeleteDialog(Map<String, dynamic> item) {
