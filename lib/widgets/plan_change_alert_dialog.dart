@@ -3,10 +3,17 @@ import 'package:intl/intl.dart';
 
 import 'package:crm_app/services/plan_change_alert_service.dart';
 
+typedef PlanChangeAlertComplete = Future<void> Function(
+  PlanChangeAlertEntry entry,
+  String afterValue,
+  String note,
+);
+
 class PlanChangeAlertDialog extends StatefulWidget {
   final PlanChangeAlertResult result;
   final Future<void> Function() onHideToday;
   final Future<void> Function() onExport;
+  final PlanChangeAlertComplete onComplete;
   final bool canExport;
 
   const PlanChangeAlertDialog({
@@ -14,6 +21,7 @@ class PlanChangeAlertDialog extends StatefulWidget {
     required this.result,
     required this.onHideToday,
     required this.onExport,
+    required this.onComplete,
     required this.canExport,
   });
 
@@ -23,6 +31,8 @@ class PlanChangeAlertDialog extends StatefulWidget {
 
 class _PlanChangeAlertDialogState extends State<PlanChangeAlertDialog> {
   bool isExporting = false;
+  final Set<String> completedTaskIds = {};
+  final Set<String> completingTaskIds = {};
 
   @override
   Widget build(BuildContext context) {
@@ -95,6 +105,9 @@ class _PlanChangeAlertDialogState extends State<PlanChangeAlertDialog> {
                       _CarrierSection(
                         carrier: carrier,
                         groups: widget.result.grouped[carrier]!,
+                        completedTaskIds: completedTaskIds,
+                        completingTaskIds: completingTaskIds,
+                        onComplete: _completeEntry,
                       ),
                 ],
               ),
@@ -143,6 +156,125 @@ class _PlanChangeAlertDialogState extends State<PlanChangeAlertDialog> {
       if (mounted) setState(() => isExporting = false);
     }
   }
+
+  Future<void> _completeEntry(PlanChangeAlertEntry entry) async {
+    final taskId = entry.task?.id;
+    if (taskId == null || completingTaskIds.contains(taskId)) return;
+
+    final afterController = TextEditingController(
+      text: entry.type == PlanChangeAlertType.addServiceDelete
+          ? '없음'
+          : entry.currentValue,
+    );
+    final noteController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('처리완료 기록'),
+        content: SizedBox(
+          width: 380,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _CompleteInfoRow(label: '대상', value: entry.customerName),
+              _CompleteInfoRow(label: '유형', value: entry.type.label),
+              _CompleteInfoRow(label: '변경 전', value: entry.currentValue),
+              const SizedBox(height: 10),
+              TextField(
+                controller: afterController,
+                decoration: const InputDecoration(
+                  labelText: '변경 후',
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: noteController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: '메모',
+                  isDense: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('기록'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) {
+      afterController.dispose();
+      noteController.dispose();
+      return;
+    }
+
+    setState(() => completingTaskIds.add(taskId));
+    try {
+      await widget.onComplete(
+        entry,
+        afterController.text.trim(),
+        noteController.text.trim(),
+      );
+      if (mounted) {
+        setState(() => completedTaskIds.add(taskId));
+      }
+    } finally {
+      afterController.dispose();
+      noteController.dispose();
+      if (mounted) {
+        setState(() => completingTaskIds.remove(taskId));
+      }
+    }
+  }
+}
+
+class _CompleteInfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _CompleteInfoRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 64,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF6B7280),
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value.isEmpty ? '-' : value,
+              style: const TextStyle(
+                color: Color(0xFF111827),
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _EmptyAlert extends StatelessWidget {
@@ -185,10 +317,16 @@ class _EmptyAlert extends StatelessWidget {
 class _CarrierSection extends StatelessWidget {
   final String carrier;
   final Map<PlanChangeAlertType, List<PlanChangeAlertEntry>> groups;
+  final Set<String> completedTaskIds;
+  final Set<String> completingTaskIds;
+  final Future<void> Function(PlanChangeAlertEntry entry) onComplete;
 
   const _CarrierSection({
     required this.carrier,
     required this.groups,
+    required this.completedTaskIds,
+    required this.completingTaskIds,
+    required this.onComplete,
   });
 
   @override
@@ -222,7 +360,13 @@ class _CarrierSection extends StatelessWidget {
           const SizedBox(height: 12),
           for (final type in PlanChangeAlertService.typeOrder)
             if (groups.containsKey(type))
-              _TypeGroup(type: type, entries: groups[type]!),
+              _TypeGroup(
+                type: type,
+                entries: groups[type]!,
+                completedTaskIds: completedTaskIds,
+                completingTaskIds: completingTaskIds,
+                onComplete: onComplete,
+              ),
         ],
       ),
     );
@@ -232,10 +376,16 @@ class _CarrierSection extends StatelessWidget {
 class _TypeGroup extends StatelessWidget {
   final PlanChangeAlertType type;
   final List<PlanChangeAlertEntry> entries;
+  final Set<String> completedTaskIds;
+  final Set<String> completingTaskIds;
+  final Future<void> Function(PlanChangeAlertEntry entry) onComplete;
 
   const _TypeGroup({
     required this.type,
     required this.entries,
+    required this.completedTaskIds,
+    required this.completingTaskIds,
+    required this.onComplete,
   });
 
   @override
@@ -276,7 +426,14 @@ class _TypeGroup extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 7),
-          for (final entry in entries) _CustomerRow(entry: entry),
+          for (final entry in entries)
+            _CustomerRow(
+              entry: entry,
+              isCompleted: entry.isCompleted ||
+                  completedTaskIds.contains(entry.task?.id ?? ''),
+              isCompleting: completingTaskIds.contains(entry.task?.id ?? ''),
+              onComplete: entry.task == null ? null : () => onComplete(entry),
+            ),
         ],
       ),
     );
@@ -285,8 +442,16 @@ class _TypeGroup extends StatelessWidget {
 
 class _CustomerRow extends StatelessWidget {
   final PlanChangeAlertEntry entry;
+  final bool isCompleted;
+  final bool isCompleting;
+  final VoidCallback? onComplete;
 
-  const _CustomerRow({required this.entry});
+  const _CustomerRow({
+    required this.entry,
+    required this.isCompleted,
+    required this.isCompleting,
+    required this.onComplete,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -342,6 +507,30 @@ class _CustomerRow extends StatelessWidget {
                 runSpacing: 5,
                 children: details,
               ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  _StatusPill(isCompleted: isCompleted),
+                  const Spacer(),
+                  if (!isCompleted)
+                    OutlinedButton.icon(
+                      onPressed: isCompleting ? null : onComplete,
+                      icon: isCompleting
+                          ? const SizedBox(
+                              width: 13,
+                              height: 13,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.check_rounded, size: 15),
+                      label: Text(isCompleting ? '기록 중' : '처리완료'),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 30),
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                ],
+              ),
             ],
           );
         },
@@ -356,6 +545,33 @@ class _CustomerRow extends StatelessWidget {
         color: Color(0xFF6B7280),
         fontSize: 11,
         fontWeight: FontWeight.w700,
+      ),
+    );
+  }
+}
+
+class _StatusPill extends StatelessWidget {
+  final bool isCompleted;
+
+  const _StatusPill({required this.isCompleted});
+
+  @override
+  Widget build(BuildContext context) {
+    final color =
+        isCompleted ? const Color(0xFF059669) : const Color(0xFFF59E0B);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        isCompleted ? '처리완료' : '미처리',
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+        ),
       ),
     );
   }

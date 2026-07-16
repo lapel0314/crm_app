@@ -282,9 +282,29 @@ class _AppLayoutState extends State<AppLayout> {
         result: result,
         onHideToday: () => _hideTodayPlanAlert(result.date),
         onExport: () => _exportPlanAlertExcel(result),
+        onComplete: _completePlanAlertEntry,
         canExport: isPrivilegedRole(widget.role),
       ),
     );
+  }
+
+  Future<void> _completePlanAlertEntry(
+    PlanChangeAlertEntry entry,
+    String afterValue,
+    String note,
+  ) async {
+    final task = entry.task;
+    if (task == null) {
+      _showMessage('처리 작업을 찾을 수 없습니다. 알림을 새로고침해 주세요.');
+      return;
+    }
+    await planAlertService.completeTask(
+      task: task,
+      afterValue: afterValue,
+      note: note,
+    );
+    await _fetchTodayPlanAlert();
+    if (mounted) _showMessage('처리완료로 기록했습니다.');
   }
 
   Future<void> _hideTodayPlanAlert(DateTime date) async {

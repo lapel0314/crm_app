@@ -7,6 +7,7 @@ import 'package:crm_app/services/customer_excel_export_service.dart';
 import 'package:crm_app/services/kakao_talk_service.dart';
 import 'package:crm_app/services/audit_log_service.dart';
 import 'package:crm_app/services/contact_action_service.dart';
+import 'package:crm_app/services/plan_change_alert_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/constants/message_templates.dart';
@@ -45,10 +46,12 @@ class _CustomerPageState extends State<CustomerPage> {
   final kakaoTalkService = KakaoTalkService();
   final contactActionService = const ContactActionService();
   final auditLogService = AuditLogService();
+  final planAlertService = PlanChangeAlertService(supabase);
   final Debouncer _searchDebouncer =
       Debouncer(const Duration(milliseconds: 250));
 
   List<Map<String, dynamic>> customers = [];
+  Map<String, List<PlanChangeTask>> planChangeTasksByCustomerId = {};
   final Set<String> selectedCustomerIds = {};
   bool isLoading = true;
   bool isSendingKakao = false;
@@ -454,6 +457,81 @@ class _CustomerPageState extends State<CustomerPage> {
     return const Color(0xFF6B7280);
   }
 
+  List<PlanChangeTask> _tasksForCustomer(Map<String, dynamic> customer) {
+    return planChangeTasksByCustomerId[customer['id']?.toString() ?? ''] ??
+        const <PlanChangeTask>[];
+  }
+
+  Widget _planTaskStatusBadge(Map<String, dynamic> customer) {
+    final tasks = _tasksForCustomer(customer);
+    if (tasks.isEmpty) return _tableText('-');
+
+    final today = DateTime.now();
+    final overdueCount = tasks.where((task) => task.isOverdue(today)).length;
+    final pendingCount = tasks
+        .where((task) => task.status == PlanChangeTaskStatus.pending)
+        .length;
+    final doneCount =
+        tasks.where((task) => task.status == PlanChangeTaskStatus.done).length;
+
+    if (overdueCount > 0) {
+      return _tableBadge('지연 $overdueCount', color: const Color(0xFFDC2626));
+    }
+    if (pendingCount > 0) {
+      return _tableBadge('미처리 $pendingCount', color: const Color(0xFFF59E0B));
+    }
+    if (doneCount > 0) {
+      return _tableBadge('완료 $doneCount', color: const Color(0xFF059669));
+    }
+    return _tableBadge('보류', color: const Color(0xFF6B7280));
+  }
+
+  List<Widget> _planTaskDetailRows(Map<String, dynamic> customer) {
+    final tasks = _tasksForCustomer(customer);
+    if (tasks.isEmpty) {
+      return [_detailRow('처리상태', '대상 없음')];
+    }
+
+    final today = DateTime.now();
+    final pendingCount = tasks
+        .where((task) => task.status == PlanChangeTaskStatus.pending)
+        .length;
+    final overdueCount = tasks.where((task) => task.isOverdue(today)).length;
+    final doneCount =
+        tasks.where((task) => task.status == PlanChangeTaskStatus.done).length;
+    final rows = <Widget>[
+      _detailRow(
+        '요약',
+        '미처리 $pendingCount건 · 지연 $overdueCount건 · 완료 $doneCount건',
+      ),
+    ];
+
+    for (final task in tasks.take(4)) {
+      rows.add(
+        _detailRow(
+          task.typeLabel,
+          '${_date(task.dueDate)} · ${task.statusLabel}',
+        ),
+      );
+      rows.add(_detailRow('변경내용', _taskChangeText(task)));
+      if (task.completedAt != null) {
+        rows.add(_detailRow('처리일', _date(task.completedAt)));
+      }
+      if (task.note.isNotEmpty) {
+        rows.add(_detailRow('메모', task.note));
+      }
+    }
+    return rows;
+  }
+
+  String _taskChangeText(PlanChangeTask task) {
+    if (task.afterValue.isEmpty) {
+      return '변경 전: ${task.beforeValue.isEmpty ? '-' : task.beforeValue}';
+    }
+    final before = task.beforeValue.isEmpty ? '-' : task.beforeValue;
+    return '$before -> ${task.afterValue}';
+  }
+
   Color _staffColor(dynamic value) {
     final staff = _text(value);
     const palette = [
@@ -535,10 +613,14 @@ class _CustomerPageState extends State<CustomerPage> {
           data.map((e) => Map<String, dynamic>.from(e)).where(matches).toList();
       final nextCustomerIds =
           nextCustomers.map((customer) => customer['id'].toString()).toSet();
+      final nextTaskMap = isOpenView
+          ? const <String, List<PlanChangeTask>>{}
+          : await planAlertService.fetchCustomerTasks(nextCustomerIds);
 
       if (!mounted) return;
       setState(() {
         customers = nextCustomers;
+        planChangeTasksByCustomerId = nextTaskMap;
         selectedCustomerIds.removeWhere((id) => !nextCustomerIds.contains(id));
         currentPage = 0;
         isLoading = false;
@@ -1783,6 +1865,12 @@ class _CustomerPageState extends State<CustomerPage> {
                   final totalRebate = currentTotalRebate();
                   const tax = 0;
                   final margin = currentMargin();
+                  final customerId = customer['id'].toString();
+                  final planBefore = customer['plan']?.toString() ?? '';
+                  final addServiceBefore =
+                      customer['add_service']?.toString() ?? '';
+                  final planAfter = planController.text.trim();
+                  final addServiceAfter = addServiceController.text.trim();
 
                   try {
                     final updated = await supabase
@@ -1794,8 +1882,8 @@ class _CustomerPageState extends State<CustomerPage> {
                           'previous_carrier':
                               previousCarrierController.text.trim(),
                           'model': modelController.text.trim(),
-                          'plan': planController.text.trim(),
-                          'add_service': addServiceController.text.trim(),
+                          'plan': planAfter,
+                          'add_service': addServiceAfter,
                           'join_type': joinType,
                           'contract_type': contractType,
                           'installment': installment,
@@ -1833,8 +1921,26 @@ class _CustomerPageState extends State<CustomerPage> {
                       throw StateError('수정 권한이 없거나 대상 고객을 찾을 수 없습니다.');
                     }
 
+                    var completedTasks = 0;
+                    try {
+                      completedTasks = await planAlertService
+                          .completePendingTasksForCustomerChange(
+                        customerId: customerId,
+                        planBefore: planBefore,
+                        planAfter: planAfter,
+                        addServiceBefore: addServiceBefore,
+                        addServiceAfter: addServiceAfter,
+                      );
+                    } catch (e) {
+                      _logUiError('요금제/부가 처리상태 기록 실패: $e');
+                    }
+
                     if (mounted) Navigator.pop(context);
-                    _showCenterMessage('고객 수정 완료');
+                    _showCenterMessage(
+                      completedTasks > 0
+                          ? '고객 수정 완료 · 처리 $completedTasks건 기록'
+                          : '고객 수정 완료',
+                    );
                     fetchCustomers(keyword: searchController.text);
                   } catch (e) {
                     final message =
@@ -1966,6 +2072,13 @@ class _CustomerPageState extends State<CustomerPage> {
                       _detailRow('할부개월', customer['installment']),
                     ],
                   ),
+                  if (!isOpenView) ...[
+                    const SizedBox(height: 16),
+                    _sectionCard(
+                      title: '요금제/부가 처리',
+                      children: _planTaskDetailRows(customer),
+                    ),
+                  ],
                   const SizedBox(height: 16),
                   _sectionCard(
                     title: '정산 정보',
@@ -2240,6 +2353,7 @@ class _CustomerPageState extends State<CustomerPage> {
     required bool partiallySelected,
   }) {
     final showSelection = !isOpenView;
+    final showTaskStatus = !isOpenView;
     final baseWidths = <double>[
       if (showSelection) 118,
       104,
@@ -2252,6 +2366,7 @@ class _CustomerPageState extends State<CustomerPage> {
       150,
       170,
       150,
+      if (showTaskStatus) 112,
       92,
       86,
       184,
@@ -2268,6 +2383,7 @@ class _CustomerPageState extends State<CustomerPage> {
       '모델명',
       '요금제',
       '부가서비스',
+      if (showTaskStatus) '처리상태',
       '공시/선약',
       '할부개월',
       '',
@@ -2393,17 +2509,22 @@ class _CustomerPageState extends State<CustomerPage> {
                             _tableText(_text(customer['add_service'])),
                             widths[offset + 9],
                           ),
+                          if (showTaskStatus)
+                            _tableCell(
+                              _planTaskStatusBadge(customer),
+                              widths[offset + 10],
+                            ),
                           _tableCell(
                             _tableBadge(
                               _text(customer['contract_type']),
                               color:
                                   _contractTypeColor(customer['contract_type']),
                             ),
-                            widths[offset + 10],
+                            widths[offset + (showTaskStatus ? 11 : 10)],
                           ),
                           _tableCell(
                             _tableText('${_text(customer['installment'])}개월'),
-                            widths[offset + 11],
+                            widths[offset + (showTaskStatus ? 12 : 11)],
                           ),
                           _tableCell(
                             Row(
@@ -2457,7 +2578,7 @@ class _CustomerPageState extends State<CustomerPage> {
                                   ),
                               ],
                             ),
-                            widths[offset + 12],
+                            widths[offset + (showTaskStatus ? 13 : 12)],
                           ),
                         ],
                       ),

@@ -1,11 +1,11 @@
 #define MyAppName "핑크폰 CRM"
-#define MyAppVersion "1.1.1"
+#define MyAppVersion "1.1.2"
 #define MyAppPublisher "Pink Phone"
 #define MyAppExeName "핑크폰 CRM.exe"
 #define MyBuildExeName "crm_app.exe"
 #define MyBuildDir "build\windows\x64\runner\Release"
 #ifndef InstallerPassword
-#define InstallerPassword "123456"
+#define InstallerPassword "312546"
 #endif
 
 [Setup]
