@@ -7,6 +7,7 @@ import 'package:crm_app/services/notice_service.dart';
 import 'package:crm_app/utils/postgrest_filter_utils.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'audit_log_page.dart';
+import 'signup_approval_dashboard_page.dart';
 
 final supabase = Supabase.instance.client;
 
@@ -867,6 +868,20 @@ class _AdminPageState extends State<AdminPage> {
                           icon: Icons.delete_sweep_outlined,
                           label: '공지사항 관리',
                           onTap: showNoticeManagementDialog,
+                        ),
+                        const SizedBox(width: 12),
+                        _headerActionButton(
+                          icon: Icons.how_to_reg_rounded,
+                          label: '승인현황',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => SignupApprovalDashboardPage(
+                                    role: widget.role),
+                              ),
+                            );
+                          },
                         ),
                         const SizedBox(width: 12),
                         _headerActionButton(

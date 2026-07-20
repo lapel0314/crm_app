@@ -107,18 +107,29 @@ class _AuditLogPageState extends State<AuditLogPage> {
     return switch (_value(value)) {
       'create_inventory' => '재고 등록',
       'update_inventory' => '재고 수정',
+      'insert_device_inventory' => '재고 등록',
+      'update_device_inventory' => '재고 수정',
       'delete_inventory' => '재고 삭제',
       'soft_delete_inventory' => '재고 휴지통 이동',
       'export_customers_excel' => '고객DB 엑셀 다운로드',
       'export_wired_members_excel' => '유선회원 엑셀 다운로드',
       'create_customer' => '고객 등록',
       'update_customer' => '고객 수정',
+      'insert_customers' => '고객 등록',
+      'update_customers' => '고객 수정',
       'delete_customer' => '고객 삭제',
+      'delete_customers' => '고객 삭제',
       'soft_delete_customer' => '고객 휴지통 이동',
       'create_lead' => '가망고객 등록',
       'update_lead' => '가망고객 수정',
+      'insert_leads' => '가망고객 등록',
+      'update_leads' => '가망고객 수정',
       'delete_lead' => '가망고객 삭제',
+      'delete_leads' => '가망고객 삭제',
       'soft_delete_lead' => '가망고객 휴지통 이동',
+      'insert_wired_members' => '유선회원 등록',
+      'update_wired_members' => '유선회원 수정',
+      'delete_wired_members' => '유선회원 삭제',
       'soft_delete_wired_member' => '유선회원 휴지통 이동',
       'update_profiles' => '직원정보 수정',
       'delete_profiles' => '직원정보 삭제',
@@ -141,15 +152,51 @@ class _AuditLogPageState extends State<AuditLogPage> {
 
   String _detailKeyLabel(String key) {
     return switch (key) {
+      'id' => '관리번호',
       'store' => '매장',
+      'normalized_store' => '매장',
       'model_name' => '모델명',
       'serial_number' => '일련번호',
       'status' => '상태',
       'memo' => '메모',
       'plan_change_add_service_delete' => '요변/부가삭제',
+      'created_at' => '등록일시',
+      'updated_at' => '수정일시',
+      'join_date' => '가입일',
+      'm3' => '3개월 기준일',
+      'm6' => '6개월 기준일',
       'name' => '이름',
       'phone' => '연락처',
+      'mobile' => '휴대폰',
+      'second' => '보조 연락처',
+      'join_type' => '가입유형',
+      'carrier' => '통신사/거래처',
+      'previous_carrier' => '이전 통신사',
+      'model' => '모델',
+      'plan' => '요금제',
+      'add_service' => '부가서비스',
+      'contract_type' => '약정유형',
+      'installment' => '할부개월',
+      'rebate' => '리베이트',
+      'add_rebate' => '추가 리베이트',
+      'hidden_rebate' => '숨김 리베이트',
+      'hidden_note' => '숨김 메모',
+      'deduction' => '차감',
+      'deduction_note' => '차감 메모',
+      'support_money' => '지원금',
+      'payment' => '결제금',
+      'payment_note' => '결제 메모',
+      'deposit' => '예치금',
+      'bank_info' => '계좌정보',
+      'trade_in' => '중고반납',
+      'trade_model' => '반납모델',
+      'trade_price' => '반납금액',
+      'total_rebate' => '총 리베이트',
+      'tax' => '세금',
+      'margin' => '마진',
+      'kakao_chat_type' => '카카오방 유형',
       'role' => '권한',
+      'email' => '이메일',
       'staff' => '담당자',
       'row_count' => '행 수',
       'file_name' => '파일명',
@@ -163,33 +210,88 @@ class _AuditLogPageState extends State<AuditLogPage> {
       'last_login_at' => '마지막 로그인',
       'last_login_platform' => '로그인 플랫폼',
       'last_login_public_ip' => '로그인 공인IP',
+      'is_deleted' => '삭제 여부',
+      'deleted_at' => '삭제일시',
+      'deleted_by' => '삭제자',
       _ => key,
     };
   }
 
+  bool _isEmptyValue(dynamic value) {
+    if (value == null) return true;
+    final text = value.toString().trim();
+    return text.isEmpty || text == 'null';
+  }
+
+  String _displayValue(dynamic value) {
+    if (_isEmptyValue(value)) return '없음';
+    if (value == true) return '예';
+    if (value == false) return '아니오';
+    final text = value.toString().trim();
+    if (text.length >= 19 && DateTime.tryParse(text) != null) {
+      return _timeLabel(text);
+    }
+    return text;
+  }
+
+  List<String> get _businessDetailKeys => const [
+        'name',
+        'phone',
+        'store',
+        'staff',
+        'join_date',
+        'carrier',
+        'previous_carrier',
+        'join_type',
+        'model',
+        'plan',
+        'add_service',
+        'contract_type',
+        'support_money',
+        'rebate',
+        'margin',
+        'memo',
+      ];
+
   String _detailLabel(dynamic detail) {
     if (detail == null) return '-';
     if (detail is Map) {
+      final changes = _changedFields(detail);
+      final oldRow = _asStringMap(_asStringMap(detail)['old']);
+      final newRow = _asStringMap(_asStringMap(detail)['new']);
+      if (newRow.isNotEmpty && oldRow.isEmpty) {
+        return _rowSummary(newRow, prefix: '등록 내용');
+      }
+      if (oldRow.isNotEmpty && newRow.isEmpty) {
+        return _rowSummary(oldRow, prefix: '삭제 내용');
+      }
+      if (changes.isNotEmpty) {
+        return changes.take(4).map((field) {
+          return '${_detailKeyLabel(field.key)}: ${field.oldValue} → ${field.newValue}';
+        }).join(' / ');
+      }
       return detail.entries
+          .where((entry) => !_isEmptyValue(entry.value))
           .map((entry) =>
-              '${_detailKeyLabel(entry.key.toString())}: ${entry.value}')
+              '${_detailKeyLabel(entry.key.toString())}: ${_displayValue(entry.value)}')
           .join(' / ');
     }
     return detail.toString();
   }
 
   String _targetLabel(Map<String, dynamic> log) {
-    final detail = log['detail'];
-    if (detail is Map) {
-      final model = _value(detail['model_name']);
-      final serial = _value(detail['serial_number']);
-      if (model != '-' || serial != '-') {
-        return [model, serial].where((value) => value != '-').join(' / ');
-      }
-      final name = _value(detail['name']);
-      if (name != '-') return name;
+    final row = _auditRow(log['detail']);
+    final model = _value(row['model_name'] ?? row['model']);
+    final serial = _value(row['serial_number']);
+    if (model != '-' || serial != '-') {
+      return [model, serial].where((value) => value != '-').join(' / ');
     }
-    return '대상번호 ${_value(log['target_id'])}';
+    final name = _value(row['name']);
+    final phone = _value(row['phone']);
+    if (name != '-' || phone != '-') {
+      return [name, phone].where((value) => value != '-').join(' / ');
+    }
+    return '상세 보기';
   }
 
   Map<String, dynamic> _asStringMap(dynamic value) {
@@ -219,6 +321,29 @@ class _AuditLogPageState extends State<AuditLogPage> {
         .toList();
   }
 
+  Map<String, dynamic> _auditRow(dynamic detail) {
+    final map = _asStringMap(detail);
+    final newRow = _asStringMap(map['new']);
+    if (newRow.isNotEmpty) return newRow;
+    final oldRow = _asStringMap(map['old']);
+    if (oldRow.isNotEmpty) return oldRow;
+    return map;
+  }
+
+  String _rowSummary(
+    Map<String, dynamic> row, {
+    required String prefix,
+  }) {
+    final parts = <String>[];
+    for (final key in _businessDetailKeys) {
+      if (_isEmptyValue(row[key])) continue;
+      parts.add('${_detailKeyLabel(key)} ${_displayValue(row[key])}');
+      if (parts.length >= 5) break;
+    }
+    if (parts.isEmpty) return prefix;
+    return '$prefix: ${parts.join(' / ')}';
+  }
+
   String _prettyDetail(dynamic detail) {
     try {
       return const JsonEncoder.withIndent('  ').convert(detail);
@@ -228,7 +353,13 @@ class _AuditLogPageState extends State<AuditLogPage> {
   }
 
   void _showLogDetail(Map<String, dynamic> log) {
-    final changes = _changedFields(log['detail']);
+    final detail = _asStringMap(log['detail']);
+    final oldRow = _asStringMap(detail['old']);
+    final newRow = _asStringMap(detail['new']);
+    final isInsert = newRow.isNotEmpty && oldRow.isEmpty;
+    final isDelete = oldRow.isNotEmpty && newRow.isEmpty;
+    final changes =
+        isInsert || isDelete ? const <_ChangedField>[] : _changedFields(detail);
     showDialog(
       context: context,
       builder: (_) {
@@ -251,15 +382,18 @@ class _AuditLogPageState extends State<AuditLogPage> {
                   runSpacing: 8,
                   children: [
                     _metaChip('화면', _tableLabel(log['target_table'])),
-                    _metaChip('대상', _value(log['target_id'])),
+                    _metaChip('대상', _targetLabel(log)),
                     _metaChip('시간', _timeLabel(log['created_at'])),
-                    _metaChip('작업자', _value(log['actor_id'])),
+                    _metaChip(
+                      '작업자',
+                      _value(log['actor_id']) == '-' ? '시스템' : '직원',
+                    ),
                   ],
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  '변경 필드',
-                  style: TextStyle(fontWeight: FontWeight.w900),
+                Text(
+                  changes.isEmpty ? '상세 내용' : '변경 내용',
+                  style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
                 const SizedBox(height: 8),
                 Expanded(
@@ -324,7 +458,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
                 if (changes.isNotEmpty) ...[
                   const Divider(height: 24),
                   const Text(
-                    '원본 상세',
+                    '개발자 원본',
                     style: TextStyle(fontWeight: FontWeight.w900),
                   ),
                   const SizedBox(height: 8),

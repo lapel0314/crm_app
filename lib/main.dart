@@ -207,11 +207,15 @@ class UpdateGate extends StatefulWidget {
   State<UpdateGate> createState() => _UpdateGateState();
 }
 
-class _UpdateGateState extends State<UpdateGate> {
+class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
+  static const Duration _resumeUpdateCheckCooldown = Duration(minutes: 10);
+
   bool _checked = false;
   bool _ready = false;
   bool _failed = false;
   bool _isUpdating = false;
+  bool _checkInProgress = false;
+  DateTime? _lastUpdateCheckAt;
   AppUpdateInfo? _blockedUpdate;
   String _updateStatus =
       '\uC5C5\uB370\uC774\uD2B8 \uBC84\uC804\uC744 \uD655\uC778\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4.';
@@ -219,12 +223,32 @@ class _UpdateGateState extends State<UpdateGate> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkUpdate());
   }
 
-  Future<void> _checkUpdate() async {
-    if (_checked || !mounted) return;
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !_ready || _isUpdating) return;
+    final lastCheckedAt = _lastUpdateCheckAt;
+    if (lastCheckedAt != null &&
+        DateTime.now().difference(lastCheckedAt) < _resumeUpdateCheckCooldown) {
+      return;
+    }
+    unawaited(_checkUpdate(force: true));
+  }
+
+  Future<void> _checkUpdate({bool force = false}) async {
+    if (_checkInProgress || (!force && _checked) || !mounted) return;
     _checked = true;
+    _checkInProgress = true;
+    _lastUpdateCheckAt = DateTime.now();
 
     final updateService = UpdateService(supabase);
     try {
@@ -241,6 +265,7 @@ class _UpdateGateState extends State<UpdateGate> {
 
       setState(() {
         _failed = false;
+        _ready = false;
         _blockedUpdate = update;
         _updateStatus = update.message;
       });
@@ -256,6 +281,8 @@ class _UpdateGateState extends State<UpdateGate> {
         _blockedUpdate = null;
         _ready = true;
       });
+    } finally {
+      _checkInProgress = false;
     }
   }
 

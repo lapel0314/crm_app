@@ -16,8 +16,7 @@ The main user workflows are:
 - dashboard summaries
 - plan-change / add-service alerts
 - rebate image and rate-card management
-- admin operations, audit logs, recycle bin, and store/network management
-- admin quality/status inspection for signup approvals, audit details, and customer data issues
+- admin operations, audit logs, recycle bin, store/network management, customer cleanup, and signup approvals
 - app update checks and installer/APK release distribution
 
 ## Technology Stack
@@ -112,7 +111,7 @@ Generated or local-only files commonly appear in the worktree and should not be 
 2. `DesktopAuthSessionService` clears persisted desktop sessions where required.
 3. `Supabase.initialize` configures the client.
 4. `MyApp` starts with `UpdateGate`.
-5. `UpdateGate` checks app update policy through the platform update service.
+5. `UpdateGate` checks app update policy through the platform update service on startup and when the app resumes after the cooldown window.
 6. `AuthGate` routes to `LoginPage` or `AppLayout`.
 
 ### Authentication and Authorization
@@ -245,11 +244,11 @@ Key files:
 Responsibilities:
 
 - employee profile approval/update/delete/password changes
-- signup/approval status summaries and pending-account approval
-- customer data quality inspection for duplicate phones, invalid phone formats, missing join dates, and unusual carrier/vendor values
+- signup/approval status summaries and pending-account approval from the employee management page
+- customer cleanup inspection for duplicate phones, invalid phone formats, missing join dates, and unusual carrier/vendor values
 - notice creation and management
-- audit log inspection with field-level old/new detail view
-- recycle bin restore
+- audit log inspection with field-level old/new detail view from the employee management page
+- deleted-record restore with search, type/date filters, delete actor display, and restore confirmation
 - store and store-network management
 
 Privileged admin mutations are routed through `auth-policy`, not direct client writes.
@@ -313,6 +312,7 @@ Key files:
 Responsibilities:
 
 - app update lookup and installer launch
+- startup and app-resume update checks with a cooldown to catch already-running Android/Windows clients
 - SHA-256 installer verification
 - desktop session cleanup and sign-out behavior
 
