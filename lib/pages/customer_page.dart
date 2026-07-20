@@ -1970,23 +1970,39 @@ class _CustomerPageState extends State<CustomerPage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (_) {
+      builder: (sheetContext) {
         return SafeArea(
           child: SizedBox(
-            height: MediaQuery.of(context).size.height * 0.9,
+            height: MediaQuery.of(sheetContext).size.height * 0.9,
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
                 children: [
-                  Container(
-                    width: 56,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFD1D5DB),
-                      borderRadius: BorderRadius.circular(999),
+                  SizedBox(
+                    height: 34,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Container(
+                          width: 56,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFD1D5DB),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: IconButton(
+                            tooltip: '닫기',
+                            onPressed: () => Navigator.of(sheetContext).pop(),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 10),
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(18),
@@ -2133,7 +2149,7 @@ class _CustomerPageState extends State<CustomerPage> {
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () {
-                              Navigator.pop(context);
+                              Navigator.of(sheetContext).pop();
                               showEditDialog(customer);
                             },
                             icon: const Icon(Icons.edit_outlined),
@@ -2144,7 +2160,7 @@ class _CustomerPageState extends State<CustomerPage> {
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () {
-                              Navigator.pop(context);
+                              Navigator.of(sheetContext).pop();
                               showDeleteDialog(customer);
                             },
                             icon: const Icon(Icons.delete_outline),
