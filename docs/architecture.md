@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-07-16
+Last updated: 2026-07-20
 
 ## Overview
 
@@ -17,6 +17,7 @@ The main user workflows are:
 - plan-change / add-service alerts
 - rebate image and rate-card management
 - admin operations, audit logs, recycle bin, and store/network management
+- admin quality/status inspection for signup approvals, audit details, and customer data issues
 - app update checks and installer/APK release distribution
 
 ## Technology Stack
@@ -50,6 +51,7 @@ The main user workflows are:
 - Windows installer definitions:
   - `installer.iss`
   - `CRM_App_Setup.iss`
+- Windows auto-update launches the downloaded installer in visible silent mode so users can see installation progress before the running app exits.
 - Release artifacts are stored locally under `dist/` when downloaded from GitHub Actions
 
 ### Operations
@@ -233,15 +235,20 @@ Key files:
 
 - `lib/pages/admin_page.dart`
 - `lib/pages/audit_log_page.dart`
+- `lib/pages/data_quality_page.dart`
+- `lib/pages/signup_approval_dashboard_page.dart`
 - `lib/pages/recycle_bin_page.dart`
 - `lib/pages/store_management_page.dart`
+- `lib/services/data_quality_service.dart`
 - `supabase/functions/auth-policy/index.ts`
 
 Responsibilities:
 
 - employee profile approval/update/delete/password changes
+- signup/approval status summaries and pending-account approval
+- customer data quality inspection for duplicate phones, invalid phone formats, missing join dates, and unusual carrier/vendor values
 - notice creation and management
-- audit log inspection
+- audit log inspection with field-level old/new detail view
 - recycle bin restore
 - store and store-network management
 
@@ -395,7 +402,7 @@ GitHub push/tag
 - RLS is expected to be enabled for sensitive CRM tables.
 - `profiles` writes should remain restricted to trusted paths.
 - `auth-policy` uses service role access and must enforce authorization before returning privileged data.
-- `audit_logs` are privileged-select only.
+- `audit_logs` are privileged-select only. Profile updates are audited, except for login-policy heartbeat-only changes to `last_login_at`, `last_login_platform`, `last_login_public_ip`, and `login_policy_message`.
 - `plan_change_tasks` and `plan_change_task_logs` store 요금제/부가서비스 follow-up status and before/after change history.
 - Soft-deleted records remain recoverable through recycle-bin flows.
 - `normalized_store` is generated in `profiles`; application code must not update it directly.

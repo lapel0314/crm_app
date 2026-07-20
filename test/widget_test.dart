@@ -1,7 +1,52 @@
+import 'package:crm_app/services/data_quality_service.dart';
 import 'package:crm_app/services/plan_change_alert_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() {
+  group('DataQualityService', () {
+    test('detects duplicate, invalid phone, missing date, and carrier issues',
+        () {
+      final service = DataQualityService(
+        SupabaseClient('https://example.supabase.co', 'test-key'),
+      );
+      final issues = service.analyzeCustomers([
+        {
+          'id': '1',
+          'name': '홍길동',
+          'phone': '010-1234-5678',
+          'join_date': '2026-07-20',
+          'carrier': 'SK',
+          'previous_carrier': '',
+          'store': '본점',
+        },
+        {
+          'id': '2',
+          'name': '김길동',
+          'phone': '01012345678',
+          'join_date': '2026-07-21',
+          'carrier': 'KT',
+          'previous_carrier': '',
+          'store': '본점',
+        },
+        {
+          'id': '3',
+          'name': '오류고객',
+          'phone': '123',
+          'join_date': '',
+          'carrier': '미상',
+          'previous_carrier': '',
+          'store': '본점',
+        },
+      ]);
+
+      expect(issues.where((issue) => issue.type == 'duplicate'), hasLength(2));
+      expect(issues.any((issue) => issue.type == 'phone'), isTrue);
+      expect(issues.any((issue) => issue.type == 'join_date'), isTrue);
+      expect(issues.any((issue) => issue.type == 'carrier'), isTrue);
+    });
+  });
+
   group('PlanChangeAlertService', () {
     test('calculates add-service delete due dates by carrier', () {
       expect(

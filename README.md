@@ -38,7 +38,7 @@ Windows 설치파일은 Flutter release 빌드와 Inno Setup 컴파일을 함께
 ```powershell
 $env:SUPABASE_URL = "https://your-project.supabase.co"
 $env:SUPABASE_ANON_KEY = "your-publishable-or-anon-key"
-$env:INSTALLER_PASSWORD = "<installer-password>"
+$env:INSTALLER_PASSWORD = "312546"
 
 .\build_windows_installer.ps1
 ```
@@ -49,7 +49,7 @@ PowerShell 실행 정책 때문에 막히면 아래처럼 실행합니다.
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build_windows_installer.ps1 `
   -SupabaseUrl "https://your-project.supabase.co" `
   -SupabaseAnonKey "your-publishable-or-anon-key" `
-  -InstallerPassword "<installer-password>"
+  -InstallerPassword "312546"
 ```
 
 설치파일은 `output` 폴더에 생성됩니다.

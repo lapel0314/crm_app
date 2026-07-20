@@ -2,7 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 const String installerPassword = String.fromEnvironment(
   'INSTALLER_PASSWORD',
-  defaultValue: '123456',
+  defaultValue: '312546',
 );
 
 const String updateAllowedHosts = String.fromEnvironment(

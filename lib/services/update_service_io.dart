@@ -179,8 +179,7 @@ class UpdateService extends UpdateServiceBase {
       installer.path,
       [
         '/SP-',
-        '/VERYSILENT',
-        '/SUPPRESSMSGBOXES',
+        '/SILENT',
         '/NORESTART',
         '/PASSWORD=$installerPassword',
         '/LOG=$logPath',

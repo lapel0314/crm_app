@@ -10,6 +10,7 @@ import 'package:crm_app/pages/admin_page.dart';
 import 'package:crm_app/pages/audit_log_page.dart';
 import 'package:crm_app/pages/customer_open_page.dart';
 import 'package:crm_app/pages/customer_page.dart';
+import 'package:crm_app/pages/data_quality_page.dart';
 import 'package:crm_app/pages/dashboard_page.dart';
 import 'package:crm_app/pages/global_search_page.dart';
 import 'package:crm_app/pages/home_page.dart';
@@ -18,6 +19,7 @@ import 'package:crm_app/pages/leads_page.dart';
 import 'package:crm_app/pages/rebate_page.dart';
 import 'package:crm_app/pages/recycle_bin_page.dart';
 import 'package:crm_app/pages/settings_page.dart';
+import 'package:crm_app/pages/signup_approval_dashboard_page.dart';
 import 'package:crm_app/pages/store_management_page.dart';
 import 'package:crm_app/pages/wired_members_page.dart';
 import 'package:crm_app/services/audit_log_service.dart';
@@ -141,6 +143,12 @@ class _AppLayoutState extends State<AppLayout> {
         ),
       if (isAdminRole)
         _NavItem(
+          title: '승인현황',
+          icon: Icons.how_to_reg_rounded,
+          page: SignupApprovalDashboardPage(role: widget.role),
+        ),
+      if (isAdminRole)
+        _NavItem(
           title: '매장관리',
           icon: Icons.store_mall_directory_rounded,
           page: StoreManagementPage(
@@ -160,6 +168,15 @@ class _AppLayoutState extends State<AppLayout> {
           title: '감사로그',
           icon: Icons.manage_search_rounded,
           page: AuditLogPage(role: widget.role),
+        ),
+      if (isAdminRole)
+        _NavItem(
+          title: '데이터점검',
+          icon: Icons.fact_check_rounded,
+          page: DataQualityPage(
+            role: widget.role,
+            currentStore: activeStore,
+          ),
         ),
       if (canUseSettings(widget.role))
         _NavItem(

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -12,6 +14,18 @@ class AuditLogPage extends StatefulWidget {
 
   @override
   State<AuditLogPage> createState() => _AuditLogPageState();
+}
+
+class _ChangedField {
+  final String key;
+  final String oldValue;
+  final String newValue;
+
+  const _ChangedField({
+    required this.key,
+    required this.oldValue,
+    required this.newValue,
+  });
 }
 
 class _AuditLogPageState extends State<AuditLogPage> {
@@ -106,6 +120,8 @@ class _AuditLogPageState extends State<AuditLogPage> {
       'delete_lead' => '가망고객 삭제',
       'soft_delete_lead' => '가망고객 휴지통 이동',
       'soft_delete_wired_member' => '유선회원 휴지통 이동',
+      'update_profiles' => '직원정보 수정',
+      'delete_profiles' => '직원정보 삭제',
       '-' => '-',
       final raw => raw,
     };
@@ -140,6 +156,13 @@ class _AuditLogPageState extends State<AuditLogPage> {
       'store_filter' => '매장 필터',
       'date_filter' => '기간 필터',
       'subscriber' => '가입자',
+      'approval_status' => '승인상태',
+      'rejection_reason' => '반려사유',
+      'role_code' => '권한코드',
+      'store_id' => '매장ID',
+      'last_login_at' => '마지막 로그인',
+      'last_login_platform' => '로그인 플랫폼',
+      'last_login_public_ip' => '로그인 공인IP',
       _ => key,
     };
   }
@@ -167,6 +190,189 @@ class _AuditLogPageState extends State<AuditLogPage> {
       if (name != '-') return name;
     }
     return '대상번호 ${_value(log['target_id'])}';
+  }
+
+  Map<String, dynamic> _asStringMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map((key, value) => MapEntry(key.toString(), value));
+    }
+    return <String, dynamic>{};
+  }
+
+  List<_ChangedField> _changedFields(dynamic detail) {
+    final map = _asStringMap(detail);
+    final oldRow = _asStringMap(map['old']);
+    final newRow = _asStringMap(map['new']);
+    if (oldRow.isEmpty && newRow.isEmpty) return const [];
+
+    final keys = <String>{...oldRow.keys, ...newRow.keys}.toList()..sort();
+    return keys
+        .where((key) => oldRow[key]?.toString() != newRow[key]?.toString())
+        .map(
+          (key) => _ChangedField(
+            key: key,
+            oldValue: _value(oldRow[key]),
+            newValue: _value(newRow[key]),
+          ),
+        )
+        .toList();
+  }
+
+  String _prettyDetail(dynamic detail) {
+    try {
+      return const JsonEncoder.withIndent('  ').convert(detail);
+    } catch (_) {
+      return _detailLabel(detail);
+    }
+  }
+
+  void _showLogDetail(Map<String, dynamic> log) {
+    final changes = _changedFields(log['detail']);
+    showDialog(
+      context: context,
+      builder: (_) {
+        final size = MediaQuery.of(context).size;
+        return AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          title: Text(
+            _actionLabel(log['action']),
+            style: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+          content: SizedBox(
+            width: size.width < 900 ? size.width - 56 : 760,
+            height: size.height * 0.68,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 8,
+                  children: [
+                    _metaChip('화면', _tableLabel(log['target_table'])),
+                    _metaChip('대상', _value(log['target_id'])),
+                    _metaChip('시간', _timeLabel(log['created_at'])),
+                    _metaChip('작업자', _value(log['actor_id'])),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  '변경 필드',
+                  style: TextStyle(fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 8),
+                Expanded(
+                  child: changes.isEmpty
+                      ? SingleChildScrollView(
+                          child: SelectableText(
+                            _prettyDetail(log['detail']),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              height: 1.35,
+                              color: Color(0xFF374151),
+                            ),
+                          ),
+                        )
+                      : ListView.separated(
+                          itemCount: changes.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (_, index) {
+                            final field = changes[index];
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SizedBox(
+                                    width: 150,
+                                    child: Text(
+                                      _detailKeyLabel(field.key),
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w900,
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      field.oldValue,
+                                      style: const TextStyle(
+                                        color: Color(0xFF6B7280),
+                                      ),
+                                    ),
+                                  ),
+                                  const Padding(
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 12),
+                                    child: Icon(Icons.arrow_forward, size: 16),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      field.newValue,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        color: Color(0xFF111827),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                if (changes.isNotEmpty) ...[
+                  const Divider(height: 24),
+                  const Text(
+                    '원본 상세',
+                    style: TextStyle(fontWeight: FontWeight.w900),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 150,
+                    child: SingleChildScrollView(
+                      child: SelectableText(
+                        _prettyDetail(log['detail']),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          height: 1.35,
+                          color: Color(0xFF374151),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('닫기'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _metaChip(String label, String value) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Text(
+        '$label: $value',
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          color: Color(0xFF374151),
+        ),
+      ),
+    );
   }
 
   List<Map<String, dynamic>> get filteredLogs {
@@ -224,71 +430,74 @@ class _AuditLogPageState extends State<AuditLogPage> {
   }
 
   Widget _logRow(Map<String, dynamic> log) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFF1F3F5))),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 150,
-            child: Text(
-              _actionLabel(log['action']),
-              style: const TextStyle(
-                fontWeight: FontWeight.w900,
-                color: Color(0xFF111827),
+    return InkWell(
+      onTap: () => _showLogDetail(log),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: Color(0xFFF1F3F5))),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 150,
+              child: Text(
+                _actionLabel(log['action']),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF111827),
+                ),
               ),
             ),
-          ),
-          SizedBox(
-            width: 120,
-            child: Text(
-              _tableLabel(log['target_table']),
-              style: const TextStyle(
-                fontWeight: FontWeight.w800,
-                color: Color(0xFF374151),
+            SizedBox(
+              width: 120,
+              child: Text(
+                _tableLabel(log['target_table']),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF374151),
+                ),
               ),
             ),
-          ),
-          SizedBox(
-            width: 220,
-            child: Text(
-              _targetLabel(log),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF374151),
+            SizedBox(
+              width: 220,
+              child: Text(
+                _targetLabel(log),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF374151),
+                ),
               ),
             ),
-          ),
-          SizedBox(
-            width: 170,
-            child: Text(
-              _timeLabel(log['created_at']),
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF6B7280),
+            SizedBox(
+              width: 170,
+              child: Text(
+                _timeLabel(log['created_at']),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF6B7280),
+                ),
               ),
             ),
-          ),
-          Expanded(
-            child: Text(
-              _detailLabel(log['detail']),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 12,
-                height: 1.35,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFF6B7280),
+            Expanded(
+              child: Text(
+                _detailLabel(log['detail']),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 12,
+                  height: 1.35,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF6B7280),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
