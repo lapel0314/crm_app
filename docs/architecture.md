@@ -226,6 +226,7 @@ Responsibilities:
 
 - summary metrics from customers, leads, wired members, and inventory
 - current/monthly sales and margin views
+- model ranking aggregates common alias spellings for dashboard statistics without changing stored customer model names
 - detail dialogs for dashboard cards
 
 ### Admin and Audit

@@ -1,9 +1,42 @@
 import 'package:crm_app/services/data_quality_service.dart';
 import 'package:crm_app/services/plan_change_alert_service.dart';
+import 'package:crm_app/utils/model_name_utils.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 void main() {
+  group('normalizeModelName', () {
+    test('normalizes dashboard model aliases without changing stored values',
+        () {
+      expect(normalizeModelName('A175'), 'SM-A175');
+      expect(normalizeModelName('a175'), 'SM-A175');
+      expect(normalizeModelName('SM-A175'), 'SM-A175');
+      expect(normalizeModelName('SM-A175N'), 'SM-A175');
+      expect(normalizeModelName('SM A175'), 'SM-A175');
+      expect(normalizeModelName('s928n'), 'SM-S928');
+      expect(normalizeModelName('S942'), 'SM-S942');
+      expect(normalizeModelName('S942N256'), 'SM-S942');
+      expect(normalizeModelName('S948N512GB'), 'SM-S948');
+      expect(normalizeModelName('F766N256'), 'SM-F766');
+      expect(normalizeModelName('M140'), 'SM-M140');
+      expect(normalizeModelName('L325'), 'SM-L325');
+      expect(normalizeModelName('X216'), 'SM-X216');
+      expect(normalizeModelName('아이폰17'), 'iPhone 17');
+      expect(normalizeModelName('iphone17'), 'iPhone 17');
+      expect(normalizeModelName('iPhone 17'), 'iPhone 17');
+      expect(normalizeModelName('아이폰17프로'), 'iPhone 17 Pro');
+      expect(normalizeModelName('17PR-256'), 'iPhone 17 Pro');
+      expect(normalizeModelName('17PM-512'), 'iPhone 17 Pro Max');
+      expect(normalizeModelName('17PM256'), 'iPhone 17 Pro Max');
+      expect(normalizeModelName('16E-128'), 'iPhone 16e');
+      expect(normalizeModelName('AIP16PMN512'), 'iPhone 16 Pro Max');
+      expect(normalizeModelName('갤럭시 A17'), '갤럭시 A17');
+      expect(normalizeModelName('iPhone 15'), 'iPhone 15');
+      expect(normalizeModelName('A2633-128'), 'A2633-128');
+      expect(normalizeModelName('SE3 44MM'), 'SE3 44MM');
+    });
+  });
+
   group('DataQualityService', () {
     test('detects duplicate, invalid phone, missing date, and carrier issues',
         () {

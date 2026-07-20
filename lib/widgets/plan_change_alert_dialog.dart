@@ -40,6 +40,7 @@ class _PlanChangeAlertDialogState extends State<PlanChangeAlertDialog> {
     final compact = screenSize.width < 900;
     final dateText = DateFormat('yyyy-MM-dd').format(widget.result.date);
     final customerCount = widget.result.uniqueCustomers.length;
+    final listItems = _buildListItems(widget.result);
 
     return AlertDialog(
       backgroundColor: Colors.white,
@@ -98,18 +99,37 @@ class _PlanChangeAlertDialogState extends State<PlanChangeAlertDialog> {
         height: compact ? screenSize.height * 0.62 : 560,
         child: widget.result.entries.isEmpty
             ? const _EmptyAlert()
-            : ListView(
-                children: [
-                  for (final carrier in PlanChangeAlertService.carrierOrder)
-                    if (widget.result.grouped.containsKey(carrier))
-                      _CarrierSection(
-                        carrier: carrier,
-                        groups: widget.result.grouped[carrier]!,
-                        completedTaskIds: completedTaskIds,
-                        completingTaskIds: completingTaskIds,
-                        onComplete: _completeEntry,
-                      ),
-                ],
+            : ListView.builder(
+                itemCount: listItems.length,
+                itemBuilder: (context, index) {
+                  final item = listItems[index];
+                  switch (item.kind) {
+                    case _AlertListItemKind.carrier:
+                      return _CarrierHeader(
+                        carrier: item.carrier!,
+                        total: item.count,
+                      );
+                    case _AlertListItemKind.type:
+                      return _TypeHeader(
+                        type: item.type!,
+                        count: item.count,
+                      );
+                    case _AlertListItemKind.customer:
+                      final entry = item.entry!;
+                      return _CustomerRow(
+                        entry: entry,
+                        isCompleted: entry.isCompleted ||
+                            completedTaskIds.contains(entry.task?.id ?? ''),
+                        isCompleting:
+                            completingTaskIds.contains(entry.task?.id ?? ''),
+                        onComplete: entry.task == null
+                            ? null
+                            : () => _completeEntry(entry),
+                      );
+                    case _AlertListItemKind.gap:
+                      return const SizedBox(height: 12);
+                  }
+                },
               ),
       ),
       actions: [
@@ -155,6 +175,34 @@ class _PlanChangeAlertDialogState extends State<PlanChangeAlertDialog> {
     } finally {
       if (mounted) setState(() => isExporting = false);
     }
+  }
+
+  List<_AlertListItem> _buildListItems(PlanChangeAlertResult result) {
+    final grouped = result.grouped;
+    final items = <_AlertListItem>[];
+
+    for (final carrier in PlanChangeAlertService.carrierOrder) {
+      final groups = grouped[carrier];
+      if (groups == null) continue;
+
+      final total =
+          groups.values.fold<int>(0, (sum, rows) => sum + rows.length);
+      items.add(_AlertListItem.carrier(carrier, total));
+
+      for (final type in PlanChangeAlertService.typeOrder) {
+        final entries = groups[type];
+        if (entries == null || entries.isEmpty) continue;
+
+        items.add(_AlertListItem.type(type, entries.length));
+        for (final entry in entries) {
+          items.add(_AlertListItem.customer(entry));
+        }
+      }
+
+      items.add(const _AlertListItem.gap());
+    }
+
+    return items;
   }
 
   Future<void> _completeEntry(PlanChangeAlertEntry entry) async {
@@ -314,27 +362,53 @@ class _EmptyAlert extends StatelessWidget {
   }
 }
 
-class _CarrierSection extends StatelessWidget {
-  final String carrier;
-  final Map<PlanChangeAlertType, List<PlanChangeAlertEntry>> groups;
-  final Set<String> completedTaskIds;
-  final Set<String> completingTaskIds;
-  final Future<void> Function(PlanChangeAlertEntry entry) onComplete;
+enum _AlertListItemKind { carrier, type, customer, gap }
 
-  const _CarrierSection({
+class _AlertListItem {
+  final _AlertListItemKind kind;
+  final String? carrier;
+  final PlanChangeAlertType? type;
+  final PlanChangeAlertEntry? entry;
+  final int count;
+
+  const _AlertListItem.carrier(this.carrier, this.count)
+      : kind = _AlertListItemKind.carrier,
+        type = null,
+        entry = null;
+
+  const _AlertListItem.type(this.type, this.count)
+      : kind = _AlertListItemKind.type,
+        carrier = null,
+        entry = null;
+
+  const _AlertListItem.customer(this.entry)
+      : kind = _AlertListItemKind.customer,
+        carrier = null,
+        type = null,
+        count = 0;
+
+  const _AlertListItem.gap()
+      : kind = _AlertListItemKind.gap,
+        carrier = null,
+        type = null,
+        entry = null,
+        count = 0;
+}
+
+class _CarrierHeader extends StatelessWidget {
+  final String carrier;
+  final int total;
+
+  const _CarrierHeader({
     required this.carrier,
-    required this.groups,
-    required this.completedTaskIds,
-    required this.completingTaskIds,
-    required this.onComplete,
+    required this.total,
   });
 
   @override
   Widget build(BuildContext context) {
-    final total = groups.values.fold<int>(0, (sum, rows) => sum + rows.length);
     return Container(
-      margin: const EdgeInsets.only(bottom: 14),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFFF9FAFB),
         borderRadius: BorderRadius.circular(8),
@@ -357,83 +431,51 @@ class _CarrierSection extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          for (final type in PlanChangeAlertService.typeOrder)
-            if (groups.containsKey(type))
-              _TypeGroup(
-                type: type,
-                entries: groups[type]!,
-                completedTaskIds: completedTaskIds,
-                completingTaskIds: completingTaskIds,
-                onComplete: onComplete,
-              ),
         ],
       ),
     );
   }
 }
 
-class _TypeGroup extends StatelessWidget {
+class _TypeHeader extends StatelessWidget {
   final PlanChangeAlertType type;
-  final List<PlanChangeAlertEntry> entries;
-  final Set<String> completedTaskIds;
-  final Set<String> completingTaskIds;
-  final Future<void> Function(PlanChangeAlertEntry entry) onComplete;
+  final int count;
 
-  const _TypeGroup({
+  const _TypeHeader({
     required this.type,
-    required this.entries,
-    required this.completedTaskIds,
-    required this.completingTaskIds,
-    required this.onComplete,
+    required this.count,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Row(
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFE5E7EB)),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    type.label,
-                    style: const TextStyle(
-                      color: Color(0xFF111827),
-                      fontSize: 13,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                Text(
-                  '${entries.length}명',
-                  style: const TextStyle(
-                    color: Color(0xFFC94C6E),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ],
+          Expanded(
+            child: Text(
+              type.label,
+              style: const TextStyle(
+                color: Color(0xFF111827),
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+              ),
             ),
           ),
-          const SizedBox(height: 7),
-          for (final entry in entries)
-            _CustomerRow(
-              entry: entry,
-              isCompleted: entry.isCompleted ||
-                  completedTaskIds.contains(entry.task?.id ?? ''),
-              isCompleting: completingTaskIds.contains(entry.task?.id ?? ''),
-              onComplete: entry.task == null ? null : () => onComplete(entry),
+          Text(
+            '$count명',
+            style: const TextStyle(
+              color: Color(0xFFC94C6E),
+              fontSize: 12,
+              fontWeight: FontWeight.w900,
             ),
+          ),
         ],
       ),
     );

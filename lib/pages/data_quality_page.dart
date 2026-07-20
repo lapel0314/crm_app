@@ -5,14 +5,21 @@ import 'package:crm_app/utils/store_utils.dart';
 
 final supabase = Supabase.instance.client;
 
+typedef CustomerIssueOpenHandler = void Function({
+  required String name,
+  required String phone,
+});
+
 class DataQualityPage extends StatefulWidget {
   final String role;
   final String currentStore;
+  final CustomerIssueOpenHandler? onOpenCustomer;
 
   const DataQualityPage({
     super.key,
     required this.role,
     required this.currentStore,
+    this.onOpenCustomer,
   });
 
   @override
@@ -115,6 +122,13 @@ class _DataQualityPageState extends State<DataQualityPage> {
 
   Color _severityColor(String severity) {
     return severity == '높음' ? const Color(0xFFDC2626) : const Color(0xFFD97706);
+  }
+
+  void _openCustomer(DataQualityIssue issue) {
+    widget.onOpenCustomer?.call(
+      name: issue.name == '-' ? '' : issue.name,
+      phone: issue.phone == '-' ? '' : issue.phone,
+    );
   }
 
   Widget _summaryTile(String label, int count, IconData icon) {
@@ -228,6 +242,13 @@ class _DataQualityPageState extends State<DataQualityPage> {
                 color: Color(0xFF374151),
               ),
             ),
+          ),
+          IconButton(
+            onPressed: widget.onOpenCustomer == null
+                ? null
+                : () => _openCustomer(issue),
+            icon: const Icon(Icons.open_in_new_rounded, size: 18),
+            tooltip: '고객DB에서 보기',
           ),
         ],
       ),

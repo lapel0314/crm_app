@@ -1,3 +1,4 @@
+import 'package:crm_app/utils/model_name_utils.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -1140,7 +1141,7 @@ class _DashboardPageState extends State<DashboardPage> {
   List<MapEntry<String, int>> _monthlyModelRanking() {
     final modelCounts = <String, int>{};
     for (final customer in monthCustomerSales) {
-      final model = _text(customer['model']);
+      final model = normalizeModelName(_text(customer['model']));
       if (model == '-') continue;
       modelCounts[model] = (modelCounts[model] ?? 0) + 1;
     }
@@ -1150,7 +1151,9 @@ class _DashboardPageState extends State<DashboardPage> {
 
   List<Map<String, dynamic>> _monthlyModelRows(String model) {
     final rows = monthCustomerSales
-        .where((customer) => _text(customer['model']) == model)
+        .where(
+          (customer) => normalizeModelName(_text(customer['model'])) == model,
+        )
         .toList();
     rows.sort((a, b) {
       final aDate = _customerDate(a);
@@ -1231,6 +1234,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       _popupField('고객명', row['name'], strong: true),
                       _popupField('휴대폰', row['phone']),
                       _popupField('통신사', row['carrier']),
+                      _popupField('모델명', row['model']),
                       _popupField('담당자', row['staff']),
                       _popupField('리베이트', _money(_customerTotalRebate(row)),
                           strong: true),

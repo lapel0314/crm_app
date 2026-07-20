@@ -165,6 +165,7 @@ class _AppLayoutState extends State<AppLayout> {
           page: DataQualityPage(
             role: widget.role,
             currentStore: activeStore,
+            onOpenCustomer: _openCustomerFromQualityIssue,
           ),
         ),
       if (canUseSettings(widget.role))
@@ -597,6 +598,27 @@ class _AppLayoutState extends State<AppLayout> {
     });
   }
 
+  void _openCustomerFromQualityIssue({
+    required String name,
+    required String phone,
+  }) {
+    final index = items.indexWhere((item) => item.title == '고객DB');
+    if (index < 0) return;
+    setState(() {
+      globalNameQuery = name;
+      globalPhoneQuery = phone;
+      pageSearchNameQuery = name;
+      pageSearchPhoneQuery = phone;
+      selectedIndex = index;
+    });
+  }
+
+  void _openGlobalSearchPage() {
+    final index = searchPageIndex;
+    if (index < 0) return;
+    setState(() => selectedIndex = index);
+  }
+
   void _runGlobalSearch() {
     final name = globalNameSearchController.text.trim();
     final phone = globalPhoneSearchController.text.trim();
@@ -1014,79 +1036,141 @@ class _AppLayoutState extends State<AppLayout> {
   Widget _quickTopBar(List<_NavItem> navItems) {
     final rebateIndex = navItems.indexWhere((item) => item.title == '리베이트');
 
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compactSearch = constraints.maxWidth < 980;
+        return Container(
+          height: 58,
+          padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 7),
+          decoration: const BoxDecoration(
+            color: Color(0xFF111827),
+            border: Border(bottom: BorderSide(color: Color(0xFF252740))),
+          ),
+          child: Row(
+            children: [
+              _quickButton(
+                icon: Icons.notifications_active_outlined,
+                label: '공지사항',
+                accent: hasUnreadNotice,
+                onTap: isNoticeLoading ? null : _showNoticePopup,
+                width: 150,
+              ),
+              if (canUseCustomerDb(widget.role)) ...[
+                const SizedBox(width: 8),
+                _quickButton(
+                  icon: Icons.event_available_rounded,
+                  label: '오늘 알림',
+                  accent: todayPlanAlert?.entries.isNotEmpty == true,
+                  onTap:
+                      isPlanAlertLoading ? null : () => _openTodayPlanAlert(),
+                  width: 124,
+                ),
+              ],
+              if (rebateIndex >= 0 && !compactSearch) ...[
+                const SizedBox(width: 8),
+                _quickButton(
+                  icon: Icons.image_rounded,
+                  label: '리베이트',
+                  selected: selectedIndex == rebateIndex,
+                  onTap: () {
+                    setState(() => selectedIndex = rebateIndex);
+                  },
+                  width: 116,
+                ),
+              ],
+              if (canUseGlobalSearch(widget.role)) ...[
+                const Spacer(),
+                compactSearch
+                    ? _quickSearchButton(
+                        width: 148,
+                        label: '통합검색',
+                        onPressed: _openGlobalSearchPage,
+                      )
+                    : Flexible(
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: _globalSearchBox(),
+                        ),
+                      ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _globalSearchBox() {
     return Container(
-      height: 50,
-      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 7),
-      decoration: const BoxDecoration(
-        color: Color(0xFF111827),
-        border: Border(bottom: BorderSide(color: Color(0xFF252740))),
+      constraints: const BoxConstraints(maxWidth: 620),
+      height: 44,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1F2233),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFC94C6E), width: 1.2),
       ),
       child: Row(
         children: [
-          _quickButton(
-            icon: Icons.notifications_active_outlined,
-            label: '공지사항',
-            accent: hasUnreadNotice,
-            onTap: isNoticeLoading ? null : _showNoticePopup,
-            width: 150,
+          const Icon(Icons.manage_search_rounded,
+              size: 19, color: Color(0xFFFFD6E1)),
+          const SizedBox(width: 8),
+          const Text(
+            '통합검색',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-          if (canUseCustomerDb(widget.role)) ...[
-            const SizedBox(width: 8),
-            _quickButton(
-              icon: Icons.event_available_rounded,
-              label: '오늘 알림',
-              accent: todayPlanAlert?.entries.isNotEmpty == true,
-              onTap: isPlanAlertLoading ? null : () => _openTodayPlanAlert(),
-              width: 124,
-            ),
-          ],
-          if (rebateIndex >= 0) ...[
-            const SizedBox(width: 8),
-            _quickButton(
-              icon: Icons.image_rounded,
-              label: '리베이트',
-              selected: selectedIndex == rebateIndex,
-              onTap: () {
-                setState(() => selectedIndex = rebateIndex);
-              },
-              width: 116,
-            ),
-          ],
-          if (canUseGlobalSearch(widget.role)) ...[
-            const Spacer(),
-            _quickSearchField(
+          const SizedBox(width: 12),
+          Expanded(
+            child: _quickSearchField(
               controller: globalNameSearchController,
-              hint: '고객명 검색',
+              hint: '고객명',
               icon: Icons.person_search_outlined,
-              width: 180,
             ),
-            const SizedBox(width: 8),
-            _quickSearchField(
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: _quickSearchField(
               controller: globalPhoneSearchController,
-              hint: '핸드폰번호 검색',
+              hint: '핸드폰번호',
               icon: Icons.phone_iphone_outlined,
-              width: 200,
             ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 124,
-              height: 34,
-              child: ElevatedButton.icon(
-                onPressed: _runGlobalSearch,
-                icon: const Icon(Icons.search_rounded, size: 16),
-                label: const Text('통합검색'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFC94C6E),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-            ),
-          ],
+          ),
+          const SizedBox(width: 8),
+          _quickSearchButton(
+            width: 92,
+            label: '검색',
+            onPressed: _runGlobalSearch,
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _quickSearchButton({
+    required double width,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return SizedBox(
+      width: width,
+      height: 34,
+      child: ElevatedButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(Icons.search_rounded, size: 16),
+        label: Text(label),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFFC94C6E),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
       ),
     );
   }

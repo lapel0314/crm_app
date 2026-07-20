@@ -264,6 +264,12 @@ class _SignupApprovalDashboardPageState
           children: [
             Row(
               children: [
+                IconButton(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.arrow_back_rounded),
+                  tooltip: '뒤로가기',
+                ),
+                const SizedBox(width: 8),
                 const Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
