@@ -1429,28 +1429,15 @@ class _CustomerPageState extends State<CustomerPage> {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    width: 4,
-                    height: 18,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6B7280),
-                      borderRadius: BorderRadius.circular(99),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w900,
-                      color: Color(0xFF111827),
-                    ),
-                  ),
-                ],
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: Color(0xFF111827),
+                ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Wrap(
                 spacing: 18,
                 runSpacing: 0,
@@ -2207,45 +2194,44 @@ class _CustomerPageState extends State<CustomerPage> {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: compact ? 3 : 4,
-            height: compact ? 22 : 34,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(99),
-            ),
-          ),
-          SizedBox(width: compact ? 8 : 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
+          Row(
+            children: [
+              Expanded(
+                child: Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Color(0xFF9CA3AF),
+                    color: const Color(0xFF6B7280),
                     fontSize: compact ? 10 : 12,
                     fontWeight: FontWeight.w700,
                     height: 1.1,
                   ),
                 ),
-                SizedBox(height: compact ? 2 : 5),
-                Text(
-                  value,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Color(0xFF111827),
-                    fontSize: compact ? 16 : 21,
-                    fontWeight: FontWeight.w800,
-                    height: 1,
-                  ),
+              ),
+              Container(
+                width: compact ? 20 : 26,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(2),
                 ),
-              ],
+              ),
+            ],
+          ),
+          SizedBox(height: compact ? 4 : 7),
+          Text(
+            value,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: const Color(0xFF111827),
+              fontSize: compact ? 16 : 21,
+              fontWeight: FontWeight.w800,
+              height: 1,
             ),
           ),
         ],
@@ -2606,6 +2592,142 @@ class _CustomerPageState extends State<CustomerPage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _customerMobileCard(Map<String, dynamic> customer) {
+    final customerId = customer['id'].toString();
+    final selected = selectedCustomerIds.contains(customerId);
+    final phone = _displayPhone(customer['phone']?.toString() ?? '');
+
+    return InkWell(
+      onTap: () => showDetail(customer),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE8E9EF)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (!isOpenView) ...[
+                  Checkbox(
+                    value: selected,
+                    onChanged: (value) {
+                      setState(() {
+                        if (value == true) {
+                          selectedCustomerIds.add(customerId);
+                        } else {
+                          selectedCustomerIds.remove(customerId);
+                        }
+                      });
+                    },
+                    visualDensity: VisualDensity.compact,
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                Expanded(
+                  child: Text(
+                    _displayName(customer['name']?.toString() ?? ''),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF111827),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                _tableBadge(
+                  _text(customer['carrier']),
+                  color: _carrierColor(customer['carrier']),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _tableBadge(
+                  _date(customer['join_date']),
+                  color: const Color(0xFF6B7280),
+                ),
+                _tableBadge(
+                  _text(customer['staff']),
+                  color: _staffColor(customer['staff']),
+                ),
+                _tableBadge(
+                  _text(customer['join_type']),
+                  color: _joinTypeColor(customer['join_type']),
+                ),
+                if (!isOpenView) _planTaskStatusBadge(customer),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _mobileLine(Icons.phone_iphone_outlined, phone),
+            _mobileLine(Icons.devices_other_outlined, _text(customer['model'])),
+            _mobileLine(Icons.receipt_long_outlined, _text(customer['plan'])),
+            if (_text(customer['add_service']) != '-')
+              _mobileLine(
+                Icons.add_circle_outline_rounded,
+                _text(customer['add_service']),
+              ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Spacer(),
+                _compactIconButton(
+                  tooltip: '상세',
+                  onPressed: () => showDetail(customer),
+                  icon: const Icon(Icons.visibility_outlined, size: 18),
+                ),
+                if (canEdit)
+                  _compactIconButton(
+                    tooltip: '수정',
+                    onPressed: () => showEditDialog(customer),
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                  ),
+                if (canDelete)
+                  _compactIconButton(
+                    tooltip: '삭제',
+                    onPressed: () => showDeleteDialog(customer),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _mobileLine(IconData icon, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: const Color(0xFF9CA3AF)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF4B5563),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -3114,18 +3236,12 @@ class _CustomerPageState extends State<CustomerPage> {
                                       '\uACE0\uAC1D \uC815\uBCF4\uAC00 \uC5C6\uC2B5\uB2C8\uB2E4',
                                     ),
                                   )
-                                : Scrollbar(
-                                    thumbVisibility: true,
-                                    child: SingleChildScrollView(
-                                      child: _customerTable(
-                                        visibleCustomers,
-                                        allSelected: allCustomersSelected,
-                                        hasSelectionTarget:
-                                            customers.isNotEmpty,
-                                        selectionTargetCount: customers.length,
-                                        partiallySelected:
-                                            partiallySelectedCustomers,
-                                      ),
+                                : ListView.builder(
+                                    padding: const EdgeInsets.only(bottom: 10),
+                                    itemCount: visibleCustomers.length,
+                                    itemBuilder: (context, index) =>
+                                        _customerMobileCard(
+                                      visibleCustomers[index],
                                     ),
                                   ),
                       ),

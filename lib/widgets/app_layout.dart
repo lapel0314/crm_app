@@ -69,18 +69,21 @@ class _AppLayoutState extends State<AppLayout> {
   bool get isAdminRole => isPrivilegedRole(widget.role);
   bool get canAddStores => isPrivilegedRole(widget.role);
   String get displayStore => activeStore.isEmpty ? '전체 매장' : activeStore;
+  static const Color _sidebarPink = Color(0xFFEC4899);
+  static const Color _sidebarPinkSoft = Color(0xFFFCE7F3);
+  static const Color _sidebarInactive = Color(0xFFC4C8DC);
 
   List<_NavItem> get items {
     return [
       _NavItem(
         title: '고객등록',
-        icon: Icons.edit_note_rounded,
+        icon: Icons.add_to_home_screen_rounded,
         page: HomePage(role: widget.role, currentStore: activeStore),
       ),
       if (canUseCustomerDb(widget.role))
         _NavItem(
           title: '고객DB',
-          icon: Icons.people_alt_rounded,
+          icon: Icons.contact_phone_rounded,
           page: CustomerPage(
             role: widget.role,
             currentStore: activeStore,
@@ -91,13 +94,13 @@ class _AppLayoutState extends State<AppLayout> {
       if (canUseOpenCustomerDb(widget.role))
         _NavItem(
           title: '고객DBS',
-          icon: Icons.people_alt_rounded,
+          icon: Icons.contact_phone_rounded,
           page: CustomerOpenPage(role: widget.role, currentStore: activeStore),
         ),
       if (canUseLeads(widget.role))
         _NavItem(
           title: '가망고객',
-          icon: Icons.person_search_rounded,
+          icon: Icons.person_add_alt_1_rounded,
           page: LeadsPage(
             role: widget.role,
             currentStore: activeStore,
@@ -107,7 +110,7 @@ class _AppLayoutState extends State<AppLayout> {
       if (canUseWiredMembers(widget.role))
         _NavItem(
           title: '유선회원',
-          icon: Icons.cable_rounded,
+          icon: Icons.router_rounded,
           page: WiredMembersPage(
             role: widget.role,
             currentStore: activeStore,
@@ -117,13 +120,13 @@ class _AppLayoutState extends State<AppLayout> {
       if (canUseDashboard(widget.role))
         _NavItem(
           title: '대시보드',
-          icon: Icons.dashboard_rounded,
+          icon: Icons.monitor_heart_rounded,
           page: DashboardPage(role: widget.role, currentStore: activeStore),
         ),
       if (canUseInventory(widget.role))
         _NavItem(
           title: '재고관리',
-          icon: Icons.inventory_2_rounded,
+          icon: Icons.phone_android_rounded,
           page: InventoryPage(role: widget.role, currentStore: activeStore),
         ),
       if (canViewRebate(widget.role))
@@ -136,13 +139,13 @@ class _AppLayoutState extends State<AppLayout> {
       if (isAdminRole)
         _NavItem(
           title: '직원관리',
-          icon: Icons.admin_panel_settings_rounded,
+          icon: Icons.badge_rounded,
           page: AdminPage(role: widget.role),
         ),
       if (isAdminRole)
         _NavItem(
           title: '매장관리',
-          icon: Icons.store_mall_directory_rounded,
+          icon: Icons.storefront_rounded,
           page: StoreManagementPage(
             role: widget.role,
             currentStore: activeStore,
@@ -161,7 +164,7 @@ class _AppLayoutState extends State<AppLayout> {
       if (isAdminRole)
         _NavItem(
           title: '고객정리',
-          icon: Icons.fact_check_rounded,
+          icon: Icons.rule_folder_rounded,
           page: DataQualityPage(
             role: widget.role,
             currentStore: activeStore,
@@ -1186,8 +1189,8 @@ class _AppLayoutState extends State<AppLayout> {
     final color = accent
         ? const Color(0xFFDC2626)
         : selected
-            ? const Color(0xFFC94C6E)
-            : const Color(0xFF8A8DA6);
+            ? _sidebarPink
+            : _sidebarInactive;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -1247,7 +1250,7 @@ class _AppLayoutState extends State<AppLayout> {
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: const TextStyle(color: Color(0xFF7C7F96)),
-          prefixIcon: Icon(icon, size: 16, color: const Color(0xFF8A8DA6)),
+          prefixIcon: Icon(icon, size: 16, color: _sidebarInactive),
           filled: true,
           fillColor: Colors.black.withValues(alpha: 0.12),
           contentPadding: const EdgeInsets.symmetric(horizontal: 10),
@@ -1271,56 +1274,136 @@ class _AppLayoutState extends State<AppLayout> {
   Widget _sidebarBrandHeader({required EdgeInsets padding}) {
     return Padding(
       padding: padding,
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: const Color(0xFFC94C6E),
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFFC94C6E).withValues(alpha: 0.32),
-                  blurRadius: 18,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.phone_iphone_rounded,
-              size: 19,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  '핑크폰',
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w900,
-                    color: Colors.white,
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF202336),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF303349)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: _sidebarPinkSoft),
+                boxShadow: [
+                  BoxShadow(
+                    color: _sidebarPink.withValues(alpha: 0.30),
+                    blurRadius: 16,
+                    offset: const Offset(0, 7),
                   ),
+                ],
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(5),
+                child: Image.asset(
+                  'assets/images/app_icon.png',
+                  fit: BoxFit.contain,
+                  filterQuality: FilterQuality.medium,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  '권한: ${widget.role}',
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: Color(0xFF9CA3AF),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    '핑크폰',
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      height: 1.05,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          widget.role,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: _sidebarInactive,
+                            fontWeight: FontWeight.w800,
+                            height: 1,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Container(
+                        width: 4,
+                        height: 4,
+                        decoration: const BoxDecoration(
+                          color: _sidebarPink,
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      const Text(
+                        'CRM',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: _sidebarPinkSoft,
+                          fontWeight: FontWeight.w900,
+                          height: 1,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _storeIconBox({required bool selected}) {
+    return Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        color: selected ? _sidebarPink : _sidebarPink.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(9),
+        border: Border.all(
+          color: selected
+              ? _sidebarPinkSoft.withValues(alpha: 0.45)
+              : _sidebarPink.withValues(alpha: 0.30),
+        ),
+      ),
+      child: Icon(
+        Icons.storefront_rounded,
+        size: 18,
+        color: selected ? Colors.white : _sidebarPinkSoft,
+      ),
+    );
+  }
+
+  Widget _storeChangeBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+      decoration: BoxDecoration(
+        color: _sidebarPink.withValues(alpha: 0.14),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: _sidebarPink.withValues(alpha: 0.28)),
+      ),
+      child: const Text(
+        '변경',
+        style: TextStyle(
+          color: _sidebarPinkSoft,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+          height: 1,
+        ),
       ),
     );
   }
@@ -1331,70 +1414,64 @@ class _AppLayoutState extends State<AppLayout> {
       child: Column(
         children: [
           InkWell(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(12),
             onTap: _toggleStoreAccordion,
             child: Container(
-              height: 42,
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              constraints: const BoxConstraints(minHeight: 62),
+              padding: const EdgeInsets.all(11),
               decoration: BoxDecoration(
                 color: isStoreAccordionOpen
-                    ? const Color(0xFFC94C6E).withValues(alpha: 0.12)
-                    : Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(8),
+                    ? _sidebarPink.withValues(alpha: 0.14)
+                    : const Color(0xFF202336),
+                borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: isStoreAccordionOpen
-                      ? const Color(0xFFC94C6E).withValues(alpha: 0.38)
-                      : const Color(0xFF252740),
+                      ? _sidebarPink.withValues(alpha: 0.45)
+                      : const Color(0xFF303349),
                 ),
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFC94C6E).withValues(alpha: 0.16),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Icon(
-                      Icons.storefront_rounded,
-                      size: 14,
-                      color: Color(0xFFC94C6E),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
+                  _storeIconBox(selected: isStoreAccordionOpen),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const Text(
-                          '매장',
+                          '현재 매장',
                           style: TextStyle(
                             fontSize: 10,
-                            color: Color(0xFF7C7F96),
+                            color: _sidebarInactive,
                             fontWeight: FontWeight.w800,
+                            height: 1,
                           ),
                         ),
+                        const SizedBox(height: 6),
                         Text(
                           displayStore,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFFE5E7EB),
-                            fontWeight: FontWeight.w800,
+                            fontSize: 13,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w900,
+                            height: 1,
                           ),
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(width: 8),
+                  _storeChangeBadge(),
+                  const SizedBox(width: 6),
                   AnimatedRotation(
                     turns: isStoreAccordionOpen ? 0.5 : 0,
                     duration: const Duration(milliseconds: 180),
                     child: const Icon(
                       Icons.keyboard_arrow_down_rounded,
-                      size: 18,
-                      color: Color(0xFF8A8DA6),
+                      size: 19,
+                      color: _sidebarInactive,
                     ),
                   ),
                 ],
@@ -1454,7 +1531,7 @@ class _AppLayoutState extends State<AppLayout> {
               child: Text(
                 '등록된 매장이 없습니다.',
                 style: TextStyle(
-                  color: Color(0xFF8A8DA6),
+                  color: _sidebarInactive,
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                 ),
@@ -1507,7 +1584,7 @@ class _AppLayoutState extends State<AppLayout> {
         padding: const EdgeInsets.symmetric(horizontal: 9),
         decoration: BoxDecoration(
           color: selected
-              ? const Color(0xFFC94C6E).withValues(alpha: 0.16)
+              ? _sidebarPink.withValues(alpha: 0.16)
               : Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(7),
         ),
@@ -1516,12 +1593,9 @@ class _AppLayoutState extends State<AppLayout> {
             Icon(
               store.allStores
                   ? Icons.all_inbox_rounded
-                  : selected
-                      ? Icons.radio_button_checked
-                      : Icons.storefront_outlined,
+                  : Icons.storefront_rounded,
               size: 15,
-              color:
-                  selected ? const Color(0xFFC94C6E) : const Color(0xFF8A8DA6),
+              color: selected ? _sidebarPink : _sidebarInactive,
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -1549,10 +1623,10 @@ class _AppLayoutState extends State<AppLayout> {
         height: 36,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFFC94C6E).withValues(alpha: 0.16),
+          color: _sidebarPink.withValues(alpha: 0.16),
           borderRadius: BorderRadius.circular(7),
           border: Border.all(
-            color: const Color(0xFFC94C6E).withValues(alpha: 0.34),
+            color: _sidebarPink.withValues(alpha: 0.34),
           ),
         ),
         child: Row(
@@ -1567,7 +1641,7 @@ class _AppLayoutState extends State<AppLayout> {
               const Icon(
                 Icons.add_business_rounded,
                 size: 16,
-                color: Color(0xFFC94C6E),
+                color: _sidebarPink,
               ),
             const SizedBox(width: 8),
             const Expanded(
@@ -1651,7 +1725,7 @@ class _AppLayoutState extends State<AppLayout> {
                     _compactActionItem(
                       icon: Icons.logout_rounded,
                       label: '로그아웃',
-                      color: const Color(0xFF8A8DA6),
+                      color: _sidebarInactive,
                       onTap: () {
                         Navigator.pop(context);
                         _confirmLogout();
@@ -1661,7 +1735,7 @@ class _AppLayoutState extends State<AppLayout> {
                     _compactActionItem(
                       icon: Icons.power_settings_new_rounded,
                       label: '종료',
-                      color: const Color(0xFFDC2626),
+                      color: const Color(0xFFEF4444),
                       onTap: () {
                         Navigator.pop(context);
                         _confirmExit();
@@ -1766,26 +1840,21 @@ class _AppLayoutState extends State<AppLayout> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
           color: selected
-              ? const Color(0xFFC94C6E).withValues(alpha: 0.14)
+              ? _sidebarPink.withValues(alpha: 0.18)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           children: [
-            Icon(
-              item.icon,
-              color:
-                  selected ? const Color(0xFFC94C6E) : const Color(0xFF8A8DA6),
-              size: 18,
-            ),
+            _sidebarMenuIcon(item.icon, selected: selected),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
                 item.title,
                 style: TextStyle(
                   fontSize: 14,
-                  fontWeight: FontWeight.w700,
-                  color: selected ? Colors.white : const Color(0xFF8A8DA6),
+                  fontWeight: FontWeight.w800,
+                  color: selected ? Colors.white : _sidebarInactive,
                 ),
               ),
             ),
@@ -1813,7 +1882,7 @@ class _AppLayoutState extends State<AppLayout> {
         ),
         child: Row(
           children: [
-            Icon(icon, color: color),
+            _sidebarActionIcon(icon, color: color),
             const SizedBox(width: 12),
             Expanded(
               child: Text(
@@ -1828,6 +1897,40 @@ class _AppLayoutState extends State<AppLayout> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _sidebarMenuIcon(IconData icon, {required bool selected}) {
+    return Container(
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        color: selected ? _sidebarPink : Colors.white.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: selected
+              ? _sidebarPinkSoft.withValues(alpha: 0.45)
+              : const Color(0xFF313449),
+        ),
+      ),
+      child: Icon(
+        icon,
+        color: selected ? Colors.white : _sidebarInactive,
+        size: 18,
+      ),
+    );
+  }
+
+  Widget _sidebarActionIcon(IconData icon, {required Color color}) {
+    return Container(
+      width: 30,
+      height: 30,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.24)),
+      ),
+      child: Icon(icon, color: color, size: 18),
     );
   }
 
@@ -1905,43 +2008,26 @@ class _AppLayoutState extends State<AppLayout> {
                             ),
                             decoration: BoxDecoration(
                               color: selected
-                                  ? const Color(
-                                      0xFFC94C6E,
-                                    ).withValues(alpha: 0.14)
+                                  ? _sidebarPink.withValues(alpha: 0.18)
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                             ),
                             child: Row(
                               children: [
-                                Icon(
-                                  item.icon,
-                                  color: selected
-                                      ? const Color(0xFFC94C6E)
-                                      : const Color(0xFF8A8DA6),
-                                  size: 18,
-                                ),
+                                _sidebarMenuIcon(item.icon, selected: selected),
                                 const SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
                                     item.title,
                                     style: TextStyle(
                                       fontSize: 14,
-                                      fontWeight: FontWeight.w700,
+                                      fontWeight: FontWeight.w800,
                                       color: selected
                                           ? Colors.white
-                                          : const Color(0xFF8A8DA6),
+                                          : _sidebarInactive,
                                     ),
                                   ),
                                 ),
-                                if (selected)
-                                  Container(
-                                    width: 6,
-                                    height: 6,
-                                    decoration: const BoxDecoration(
-                                      color: Color(0xFFC94C6E),
-                                      shape: BoxShape.circle,
-                                    ),
-                                  ),
                               ],
                             ),
                           ),
@@ -1969,9 +2055,7 @@ class _AppLayoutState extends State<AppLayout> {
                               ),
                               decoration: BoxDecoration(
                                 color: selectedIndex == settingsIndex
-                                    ? const Color(
-                                        0xFFC94C6E,
-                                      ).withValues(alpha: 0.14)
+                                    ? _sidebarPink.withValues(alpha: 0.18)
                                     : Colors.white.withValues(alpha: 0.05),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
@@ -1980,11 +2064,9 @@ class _AppLayoutState extends State<AppLayout> {
                               ),
                               child: Row(
                                 children: [
-                                  Icon(
+                                  _sidebarMenuIcon(
                                     Icons.settings_rounded,
-                                    color: selectedIndex == settingsIndex
-                                        ? const Color(0xFFC94C6E)
-                                        : const Color(0xFF8A8DA6),
+                                    selected: selectedIndex == settingsIndex,
                                   ),
                                   const SizedBox(width: 12),
                                   Expanded(
@@ -1995,7 +2077,7 @@ class _AppLayoutState extends State<AppLayout> {
                                         fontWeight: FontWeight.w800,
                                         color: selectedIndex == settingsIndex
                                             ? Colors.white
-                                            : const Color(0xFF8A8DA6),
+                                            : _sidebarInactive,
                                       ),
                                     ),
                                   ),
@@ -2020,14 +2102,14 @@ class _AppLayoutState extends State<AppLayout> {
                                 color: const Color(0xFF252740),
                               ),
                             ),
-                            child: const Row(
+                            child: Row(
                               children: [
-                                Icon(
+                                _sidebarActionIcon(
                                   Icons.logout_rounded,
-                                  color: Color(0xFF8A8DA6),
+                                  color: _sidebarInactive,
                                 ),
-                                SizedBox(width: 12),
-                                Expanded(
+                                const SizedBox(width: 12),
+                                const Expanded(
                                   child: Text(
                                     '\uB85C\uADF8\uC544\uC6C3',
                                     style: TextStyle(
@@ -2057,20 +2139,20 @@ class _AppLayoutState extends State<AppLayout> {
                                 color: const Color(0xFF252740),
                               ),
                             ),
-                            child: const Row(
+                            child: Row(
                               children: [
-                                Icon(
+                                _sidebarActionIcon(
                                   Icons.power_settings_new_rounded,
-                                  color: Color(0xFFDC2626),
+                                  color: const Color(0xFFEF4444),
                                 ),
-                                SizedBox(width: 12),
-                                Expanded(
+                                const SizedBox(width: 12),
+                                const Expanded(
                                   child: Text(
                                     '종료',
                                     style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w800,
-                                      color: Color(0xFFDC2626),
+                                      color: Color(0xFFEF4444),
                                     ),
                                   ),
                                 ),

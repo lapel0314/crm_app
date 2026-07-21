@@ -131,34 +131,55 @@ class _DataQualityPageState extends State<DataQualityPage> {
     );
   }
 
-  Widget _summaryTile(String label, int count, IconData icon) {
-    return Expanded(
-      child: Container(
-        height: 88,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: const Color(0xFF111827)),
-            const SizedBox(width: 12),
-            Column(
+  Widget _summaryTile(
+    String label,
+    int count,
+    IconData icon, {
+    bool expand = true,
+    bool compact = false,
+  }) {
+    final tile = Container(
+      height: compact ? 70 : 88,
+      padding: EdgeInsets.all(compact ? 12 : 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: compact ? 30 : 36,
+            height: compact ? 30 : 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFFCE7F3),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFF9A8D4)),
+            ),
+            child: Icon(
+              icon,
+              color: const Color(0xFFEC4899),
+              size: compact ? 17 : 21,
+            ),
+          ),
+          SizedBox(width: compact ? 10 : 12),
+          Expanded(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   '$count건',
-                  style: const TextStyle(
-                    fontSize: 22,
+                  style: TextStyle(
+                    fontSize: compact ? 18 : 22,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFF111827),
+                    color: const Color(0xFF111827),
                   ),
                 ),
                 Text(
                   label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
@@ -167,10 +188,12 @@ class _DataQualityPageState extends State<DataQualityPage> {
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
+
+    return expand ? Expanded(child: tile) : tile;
   }
 
   Widget _issueRow(DataQualityIssue issue) {
@@ -255,6 +278,238 @@ class _DataQualityPageState extends State<DataQualityPage> {
     );
   }
 
+  Widget _issueCard(DataQualityIssue issue) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE8E9EF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _IssuePill(label: _typeLabel(issue.type)),
+              const SizedBox(width: 8),
+              Text(
+                issue.severity,
+                style: TextStyle(
+                  color: _severityColor(issue.severity),
+                  fontSize: 12,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const Spacer(),
+              IconButton(
+                onPressed: widget.onOpenCustomer == null
+                    ? null
+                    : () => _openCustomer(issue),
+                icon: const Icon(Icons.open_in_new_rounded, size: 18),
+                tooltip: '고객DB에서 보기',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 32,
+                  height: 32,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            issue.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF111827),
+              fontSize: 14,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${issue.name} · ${issue.phone}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF374151),
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${issue.store} · 가입일 ${issue.joinDate} · ${issue.carrier} / ${issue.previousCarrier}',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF6B7280),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            issue.detail,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Color(0xFF4B5563),
+              fontSize: 12,
+              height: 1.35,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _searchField() {
+    return SizedBox(
+      height: 42,
+      child: TextField(
+        controller: searchController,
+        onChanged: (_) => setState(() {}),
+        decoration: InputDecoration(
+          hintText: '고객, 연락처, 매장 검색',
+          prefixIcon: const Icon(Icons.search_rounded, size: 20),
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _titleBlock() {
+    return const Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '고객정리',
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w900,
+            color: Color(0xFF111827),
+          ),
+        ),
+        SizedBox(height: 4),
+        Text(
+          '중복 고객, 전화번호, 가입일, 통신사 이상값을 점검합니다',
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF6B7280),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _header(bool mobile) {
+    if (mobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _titleBlock(),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _searchField()),
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 42,
+                height: 42,
+                child: ElevatedButton(
+                  onPressed: fetchIssues,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF111827),
+                    foregroundColor: Colors.white,
+                    padding: EdgeInsets.zero,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Icon(Icons.refresh_rounded, size: 18),
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: _titleBlock()),
+        const SizedBox(width: 16),
+        SizedBox(width: 320, child: _searchField()),
+        const SizedBox(width: 10),
+        ElevatedButton.icon(
+          onPressed: fetchIssues,
+          icon: const Icon(Icons.refresh_rounded, size: 17),
+          label: const Text('새로고침'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF111827),
+            foregroundColor: Colors.white,
+            elevation: 0,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _summarySection(bool mobile) {
+    if (mobile) {
+      return GridView.count(
+        crossAxisCount: 2,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+        childAspectRatio: 2.25,
+        children: [
+          _summaryTile('전체 이슈', issues.length, Icons.storefront_rounded,
+              expand: false, compact: true),
+          _summaryTile('중복 의심', _count('중복'), Icons.contact_phone_rounded,
+              expand: false, compact: true),
+          _summaryTile('전화번호', _count('전화번호'), Icons.phone_android_rounded,
+              expand: false, compact: true),
+          _summaryTile(
+            '가입일/통신사',
+            _count('가입일') + _count('통신사'),
+            Icons.sim_card_rounded,
+            expand: false,
+            compact: true,
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        _summaryTile('전체 이슈', issues.length, Icons.storefront_rounded),
+        const SizedBox(width: 12),
+        _summaryTile('중복 의심', _count('중복'), Icons.contact_phone_rounded),
+        const SizedBox(width: 12),
+        _summaryTile('전화번호', _count('전화번호'), Icons.phone_android_rounded),
+        const SizedBox(width: 12),
+        _summaryTile(
+          '가입일/통신사',
+          _count('가입일') + _count('통신사'),
+          Icons.sim_card_rounded,
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!isAdmin) {
@@ -262,86 +517,22 @@ class _DataQualityPageState extends State<DataQualityPage> {
     }
 
     final rows = filteredIssues;
+    final mobile = MediaQuery.of(context).size.width < 700;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F8),
       body: Padding(
-        padding: const EdgeInsets.all(28),
+        padding: EdgeInsets.all(mobile ? 18 : 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '데이터 품질 검사',
-                        style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w900,
-                          color: Color(0xFF111827),
-                        ),
-                      ),
-                      SizedBox(height: 4),
-                      Text(
-                        '중복 고객, 전화번호, 가입일, 통신사 이상값을 점검합니다',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF6B7280),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(
-                  width: 320,
-                  height: 42,
-                  child: TextField(
-                    controller: searchController,
-                    onChanged: (_) => setState(() {}),
-                    decoration: InputDecoration(
-                      hintText: '고객, 연락처, 매장 검색',
-                      prefixIcon: const Icon(Icons.search_rounded, size: 20),
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                ElevatedButton.icon(
-                  onPressed: fetchIssues,
-                  icon: const Icon(Icons.refresh_rounded, size: 17),
-                  label: const Text('새로고침'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF111827),
-                    foregroundColor: Colors.white,
-                    elevation: 0,
-                  ),
-                ),
-              ],
-            ),
+            _header(mobile),
             const SizedBox(height: 18),
-            Row(
-              children: [
-                _summaryTile('전체 이슈', issues.length, Icons.fact_check),
-                const SizedBox(width: 12),
-                _summaryTile('중복 의심', _count('중복'), Icons.group),
-                const SizedBox(width: 12),
-                _summaryTile('전화번호', _count('전화번호'), Icons.phone),
-                const SizedBox(width: 12),
-                _summaryTile(
-                    '가입일/통신사', _count('가입일') + _count('통신사'), Icons.event_note),
-              ],
-            ),
+            _summarySection(mobile),
             const SizedBox(height: 14),
             Wrap(
               spacing: 8,
+              runSpacing: 8,
               children: [
                 for (final type in issueTypes)
                   ChoiceChip(
@@ -364,12 +555,41 @@ class _DataQualityPageState extends State<DataQualityPage> {
                     : rows.isEmpty
                         ? const Center(child: Text('조건에 맞는 품질 이슈가 없습니다'))
                         : ListView.builder(
+                            padding: EdgeInsets.only(bottom: mobile ? 10 : 0),
                             itemCount: rows.length,
-                            itemBuilder: (_, index) => _issueRow(rows[index]),
+                            itemBuilder: (_, index) => mobile
+                                ? _issueCard(rows[index])
+                                : _issueRow(rows[index]),
                           ),
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _IssuePill extends StatelessWidget {
+  final String label;
+
+  const _IssuePill({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFCE7F3),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: const Color(0xFFF9A8D4)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Color(0xFFEC4899),
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
         ),
       ),
     );

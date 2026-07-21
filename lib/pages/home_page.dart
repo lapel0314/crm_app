@@ -601,29 +601,29 @@ class _HomePageState extends State<HomePage> {
       ),
       child: Row(
         children: [
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF6B7280),
+              ),
+            ),
+          ),
           Container(
-            width: 4,
-            height: 28,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(
-              color: const Color(0xFFC94C6E),
-              borderRadius: BorderRadius.circular(99),
+              color: const Color(0xFFFFF1F6),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: const Color(0xFFF7C6D6)),
             ),
-          ),
-          const SizedBox(width: 12),
-          Text(
-            label,
-            style: const TextStyle(
-              fontWeight: FontWeight.w700,
-              color: Color(0xFF6B7280),
-            ),
-          ),
-          const Spacer(),
-          Text(
-            value,
-            style: const TextStyle(
-              fontWeight: FontWeight.w900,
-              fontSize: 18,
-              color: Color(0xFF111827),
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+                color: Color(0xFFC94C6E),
+              ),
             ),
           ),
         ],

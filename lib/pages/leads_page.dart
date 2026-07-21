@@ -942,23 +942,14 @@ class _LeadsPageState extends State<LeadsPage> {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 4,
-            height: compact ? 28 : 34,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(99),
-            ),
-          ),
-          SizedBox(width: compact ? 10 : 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
+          Row(
+            children: [
+              Expanded(
+                child: Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -969,18 +960,26 @@ class _LeadsPageState extends State<LeadsPage> {
                     height: 1.15,
                   ),
                 ),
-                SizedBox(height: compact ? 4 : 5),
-                Text(
-                  value,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: const Color(0xFF111827),
-                    fontSize: compact ? 18 : 21,
-                    fontWeight: FontWeight.w800,
-                    height: 1,
-                  ),
+              ),
+              Container(
+                width: compact ? 22 : 26,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(2),
                 ),
-              ],
+              ),
+            ],
+          ),
+          SizedBox(height: compact ? 5 : 7),
+          Text(
+            value,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: const Color(0xFF111827),
+              fontSize: compact ? 18 : 21,
+              fontWeight: FontWeight.w800,
+              height: 1,
             ),
           ),
         ],
@@ -1252,6 +1251,135 @@ class _LeadsPageState extends State<LeadsPage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _leadMobileCard(Map<String, dynamic> item) {
+    final leadId = textValue(item['id']);
+    final selected = selectedLeadIds.contains(leadId);
+
+    return InkWell(
+      onTap: () => showEditDialog(item),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE8E9EF)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Checkbox(
+                  value: selected,
+                  onChanged: (value) {
+                    setState(() {
+                      if (value == true) {
+                        selectedLeadIds.add(leadId);
+                      } else {
+                        selectedLeadIds.remove(leadId);
+                      }
+                    });
+                  },
+                  visualDensity: VisualDensity.compact,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    textValue(item['subscriber']),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF111827),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                _tableBadge(
+                  textValue(item['target_carrier']),
+                  color: _carrierColor(item['target_carrier']),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _tableBadge(
+                  shortDate(item['lead_date']),
+                  color: const Color(0xFF6B7280),
+                ),
+                _tableBadge(
+                  textValue(item['manager']),
+                  color: const Color(0xFF0EA5E9),
+                ),
+                _tableBadge(
+                  textValue(item['previous_carrier']),
+                  color: _carrierColor(item['previous_carrier']),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _leadMobileLine(
+                Icons.phone_iphone_outlined, textValue(item['phone'])),
+            if (textValue(item['memo']) != '-')
+              _leadMobileLine(Icons.notes_rounded, textValue(item['memo'])),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                ContactActionButtons(
+                  customerName: textValue(item['subscriber']),
+                  phone: textValue(item['phone']),
+                  onMessage: showMessage,
+                  dense: true,
+                ),
+                const Spacer(),
+                if (canEdit)
+                  _compactIconButton(
+                    tooltip: '수정',
+                    onPressed: () => showEditDialog(item),
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                  ),
+                if (canDelete)
+                  _compactIconButton(
+                    tooltip: '삭제',
+                    onPressed: () => showDeleteDialog(item),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _leadMobileLine(IconData icon, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: const Color(0xFF9CA3AF)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF4B5563),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -1856,12 +1984,22 @@ class _LeadsPageState extends State<LeadsPage> {
                           ? const Center(child: CircularProgressIndicator())
                           : filteredLeads.isEmpty
                               ? const Center(child: Text('등록된 가망고객이 없습니다'))
-                              : Scrollbar(
-                                  thumbVisibility: true,
-                                  child: SingleChildScrollView(
-                                    child: _leadsTable(visibleLeads),
-                                  ),
-                                ),
+                              : mobile
+                                  ? ListView.builder(
+                                      padding:
+                                          const EdgeInsets.only(bottom: 10),
+                                      itemCount: visibleLeads.length,
+                                      itemBuilder: (context, index) =>
+                                          _leadMobileCard(
+                                        visibleLeads[index],
+                                      ),
+                                    )
+                                  : Scrollbar(
+                                      thumbVisibility: true,
+                                      child: SingleChildScrollView(
+                                        child: _leadsTable(visibleLeads),
+                                      ),
+                                    ),
                     ),
                     _pagination(
                       totalItems: filteredLeads.length,

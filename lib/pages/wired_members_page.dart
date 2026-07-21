@@ -1569,28 +1569,15 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                width: 4,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6B7280),
-                  borderRadius: BorderRadius.circular(99),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                title,
-                style: const TextStyle(
-                  color: Color(0xFF111827),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-            ],
+          Text(
+            title,
+            style: const TextStyle(
+              color: Color(0xFF111827),
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Wrap(
             spacing: 18,
             runSpacing: 0,
@@ -1851,45 +1838,44 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
           ),
         ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            width: 4,
-            height: compact ? 28 : 34,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(99),
-            ),
-          ),
-          SizedBox(width: compact ? 10 : 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
+          Row(
+            children: [
+              Expanded(
+                child: Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Color(0xFF9CA3AF),
+                    color: const Color(0xFF6B7280),
                     fontSize: compact ? 11 : 12,
                     fontWeight: FontWeight.w700,
                     height: 1.15,
                   ),
                 ),
-                SizedBox(height: compact ? 4 : 5),
-                Text(
-                  value,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Color(0xFF111827),
-                    fontSize: compact ? 18 : 21,
-                    fontWeight: FontWeight.w800,
-                    height: 1,
-                  ),
+              ),
+              Container(
+                width: compact ? 22 : 26,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(2),
                 ),
-              ],
+              ),
+            ],
+          ),
+          SizedBox(height: compact ? 5 : 7),
+          Text(
+            value,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: const Color(0xFF111827),
+              fontSize: compact ? 18 : 21,
+              fontWeight: FontWeight.w800,
+              height: 1,
             ),
           ),
         ],
@@ -2216,6 +2202,146 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
           ),
         );
       },
+    );
+  }
+
+  Widget _wiredMobileCard(Map<String, dynamic> item) {
+    final memberId = textValue(item['id']);
+    final selected = selectedMemberIds.contains(memberId);
+
+    return InkWell(
+      onTap: () => showDetailDialog(item),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFFE8E9EF)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Checkbox(
+                  value: selected,
+                  onChanged: (value) {
+                    setState(() {
+                      if (value == true) {
+                        selectedMemberIds.add(memberId);
+                      } else {
+                        selectedMemberIds.remove(memberId);
+                      }
+                    });
+                  },
+                  visualDensity: VisualDensity.compact,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    textValue(item['subscriber']),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Color(0xFF111827),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                _tableBadge(
+                  textValue(item['carrier']),
+                  color: _carrierColor(item['carrier']),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              children: [
+                _tableBadge(
+                  textValue(item['activation_center']),
+                  color: const Color(0xFF6B7280),
+                ),
+                _tableBadge(
+                  textValue(item['seller']),
+                  color: const Color(0xFF0EA5E9),
+                ),
+                _tableBadge(
+                  textValue(item['internet_type']),
+                  color: const Color(0xFF3B82F6),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _wiredMobileLine(
+                Icons.phone_iphone_outlined, textValue(item['phone'])),
+            _wiredMobileLine(
+              Icons.card_giftcard_outlined,
+              '상품권 ${money(item['gift_card'])}',
+            ),
+            _wiredMobileLine(
+              Icons.payments_outlined,
+              '선입금 ${money(item['prepaid_amount'])} · 후입금 ${money(item['postpaid_amount'])}',
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                ContactActionButtons(
+                  customerName: textValue(item['subscriber']),
+                  phone: textValue(item['phone']),
+                  onMessage: showMessage,
+                  dense: true,
+                ),
+                const Spacer(),
+                _compactIconButton(
+                  tooltip: '상세',
+                  onPressed: () => showDetailDialog(item),
+                  icon: const Icon(Icons.visibility_outlined, size: 18),
+                ),
+                if (canEdit)
+                  _compactIconButton(
+                    tooltip: '수정',
+                    onPressed: () => showEditDialog(item),
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                  ),
+                if (canDelete)
+                  _compactIconButton(
+                    tooltip: '삭제',
+                    onPressed: () => showDeleteDialog(item),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _wiredMobileLine(IconData icon, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 3),
+      child: Row(
+        children: [
+          Icon(icon, size: 14, color: const Color(0xFF9CA3AF)),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              value,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFF4B5563),
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2917,21 +3043,31 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                           ? const Center(child: CircularProgressIndicator())
                           : members.isEmpty
                               ? const Center(child: Text('등록된 유선회원이 없습니다'))
-                              : Scrollbar(
-                                  thumbVisibility: true,
-                                  child: SingleChildScrollView(
-                                    child: _wiredTable(
-                                      visibleMembers,
-                                      allSelected: allMembersSelected,
-                                      hasSelectionTarget:
-                                          filteredMembers.isNotEmpty,
-                                      selectionTargetCount:
-                                          filteredMembers.length,
-                                      partiallySelected:
-                                          partiallySelectedMembers,
+                              : mobile
+                                  ? ListView.builder(
+                                      padding:
+                                          const EdgeInsets.only(bottom: 10),
+                                      itemCount: visibleMembers.length,
+                                      itemBuilder: (context, index) =>
+                                          _wiredMobileCard(
+                                        visibleMembers[index],
+                                      ),
+                                    )
+                                  : Scrollbar(
+                                      thumbVisibility: true,
+                                      child: SingleChildScrollView(
+                                        child: _wiredTable(
+                                          visibleMembers,
+                                          allSelected: allMembersSelected,
+                                          hasSelectionTarget:
+                                              filteredMembers.isNotEmpty,
+                                          selectionTargetCount:
+                                              filteredMembers.length,
+                                          partiallySelected:
+                                              partiallySelectedMembers,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ),
                     ),
                     _pagination(
                       totalItems: filteredMembers.length,

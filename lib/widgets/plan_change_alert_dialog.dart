@@ -601,19 +601,29 @@ class _StatusPill extends StatelessWidget {
   Widget build(BuildContext context) {
     final color =
         isCompleted ? const Color(0xFF059669) : const Color(0xFFF59E0B);
+    final icon =
+        isCompleted ? Icons.phone_callback_rounded : Icons.phone_paused_rounded;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.10),
-        borderRadius: BorderRadius.circular(6),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: color.withValues(alpha: 0.30)),
       ),
-      child: Text(
-        isCompleted ? '처리완료' : '미처리',
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 12),
+          const SizedBox(width: 4),
+          Text(
+            isCompleted ? '처리완료' : '미처리',
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
       ),
     );
   }
