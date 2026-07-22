@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-07-20
+Last updated: 2026-07-22
 
 ## Overview
 
@@ -226,7 +226,7 @@ Responsibilities:
 
 - summary metrics from customers, leads, wired members, and inventory
 - current/monthly sales and margin views
-- model ranking aggregates common alias spellings for dashboard statistics without changing stored customer model names
+- model ranking first applies admin-managed `model_name_mappings`, then falls back to local alias normalization, without changing stored customer model names
 - detail dialogs for dashboard cards
 
 ### Admin and Audit
@@ -236,6 +236,7 @@ Key files:
 - `lib/pages/admin_page.dart`
 - `lib/pages/audit_log_page.dart`
 - `lib/pages/data_quality_page.dart`
+- `lib/pages/model_name_mapping_page.dart`
 - `lib/pages/signup_approval_dashboard_page.dart`
 - `lib/pages/recycle_bin_page.dart`
 - `lib/pages/store_management_page.dart`
@@ -249,6 +250,7 @@ Responsibilities:
 - customer cleanup inspection for duplicate phones, invalid phone formats, missing join dates, and unusual carrier/vendor values
 - notice creation and management
 - audit log inspection with field-level old/new detail view from the employee management page
+- representative/developer model-name mapping management for dashboard statistics
 - deleted-record restore with search, type/date filters, delete actor display, and restore confirmation
 - store and store-network management
 
@@ -353,6 +355,18 @@ PlanChangeAlertService computes due alert entries
 ```
 
 The task table is separate from `customers` so operational customer data and follow-up processing history remain independent.
+
+### Model Name Mapping Flow
+
+```text
+Representative/developer saves display model name + registered aliases
+  -> public.model_name_mappings stores the mapping under RLS
+  -> Dashboard loads active mappings with customer rows
+  -> monthly model ranking groups customer.model by the mapping first
+  -> local model-name normalization remains a fallback for unmapped values
+```
+
+Stored customer rows are not rewritten by this flow.
 
 ### Trusted Admin / Policy Flow
 

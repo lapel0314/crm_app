@@ -933,12 +933,12 @@ class _LeadsPageState extends State<LeadsPage> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE8E9EF)),
+        border: Border.all(color: color.withValues(alpha: 0.20)),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x0A000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
+            color: Color(0x0D000000),
+            blurRadius: 12,
+            offset: Offset(0, 4),
           ),
         ],
       ),
@@ -946,40 +946,26 @@ class _LeadsPageState extends State<LeadsPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: const Color(0xFF6B7280),
-                    fontSize: compact ? 11 : 12,
-                    fontWeight: FontWeight.w700,
-                    height: 1.15,
-                  ),
-                ),
-              ),
-              Container(
-                width: compact ? 22 : 26,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.55),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: compact ? 5 : 7),
           Text(
             value,
             overflow: TextOverflow.ellipsis,
             style: TextStyle(
               color: const Color(0xFF111827),
-              fontSize: compact ? 18 : 21,
-              fontWeight: FontWeight.w800,
+              fontSize: compact ? 22 : 26,
+              fontWeight: FontWeight.w900,
               height: 1,
+            ),
+          ),
+          SizedBox(height: compact ? 7 : 9),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: const Color(0xFF4B5563),
+              fontSize: compact ? 12 : 13,
+              fontWeight: FontWeight.w800,
+              height: 1.1,
             ),
           ),
         ],

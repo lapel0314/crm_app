@@ -133,6 +133,9 @@ class _AuditLogPageState extends State<AuditLogPage> {
       'soft_delete_wired_member' => '유선회원 휴지통 이동',
       'update_profiles' => '직원정보 수정',
       'delete_profiles' => '직원정보 삭제',
+      'insert_model_name_mappings' => '모델명 매핑 등록',
+      'update_model_name_mappings' => '모델명 매핑 수정',
+      'delete_model_name_mappings' => '모델명 매핑 삭제',
       '-' => '-',
       final raw => raw,
     };
@@ -145,6 +148,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
       'leads' => '가망고객',
       'wired_members' => '유선회원',
       'profiles' => '직원관리',
+      'model_name_mappings' => '모델명 관리',
       '-' => '-',
       final raw => raw,
     };
@@ -156,6 +160,9 @@ class _AuditLogPageState extends State<AuditLogPage> {
       'store' => '매장',
       'normalized_store' => '매장',
       'model_name' => '모델명',
+      'display_name' => '표시 모델명',
+      'registered_names' => '등록 모델명',
+      'is_active' => '사용 여부',
       'serial_number' => '일련번호',
       'status' => '상태',
       'memo' => '메모',

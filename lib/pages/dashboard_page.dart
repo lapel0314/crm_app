@@ -28,6 +28,7 @@ class _DashboardPageState extends State<DashboardPage> {
   List<Map<String, dynamic>> wiredMembers = [];
   List<Map<String, dynamic>> leads = [];
   List<Map<String, dynamic>> inventory = [];
+  Map<String, String> modelAliasLookup = {};
 
   int todayRebate = 0;
   int todayMargin = 0;
@@ -243,6 +244,10 @@ class _DashboardPageState extends State<DashboardPage> {
         supabase.from('device_inventory').select().eq('is_deleted', false),
         supabase.from('wired_members').select().eq('is_deleted', false),
         supabase.from('leads').select().eq('is_deleted', false),
+        supabase
+            .from('model_name_mappings')
+            .select('display_name, registered_names, is_active')
+            .eq('is_active', true),
       ]);
 
       final customerList = _filterStoreRows(
@@ -256,6 +261,11 @@ class _DashboardPageState extends State<DashboardPage> {
       );
       final leadList = _filterStoreRows(
         result[3].map((e) => Map<String, dynamic>.from(e)).toList(),
+      );
+      final aliasLookup = buildModelAliasLookup(
+        result[4]
+            .map((e) => ModelNameMapping.fromJson(Map<String, dynamic>.from(e)))
+            .toList(),
       );
 
       final now = DateTime.now();
@@ -300,6 +310,7 @@ class _DashboardPageState extends State<DashboardPage> {
         inventory = inventoryList;
         wiredMembers = wiredList;
         leads = leadList;
+        modelAliasLookup = aliasLookup;
         todayRebate = dailyRebateSum;
         todayMargin = dailyMarginSum;
         monthRebate = monthlyRebateSum;
@@ -1141,7 +1152,10 @@ class _DashboardPageState extends State<DashboardPage> {
   List<MapEntry<String, int>> _monthlyModelRanking() {
     final modelCounts = <String, int>{};
     for (final customer in monthCustomerSales) {
-      final model = normalizeModelName(_text(customer['model']));
+      final model = normalizeModelNameWithAliases(
+        _text(customer['model']),
+        modelAliasLookup,
+      );
       if (model == '-') continue;
       modelCounts[model] = (modelCounts[model] ?? 0) + 1;
     }
@@ -1152,7 +1166,12 @@ class _DashboardPageState extends State<DashboardPage> {
   List<Map<String, dynamic>> _monthlyModelRows(String model) {
     final rows = monthCustomerSales
         .where(
-          (customer) => normalizeModelName(_text(customer['model'])) == model,
+          (customer) =>
+              normalizeModelNameWithAliases(
+                _text(customer['model']),
+                modelAliasLookup,
+              ) ==
+              model,
         )
         .toList();
     rows.sort((a, b) {

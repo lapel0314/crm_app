@@ -7,6 +7,7 @@ import 'package:crm_app/services/notice_service.dart';
 import 'package:crm_app/utils/postgrest_filter_utils.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'audit_log_page.dart';
+import 'model_name_mapping_page.dart';
 import 'signup_approval_dashboard_page.dart';
 
 final supabase = Supabase.instance.client;
@@ -892,6 +893,20 @@ class _AdminPageState extends State<AdminPage> {
                               context,
                               MaterialPageRoute(
                                 builder: (_) => AuditLogPage(role: widget.role),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(width: 12),
+                        _headerActionButton(
+                          icon: Icons.phone_iphone_rounded,
+                          label: '모델명 관리',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    ModelNameMappingPage(role: widget.role),
                               ),
                             );
                           },

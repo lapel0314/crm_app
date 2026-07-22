@@ -8,32 +8,61 @@ void main() {
   group('normalizeModelName', () {
     test('normalizes dashboard model aliases without changing stored values',
         () {
-      expect(normalizeModelName('A175'), 'SM-A175');
-      expect(normalizeModelName('a175'), 'SM-A175');
-      expect(normalizeModelName('SM-A175'), 'SM-A175');
-      expect(normalizeModelName('SM-A175N'), 'SM-A175');
-      expect(normalizeModelName('SM A175'), 'SM-A175');
-      expect(normalizeModelName('s928n'), 'SM-S928');
-      expect(normalizeModelName('S942'), 'SM-S942');
-      expect(normalizeModelName('S942N256'), 'SM-S942');
-      expect(normalizeModelName('S948N512GB'), 'SM-S948');
-      expect(normalizeModelName('F766N256'), 'SM-F766');
-      expect(normalizeModelName('M140'), 'SM-M140');
-      expect(normalizeModelName('L325'), 'SM-L325');
-      expect(normalizeModelName('X216'), 'SM-X216');
-      expect(normalizeModelName('아이폰17'), 'iPhone 17');
-      expect(normalizeModelName('iphone17'), 'iPhone 17');
-      expect(normalizeModelName('iPhone 17'), 'iPhone 17');
-      expect(normalizeModelName('아이폰17프로'), 'iPhone 17 Pro');
-      expect(normalizeModelName('17PR-256'), 'iPhone 17 Pro');
-      expect(normalizeModelName('17PM-512'), 'iPhone 17 Pro Max');
-      expect(normalizeModelName('17PM256'), 'iPhone 17 Pro Max');
-      expect(normalizeModelName('16E-128'), 'iPhone 16e');
-      expect(normalizeModelName('AIP16PMN512'), 'iPhone 16 Pro Max');
-      expect(normalizeModelName('갤럭시 A17'), '갤럭시 A17');
-      expect(normalizeModelName('iPhone 15'), 'iPhone 15');
+      expect(normalizeModelName('A175'), '갤럭시 A17 256GB');
+      expect(normalizeModelName('a175'), '갤럭시 A17 256GB');
+      expect(normalizeModelName('SM-A175'), '갤럭시 A17 256GB');
+      expect(normalizeModelName('SM-A175N'), '갤럭시 A17 256GB');
+      expect(normalizeModelName('SM A175'), '갤럭시 A17 256GB');
+      expect(normalizeModelName('s928n'), '갤럭시 SM-S928 256GB');
+      expect(normalizeModelName('S942'), '갤럭시 S26 256GB');
+      expect(normalizeModelName('S942N256'), '갤럭시 S26 256GB');
+      expect(normalizeModelName('S948N512GB'), '갤럭시 S26 울트라 512GB');
+      expect(normalizeModelName('F766N256'), '갤럭시 Z 플립7 256GB');
+      expect(normalizeModelName('M140'), '스타일폴더2');
+      expect(normalizeModelName('AT-M140'), '스타일폴더2');
+      expect(normalizeModelName('AT-M140S'), '스타일폴더2');
+      expect(normalizeModelName('L325'), '갤럭시 SM-L325');
+      expect(normalizeModelName('X216'), '갤럭시 탭 A9+');
+      expect(normalizeModelName('아이폰17'), '아이폰 17 256GB');
+      expect(normalizeModelName('iphone17'), '아이폰 17 256GB');
+      expect(normalizeModelName('iPhone 17'), '아이폰 17 256GB');
+      expect(normalizeModelName('아이폰17프로'), '아이폰 17 프로 256GB');
+      expect(normalizeModelName('17PR-256'), '아이폰 17 프로 256GB');
+      expect(normalizeModelName('17PM-512'), '아이폰 17 프로 맥스 512GB');
+      expect(normalizeModelName('17PM256'), '아이폰 17 프로 맥스 256GB');
+      expect(normalizeModelName('16E-128'), '아이폰 16e 128GB');
+      expect(normalizeModelName('AIP16PMN512'), '아이폰 16 프로 맥스 512GB');
+      expect(normalizeModelName('갤럭시 A17'), '갤럭시 A17 256GB');
+      expect(normalizeModelName('iPhone 15'), '아이폰 15 256GB');
       expect(normalizeModelName('A2633-128'), 'A2633-128');
       expect(normalizeModelName('SE3 44MM'), 'SE3 44MM');
+    });
+
+    test('uses admin model mappings before automatic fallback', () {
+      final lookup = buildModelAliasLookup(const [
+        ModelNameMapping(
+          displayName: '아이폰 17 256GB',
+          registeredNames: ['IP-17', 'iphone17', '아이폰17'],
+        ),
+        ModelNameMapping(
+          displayName: '스타일폴더2',
+          registeredNames: ['M140', 'AT-M140', 'AT-M140S'],
+        ),
+      ]);
+
+      expect(
+        normalizeModelNameWithAliases('IP-17', lookup),
+        '아이폰 17 256GB',
+      );
+      expect(
+        normalizeModelNameWithAliases('아이폰17', lookup),
+        '아이폰 17 256GB',
+      );
+      expect(normalizeModelNameWithAliases('AT-M140S', lookup), '스타일폴더2');
+      expect(
+        normalizeModelNameWithAliases('S942N256', lookup),
+        '갤럭시 S26 256GB',
+      );
     });
   });
 
