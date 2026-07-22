@@ -11,6 +11,7 @@ import 'package:crm_app/services/plan_change_alert_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/constants/message_templates.dart';
+import 'package:crm_app/utils/model_name_utils.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:crm_app/utils/debouncer.dart';
 import 'package:crm_app/widgets/contact_action_buttons.dart';
@@ -42,6 +43,7 @@ class _CustomerPageState extends State<CustomerPage> {
   final searchController = TextEditingController();
   final dateSearchController = TextEditingController();
   final phoneSearchController = TextEditingController();
+  final modelSearchController = TextEditingController();
   final NumberFormat moneyFormat = NumberFormat('#,###');
   final kakaoTalkService = KakaoTalkService();
   final contactActionService = const ContactActionService();
@@ -51,6 +53,7 @@ class _CustomerPageState extends State<CustomerPage> {
       Debouncer(const Duration(milliseconds: 250));
 
   List<Map<String, dynamic>> customers = [];
+  Map<String, String> modelAliasLookup = {};
   Map<String, List<PlanChangeTask>> planChangeTasksByCustomerId = {};
   final Set<String> selectedCustomerIds = {};
   bool isLoading = true;
@@ -231,6 +234,10 @@ class _CustomerPageState extends State<CustomerPage> {
     if (value == null) return '-';
     final t = value.toString().trim();
     return t.isEmpty ? '-' : t;
+  }
+
+  String _displayModel(dynamic value) {
+    return normalizeModelNameWithAliases(_text(value), modelAliasLookup);
   }
 
   String _formatPhone(String value) {
@@ -566,7 +573,11 @@ class _CustomerPageState extends State<CustomerPage> {
       final nameFilter = searchController.text.trim().toLowerCase();
       final phoneFilter =
           phoneSearchController.text.replaceAll(RegExp(r'[^0-9]'), '');
+      final modelFilter = modelSearchController.text.trim().toLowerCase();
+      final modelFilterKey = modelAliasKey(modelFilter);
       final legacyKeyword = keyword.trim().toLowerCase();
+      final nextModelAliasLookup =
+          buildModelAliasLookup(await _fetchModelMappings());
 
       bool matches(Map<String, dynamic> item) {
         final matchesStore = includesStoreForRole(
@@ -577,11 +588,23 @@ class _CustomerPageState extends State<CustomerPage> {
         final nameText = _text(item['name']).toLowerCase();
         final phoneText = _text(item['phone']);
         final phoneDigits = phoneText.replaceAll(RegExp(r'[^0-9]'), '');
+        final modelText = _text(item['model']).toLowerCase();
+        final modelDisplayText = normalizeModelNameWithAliases(
+                _text(item['model']), nextModelAliasLookup)
+            .toLowerCase();
+        final modelTextKey = modelAliasKey(modelText);
+        final modelDisplayKey = modelAliasKey(modelDisplayText);
 
         final matchesDate = _matchesDateSearch(item['join_date'], dateFilter);
         final matchesName = nameFilter.isEmpty || nameText.contains(nameFilter);
         final matchesPhone =
             phoneFilter.isEmpty || phoneDigits.contains(phoneFilter);
+        final matchesModel = modelFilter.isEmpty ||
+            modelText.contains(modelFilter) ||
+            modelDisplayText.contains(modelFilter) ||
+            (modelFilterKey.isNotEmpty &&
+                (modelTextKey.contains(modelFilterKey) ||
+                    modelDisplayKey.contains(modelFilterKey)));
         final joinTypeText = _text(item['join_type']);
         final matchesCarrier = _matchesCarrierFilter(item['carrier']);
         final matchesJoinType = selectedJoinTypeFilter == '전체' ||
@@ -604,6 +627,7 @@ class _CustomerPageState extends State<CustomerPage> {
             matchesStore &&
             matchesName &&
             matchesPhone &&
+            matchesModel &&
             matchesCarrier &&
             matchesJoinType &&
             matchesLegacy;
@@ -620,6 +644,7 @@ class _CustomerPageState extends State<CustomerPage> {
       if (!mounted) return;
       setState(() {
         customers = nextCustomers;
+        modelAliasLookup = nextModelAliasLookup;
         planChangeTasksByCustomerId = nextTaskMap;
         selectedCustomerIds.removeWhere((id) => !nextCustomerIds.contains(id));
         currentPage = 0;
@@ -630,6 +655,22 @@ class _CustomerPageState extends State<CustomerPage> {
       if (mounted) {
         setState(() => isLoading = false);
       }
+    }
+  }
+
+  Future<List<ModelNameMapping>> _fetchModelMappings() async {
+    try {
+      final data = await supabase
+          .from('model_name_mappings')
+          .select('display_name, registered_names, is_active')
+          .eq('is_active', true);
+      return data
+          .map((row) =>
+              ModelNameMapping.fromJson(Map<String, dynamic>.from(row)))
+          .toList();
+    } catch (e) {
+      debugPrint('customer model mapping load failed: $e');
+      return const [];
     }
   }
 
@@ -2068,7 +2109,7 @@ class _CustomerPageState extends State<CustomerPage> {
                       _detailRow('가입유형', customer['join_type']),
                       _detailRow('통신사/거래처', customer['carrier']),
                       _detailRow('기존통신사', customer['previous_carrier']),
-                      _detailRow('모델명', customer['model']),
+                      _detailRow('모델명', _displayModel(customer['model'])),
                       _detailRow('요금제', customer['plan']),
                       _detailRow('부가서비스', customer['add_service']),
                       _detailRow('공시/선약', customer['contract_type']),
@@ -2174,18 +2215,19 @@ class _CustomerPageState extends State<CustomerPage> {
     required String label,
     required String value,
     required Color color,
+    required IconData icon,
     bool compact = false,
   }) {
     return Container(
-      height: compact ? 58 : 88,
+      height: compact ? 64 : 96,
       padding: EdgeInsets.symmetric(
-        horizontal: compact ? 10 : 18,
-        vertical: compact ? 8 : 14,
+        horizontal: compact ? 12 : 20,
+        vertical: compact ? 10 : 16,
       ),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Color.lerp(Colors.white, color, 0.055),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.20)),
+        border: Border.all(color: color.withValues(alpha: 0.28)),
         boxShadow: const [
           BoxShadow(
             color: Color(0x0D000000),
@@ -2194,31 +2236,49 @@ class _CustomerPageState extends State<CustomerPage> {
           ),
         ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Row(
         children: [
-          Text(
-            value,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: const Color(0xFF111827),
-              fontSize: compact ? 20 : 26,
-              fontWeight: FontWeight.w900,
-              height: 1,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: const Color(0xFF111827),
+                    fontSize: compact ? 20 : 28,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+                SizedBox(height: compact ? 7 : 10),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: const Color(0xFF374151),
+                    fontSize: compact ? 11 : 13,
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                  ),
+                ),
+              ],
             ),
           ),
-          SizedBox(height: compact ? 6 : 9),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: const Color(0xFF4B5563),
-              fontSize: compact ? 11 : 13,
-              fontWeight: FontWeight.w800,
-              height: 1.1,
+          SizedBox(width: compact ? 8 : 14),
+          Container(
+            width: compact ? 30 : 38,
+            height: compact ? 30 : 38,
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.13),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: color.withValues(alpha: 0.18)),
             ),
+            child: Icon(icon, size: compact ? 16 : 20, color: color),
           ),
         ],
       ),
@@ -2329,6 +2389,58 @@ class _CustomerPageState extends State<CustomerPage> {
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+
+  Widget _kakaoTalkMark({bool busy = false}) {
+    if (busy) {
+      return const SizedBox(
+        width: 18,
+        height: 18,
+        child: CircularProgressIndicator(
+          strokeWidth: 2,
+          color: Color(0xFF111827),
+        ),
+      );
+    }
+
+    return Image.asset(
+      'assets/images/kakaotalk_logo.png',
+      width: 22,
+      height: 22,
+      fit: BoxFit.contain,
+    );
+  }
+
+  Widget _toolbarIconButton({
+    required String tooltip,
+    required VoidCallback? onPressed,
+    required Widget icon,
+    Color backgroundColor = Colors.white,
+    Color borderColor = const Color(0xFFE8E9EF),
+  }) {
+    return Tooltip(
+      message: tooltip,
+      waitDuration: const Duration(milliseconds: 350),
+      child: SizedBox(
+        width: 38,
+        height: 38,
+        child: OutlinedButton(
+          onPressed: onPressed,
+          style: OutlinedButton.styleFrom(
+            backgroundColor: backgroundColor,
+            disabledBackgroundColor: const Color(0xFFF3F4F6),
+            minimumSize: const Size(38, 38),
+            padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            side: BorderSide(color: borderColor),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: icon,
+        ),
       ),
     );
   }
@@ -2488,7 +2600,10 @@ class _CustomerPageState extends State<CustomerPage> {
                             widths[offset + 6],
                           ),
                           _tableCell(
-                            _tableText(_text(customer['model']), strong: true),
+                            _tableText(
+                              _displayModel(customer['model']),
+                              strong: true,
+                            ),
                             widths[offset + 7],
                           ),
                           _tableCell(_tableText(_text(customer['plan'])),
@@ -2657,7 +2772,10 @@ class _CustomerPageState extends State<CustomerPage> {
             ),
             const SizedBox(height: 8),
             _mobileLine(Icons.phone_iphone_outlined, phone),
-            _mobileLine(Icons.devices_other_outlined, _text(customer['model'])),
+            _mobileLine(
+              Icons.devices_other_outlined,
+              _displayModel(customer['model']),
+            ),
             _mobileLine(Icons.receipt_long_outlined, _text(customer['plan'])),
             if (_text(customer['add_service']) != '-')
               _mobileLine(
@@ -2907,6 +3025,7 @@ class _CustomerPageState extends State<CustomerPage> {
     searchController.dispose();
     dateSearchController.dispose();
     phoneSearchController.dispose();
+    modelSearchController.dispose();
     super.dispose();
   }
 
@@ -2991,24 +3110,28 @@ class _CustomerPageState extends State<CustomerPage> {
                         label: '\uC804\uCCB4 \uACE0\uAC1D',
                         value: '$totalCustomers\uBA85',
                         color: const Color(0xFF6B7280),
+                        icon: Icons.people_alt_rounded,
                         compact: true,
                       ),
                       _summaryTile(
                         label: '\uC2E0\uADDC \uAC1C\uD1B5',
                         value: '$newJoinCount\uBA85',
                         color: const Color(0xFF10B981),
+                        icon: Icons.person_add_alt_1_rounded,
                         compact: true,
                       ),
                       _summaryTile(
                         label: '\uBC88\uD638\uC774\uB3D9',
                         value: '$transferCount\uBA85',
                         color: const Color(0xFF3B82F6),
+                        icon: Icons.sync_alt_rounded,
                         compact: true,
                       ),
                       _summaryTile(
                         label: '\uAE30\uAE30\uBCC0\uACBD',
                         value: '$deviceChangeCount\uBA85',
                         color: const Color(0xFFF59E0B),
+                        icon: Icons.phone_android_rounded,
                         compact: true,
                       ),
                     ],
@@ -3066,6 +3189,13 @@ class _CustomerPageState extends State<CustomerPage> {
                                     width: 132,
                                   ),
                                   const SizedBox(width: 8),
+                                  _filterField(
+                                    controller: modelSearchController,
+                                    hint: '\uBAA8\uB378\uBA85',
+                                    icon: Icons.devices_other_outlined,
+                                    width: 132,
+                                  ),
+                                  const SizedBox(width: 8),
                                   _segmentedFilter(
                                     options: const [
                                       '\uC804\uCCB4',
@@ -3108,47 +3238,31 @@ class _CustomerPageState extends State<CustomerPage> {
                                 Row(
                                   children: [
                                     if (!isOpenView) ...[
-                                      SizedBox(
-                                        width: 36,
-                                        height: 36,
-                                        child: OutlinedButton(
-                                          onPressed:
-                                              selectedCustomerCount == 0 ||
-                                                      isSendingKakao
-                                                  ? null
-                                                  : showKakaoSendDialog,
-                                          style: OutlinedButton.styleFrom(
-                                            minimumSize: const Size(36, 36),
-                                            padding: EdgeInsets.zero,
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                          ),
-                                          child: Icon(
-                                            isSendingKakao
-                                                ? Icons.hourglass_top_rounded
-                                                : Icons.chat_bubble_outline,
-                                            size: 16,
-                                          ),
+                                      _toolbarIconButton(
+                                        tooltip:
+                                            '카카오 발송 ($selectedCustomerCount명)',
+                                        onPressed: selectedCustomerCount == 0 ||
+                                                isSendingKakao
+                                            ? null
+                                            : showKakaoSendDialog,
+                                        icon: _kakaoTalkMark(
+                                          busy: isSendingKakao,
                                         ),
+                                        backgroundColor:
+                                            const Color(0xFFFFF9C7),
+                                        borderColor: const Color(0xFFE6CF00),
                                       ),
                                       const SizedBox(width: 6),
-                                      SizedBox(
-                                        width: 36,
-                                        height: 36,
-                                        child: OutlinedButton(
-                                          onPressed: selectedCustomerCount == 0
-                                              ? null
-                                              : showSmsSendDialog,
-                                          style: OutlinedButton.styleFrom(
-                                            minimumSize: const Size(36, 36),
-                                            padding: EdgeInsets.zero,
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                          ),
-                                          child: const Icon(
-                                            Icons.sms_outlined,
-                                            size: 16,
-                                          ),
+                                      _toolbarIconButton(
+                                        tooltip:
+                                            '문자 발송 ($selectedCustomerCount명)',
+                                        onPressed: selectedCustomerCount == 0
+                                            ? null
+                                            : showSmsSendDialog,
+                                        icon: const Icon(
+                                          Icons.sms_outlined,
+                                          size: 18,
+                                          color: Color(0xFF374151),
                                         ),
                                       ),
                                       const SizedBox(width: 6),
@@ -3255,28 +3369,40 @@ class _CustomerPageState extends State<CustomerPage> {
           children: [
             Row(
               children: [
-                _summaryTile(
-                  label: '전체고객',
-                  value: '$totalCustomers명',
-                  color: const Color(0xFF6B7280),
+                Expanded(
+                  child: _summaryTile(
+                    label: '전체고객',
+                    value: '$totalCustomers명',
+                    color: const Color(0xFF6B7280),
+                    icon: Icons.people_alt_rounded,
+                  ),
                 ),
                 const SizedBox(width: 14),
-                _summaryTile(
-                  label: '신규개통',
-                  value: '$newJoinCount명',
-                  color: const Color(0xFF10B981),
+                Expanded(
+                  child: _summaryTile(
+                    label: '신규개통',
+                    value: '$newJoinCount명',
+                    color: const Color(0xFF10B981),
+                    icon: Icons.person_add_alt_1_rounded,
+                  ),
                 ),
                 const SizedBox(width: 14),
-                _summaryTile(
-                  label: '번호이동',
-                  value: '$transferCount명',
-                  color: const Color(0xFF3B82F6),
+                Expanded(
+                  child: _summaryTile(
+                    label: '번호이동',
+                    value: '$transferCount명',
+                    color: const Color(0xFF3B82F6),
+                    icon: Icons.sync_alt_rounded,
+                  ),
                 ),
                 const SizedBox(width: 14),
-                _summaryTile(
-                  label: '기기변경',
-                  value: '$deviceChangeCount명',
-                  color: const Color(0xFFF59E0B),
+                Expanded(
+                  child: _summaryTile(
+                    label: '기기변경',
+                    value: '$deviceChangeCount명',
+                    color: const Color(0xFFF59E0B),
+                    icon: Icons.phone_android_rounded,
+                  ),
                 ),
               ],
             ),
@@ -3328,7 +3454,14 @@ class _CustomerPageState extends State<CustomerPage> {
                                     controller: phoneSearchController,
                                     hint: '연락처 검색',
                                     icon: Icons.phone_iphone_outlined,
-                                    width: 190,
+                                    width: 170,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  _filterField(
+                                    controller: modelSearchController,
+                                    hint: '모델명 검색',
+                                    icon: Icons.devices_other_outlined,
+                                    width: 170,
                                   ),
                                   const SizedBox(width: 8),
                                   _segmentedFilter(
@@ -3360,36 +3493,28 @@ class _CustomerPageState extends State<CustomerPage> {
                           ),
                           const SizedBox(width: 12),
                           if (!isOpenView) ...[
-                            ElevatedButton.icon(
+                            _toolbarIconButton(
+                              tooltip: isSendingKakao
+                                  ? '카카오 발송 중'
+                                  : '카카오 발송 ($selectedCustomerCount명)',
                               onPressed:
                                   selectedCustomerCount == 0 || isSendingKakao
                                       ? null
                                       : showKakaoSendDialog,
-                              icon: const Icon(Icons.chat_bubble_outline,
-                                  size: 17),
-                              label: Text(isSendingKakao
-                                  ? '발송 중'
-                                  : '카카오 발송 ($selectedCustomerCount)'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFFEE500),
-                                foregroundColor: const Color(0xFF111827),
-                                elevation: 0,
-                              ),
+                              icon: _kakaoTalkMark(busy: isSendingKakao),
+                              backgroundColor: const Color(0xFFFFF9C7),
+                              borderColor: const Color(0xFFE6CF00),
                             ),
                             const SizedBox(width: 8),
-                            ElevatedButton.icon(
+                            _toolbarIconButton(
+                              tooltip: '문자 발송 ($selectedCustomerCount명)',
                               onPressed: selectedCustomerCount == 0
                                   ? null
                                   : showSmsSendDialog,
-                              icon: const Icon(Icons.sms_outlined, size: 17),
-                              label: Text('문자 발송 ($selectedCustomerCount)'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.white,
-                                foregroundColor: const Color(0xFF374151),
-                                elevation: 0,
-                                side: const BorderSide(
-                                  color: Color(0xFFE8E9EF),
-                                ),
+                              icon: const Icon(
+                                Icons.sms_outlined,
+                                size: 18,
+                                color: Color(0xFF374151),
                               ),
                             ),
                             const SizedBox(width: 8),

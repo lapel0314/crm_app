@@ -51,6 +51,7 @@ The main user workflows are:
   - `installer.iss`
   - `CRM_App_Setup.iss`
 - Windows auto-update launches the downloaded installer in visible silent mode so users can see installation progress before the running app exits.
+- Windows uninstall removes installer leftovers plus current-user Pink Phone/CRM AppData folders; server-side Supabase data is unaffected.
 - Release artifacts are stored locally under `dist/` when downloaded from GitHub Actions
 
 ### Operations
