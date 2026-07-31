@@ -1,6 +1,6 @@
 # Architecture
 
-Last updated: 2026-07-22
+Last updated: 2026-08-01
 
 ## Overview
 
@@ -38,7 +38,7 @@ The main user workflows are:
 - Supabase Postgres
 - Supabase Auth
 - Supabase Edge Function: `supabase/functions/auth-policy/index.ts`
-- Supabase Storage for files such as rebate and notice images
+- Supabase Storage for files such as rebate images, notice images, and private installer distribution
 - SQL migrations under `supabase/migrations`
 - RLS policies and helper functions in migrations and legacy SQL setup files
 
@@ -136,6 +136,8 @@ Flow:
 6. `AuthGate` periodically re-checks login policy while the app is active.
 
 Important rule: profile writes are locked down for normal clients. Trusted changes go through DB triggers or `auth-policy`.
+
+Signup cannot self-assign a privileged `role_code`. `handle_new_user` only casts self-signup `role` metadata to `role_code` for `점장`, `사원`, and `조회용`; `대표`/`개발자` `role_code` values are only ever set by an admin through `admin_update_user_profile`. `auth-policy` authorization (`isPrivileged`, `isManager`) is keyed off `profiles.role_code` only, never the raw `role` text, and privileged/manager-only actions (`admin_approve_user`, `admin_update_user_profile`, `admin_delete_user_profile`, `admin_update_user_password`, and store-network register/approve/reject/deactivate/label actions) additionally require `approval_status = 'approved'`.
 
 ### App Shell and Navigation
 
@@ -319,6 +321,8 @@ Responsibilities:
 - startup and app-resume update checks with a cooldown to catch already-running Android/Windows clients
 - SHA-256 installer verification
 - desktop session cleanup and sign-out behavior
+- resolving a signed download URL from the private `app-installers` Storage bucket when `app_updates.storage_path` is set, falling back to the legacy public `installer_url`/`apk_url` columns otherwise
+- surfacing `UpdateAuthRequiredException` when a signed URL needs a session, so `UpdateGate` can prompt login before download
 
 ## Data Flow
 
@@ -407,11 +411,20 @@ LoginPage.signup
 ```text
 GitHub push/tag
   -> Android / Windows GitHub Actions build artifacts
-  -> GitHub Release assets
-  -> public.app_updates active rows updated with URLs and SHA-256
-  -> app UpdateGate detects update
+  -> installer uploaded to private Supabase Storage bucket `app-installers`
+  -> public.app_updates active row updated with version, storage_path, SHA-256
+  -> app UpdateGate detects update (version metadata stays publicly readable, pre-login)
+  -> if no session yet, UpdateGate shows LoginPage in place of the blocked-update card
+  -> once logged in, update service calls storage.createSignedUrl() for storage_path
   -> platform update service downloads/verifies/launches installer or APK
 ```
+
+CI workflows (`android-release.yml`, `windows-release.yml`) only produce signed build
+artifacts; uploading to `app-installers` and updating `app_updates` is a manual step
+(see `README.md`, `BUILD_ANDROID.md`). Legacy active rows without `storage_path` keep
+using the old public `installer_url`/`apk_url` columns directly, so already-published
+releases are unaffected by this change. Archiving old public GitHub Release assets to
+a private release is a manual repository-settings action, not part of the app or CI.
 
 ## Database and Security Notes
 
@@ -422,6 +435,8 @@ GitHub push/tag
 - `plan_change_tasks` and `plan_change_task_logs` store 요금제/부가서비스 follow-up status and before/after change history.
 - Soft-deleted records remain recoverable through recycle-bin flows.
 - `normalized_store` is generated in `profiles`; application code must not update it directly.
+- `current_profile_has_role()` (and everything built on it: `current_profile_is_privileged()`, `current_profile_is_manager()`, most table/storage RLS policies) authorizes off `profiles.role_code` only. It never falls back to the free-text `role` column, mirroring the `role_code`-only rule in `auth-policy`.
+- The `app-installers` Storage bucket is private; any authenticated profile (approved or not) may read/sign objects in it, but only privileged (`대표`/`개발자`) accounts may upload/replace/delete installers.
 
 ## Documentation Maintenance Rule
 

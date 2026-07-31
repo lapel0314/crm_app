@@ -242,10 +242,7 @@ class _LoginPageState extends State<LoginPage>
         throw Exception('회원가입에 실패했습니다. 다시 시도해 주세요.');
       }
 
-      if (normalizedStore.isNotEmpty &&
-          (signupRole == roleOwner ||
-              signupRole == roleDeveloper ||
-              signupRole == roleManager)) {
+      if (normalizedStore.isNotEmpty && signupRole == roleManager) {
         try {
           await loginPolicyService.bootstrapSignupNetwork(
             storeName: normalizedStore,
@@ -792,8 +789,6 @@ class _LoginPageState extends State<LoginPage>
           decoration: _inputDecoration('\uC9C1\uAE09',
               prefixIcon: Icons.badge_outlined),
           items: const [
-            DropdownMenuItem(value: roleOwner, child: Text(roleOwner)),
-            DropdownMenuItem(value: roleDeveloper, child: Text(roleDeveloper)),
             DropdownMenuItem(value: roleManager, child: Text(roleManager)),
             DropdownMenuItem(value: roleStaff, child: Text(roleStaff)),
           ],

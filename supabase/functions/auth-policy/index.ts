@@ -390,12 +390,31 @@ function roleText(profile: Record<string, unknown>) {
   return String(profile.role_code ?? profile.role ?? "");
 }
 
+// Authorization must key off the trusted, enum-typed role_code column only.
+// profile.role is unvalidated free text captured from signup metadata and
+// must never grant privilege on its own.
+function roleCode(profile: Record<string, unknown>) {
+  return String(profile.role_code ?? "");
+}
+
 function isPrivileged(profile: Record<string, unknown>) {
-  return PRIVILEGED_ROLES.has(roleText(profile));
+  return PRIVILEGED_ROLES.has(roleCode(profile));
 }
 
 function isManager(profile: Record<string, unknown>) {
-  return MANAGER_ROLES.has(roleText(profile));
+  return MANAGER_ROLES.has(roleCode(profile));
+}
+
+function isApproved(profile: Record<string, unknown>) {
+  return String(profile.approval_status ?? "") === "approved";
+}
+
+function ensureApproved(profile: Record<string, unknown>) {
+  if (!isApproved(profile)) {
+    throw new Error(
+      "승인된 계정만 이 작업을 할 수 있습니다.",
+    );
+  }
 }
 
 function canManageNetworks(
@@ -514,6 +533,7 @@ function ensureCanManageNetworks(
 }
 
 function ensureCanModifyStoreNetworks(profile: Record<string, unknown>) {
+  ensureApproved(profile);
   if (!isPrivileged(profile)) {
     throw new Error(
       "\uB9E4\uC7A5 \uB124\uD2B8\uC6CC\uD06C \uB4F1\uB85D/\uBCC0\uACBD\uC740 \uB300\uD45C \uB610\uB294 \uAC1C\uBC1C\uC790\uB9CC \uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
@@ -774,7 +794,7 @@ async function bootstrapSignupNetwork(
   clientNetwork: ClientNetwork,
   body: Record<string, unknown>,
 ) {
-  if (!MANAGE_NETWORK_ROLES.has(roleText(profile))) {
+  if (!MANAGE_NETWORK_ROLES.has(roleCode(profile))) {
     return {
       success: true,
       message:
@@ -919,6 +939,13 @@ async function adminApproveUser(
   profile: Record<string, unknown>,
   body: Record<string, unknown>,
 ) {
+  if (!isApproved(profile)) {
+    return {
+      success: false,
+      message: "\uC2B9\uC778\uB41C \uACC4\uC815\uB9CC \uC774 \uC791\uC5C5\uC744 \uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+    };
+  }
+
   if (!isPrivileged(profile)) {
     return {
       success: false,
@@ -965,6 +992,13 @@ async function adminUpdateUserProfile(
   profile: Record<string, unknown>,
   body: Record<string, unknown>,
 ) {
+  if (!isApproved(profile)) {
+    return {
+      success: false,
+      message: "\uC2B9\uC778\uB41C \uACC4\uC815\uB9CC \uC774 \uC791\uC5C5\uC744 \uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+    };
+  }
+
   if (!isPrivileged(profile)) {
     return {
       success: false,
@@ -1059,6 +1093,13 @@ async function adminDeleteUserProfile(
   currentUserId: string,
   body: Record<string, unknown>,
 ) {
+  if (!isApproved(profile)) {
+    return {
+      success: false,
+      message: "\uC2B9\uC778\uB41C \uACC4\uC815\uB9CC \uC774 \uC791\uC5C5\uC744 \uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4.",
+    };
+  }
+
   if (!isPrivileged(profile)) {
     return {
       success: false,
@@ -1114,6 +1155,13 @@ async function adminUpdateUserPassword(
   profile: Record<string, unknown>,
   body: Record<string, unknown>,
 ) {
+  if (!isApproved(profile)) {
+    return {
+      success: false,
+      message: "승인된 계정만 이 작업을 할 수 있습니다.",
+    };
+  }
+
   if (!isPrivileged(profile)) {
     return {
       success: false,

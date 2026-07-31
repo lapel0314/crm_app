@@ -2,11 +2,14 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'update_service_base.dart';
 
 class UpdateService extends UpdateServiceBase {
+  static const _installerBucket = 'app-installers';
+
   const UpdateService(super.supabase);
 
   @override
@@ -23,7 +26,7 @@ class UpdateService extends UpdateServiceBase {
     final data = await supabase
         .from('app_updates')
         .select(
-          'latest_version, min_required_version, apk_url, update_message, version, installer_url, installer_sha256, notes',
+          'latest_version, min_required_version, apk_url, update_message, version, installer_url, installer_sha256, notes, storage_path',
         )
         .eq('platform', 'android')
         .eq('is_active', true)
@@ -39,8 +42,11 @@ class UpdateService extends UpdateServiceBase {
     final apkUrl = _firstText(data, ['apk_url', 'installer_url']);
     final apkSha256 = _firstText(data, ['installer_sha256']);
     final message = _firstText(data, ['update_message', 'notes']);
+    final storagePath = _firstText(data, ['storage_path']);
 
-    if (latestVersion.isEmpty || minRequiredVersion.isEmpty || apkUrl.isEmpty) {
+    if (latestVersion.isEmpty ||
+        minRequiredVersion.isEmpty ||
+        (apkUrl.isEmpty && storagePath.isEmpty)) {
       return null;
     }
 
@@ -56,6 +62,7 @@ class UpdateService extends UpdateServiceBase {
       packageSha256: apkSha256,
       message: message.isEmpty ? '최신 Android 앱을 설치한 뒤 다시 실행해 주세요.' : message,
       isRequired: true,
+      storagePath: storagePath.isEmpty ? null : storagePath,
     );
   }
 
@@ -65,7 +72,9 @@ class UpdateService extends UpdateServiceBase {
 
     final data = await supabase
         .from('app_updates')
-        .select('version, installer_url, installer_sha256, notes, auto_install')
+        .select(
+          'version, installer_url, installer_sha256, notes, auto_install, storage_path',
+        )
         .eq('platform', 'windows')
         .eq('is_active', true)
         .order('created_at', ascending: false)
@@ -78,7 +87,10 @@ class UpdateService extends UpdateServiceBase {
     final installerUrl = data['installer_url']?.toString().trim() ?? '';
     final installerSha256 = data['installer_sha256']?.toString().trim() ?? '';
     final notes = data['notes']?.toString().trim() ?? '';
-    if (version.isEmpty || installerUrl.isEmpty) return null;
+    final storagePath = data['storage_path']?.toString().trim() ?? '';
+    if (version.isEmpty || (installerUrl.isEmpty && storagePath.isEmpty)) {
+      return null;
+    }
 
     if (compareVersions(version, currentVersion) <= 0) return null;
 
@@ -91,18 +103,46 @@ class UpdateService extends UpdateServiceBase {
       packageSha256: installerSha256,
       message: notes.isEmpty ? '최신 Windows 버전을 설치한 뒤 다시 실행해 주세요.' : notes,
       isRequired: true,
+      storagePath: storagePath.isEmpty ? null : storagePath,
     );
   }
 
   @override
   Future<void> startUpdate(AppUpdateInfo update) async {
+    final downloadUrl = await _resolveDownloadUrl(update);
     if (update.platform == 'android') {
-      await _openAndroidApkUrl(update.packageUrl);
+      await _openAndroidApkUrl(downloadUrl);
       return;
     }
     if (update.platform == 'windows') {
-      final installer = await _downloadWindowsInstaller(update);
+      final installer = await _downloadWindowsInstaller(update, downloadUrl);
       await _runWindowsInstaller(installer);
+    }
+  }
+
+  /// Storage-backed updates (`storagePath` set) require an authenticated
+  /// session: the private `app-installers` bucket only signs URLs for
+  /// logged-in accounts. Legacy rows without a storage path keep using
+  /// `packageUrl` (a public GitHub Release link) directly.
+  Future<String> _resolveDownloadUrl(AppUpdateInfo update) async {
+    final storagePath = update.storagePath;
+    if (storagePath == null || storagePath.isEmpty) {
+      return update.packageUrl;
+    }
+
+    if (supabase.auth.currentSession == null) {
+      throw const UpdateAuthRequiredException();
+    }
+
+    try {
+      return await supabase.storage
+          .from(_installerBucket)
+          .createSignedUrl(storagePath, 3600);
+    } on StorageException catch (e) {
+      if (e.statusCode == '401' || e.statusCode == '403') {
+        throw const UpdateAuthRequiredException();
+      }
+      throw StateError('업데이트 다운로드 주소를 발급받지 못했습니다.');
     }
   }
 
@@ -114,8 +154,11 @@ class UpdateService extends UpdateServiceBase {
     }
   }
 
-  Future<File> _downloadWindowsInstaller(AppUpdateInfo update) async {
-    final packageUri = _validateUpdateUri(update.packageUrl);
+  Future<File> _downloadWindowsInstaller(
+    AppUpdateInfo update,
+    String downloadUrl,
+  ) async {
+    final packageUri = _validateUpdateUri(downloadUrl);
     final expectedSha256 = update.packageSha256.trim().toLowerCase();
     if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(expectedSha256)) {
       throw StateError('Windows 설치파일 SHA-256 값이 등록되지 않았습니다.');
