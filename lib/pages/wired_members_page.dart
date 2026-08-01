@@ -252,6 +252,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
       xls.TextCellValue('개통처'),
       xls.TextCellValue('가입자'),
       xls.TextCellValue('휴대폰번호'),
+      xls.TextCellValue('생년월일'),
       xls.TextCellValue('통신사'),
       xls.TextCellValue('인터넷유형'),
       xls.TextCellValue('상품권'),
@@ -285,6 +286,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
         xls.TextCellValue(member['activation_center']?.toString() ?? ''),
         xls.TextCellValue(member['subscriber']?.toString() ?? ''),
         xls.TextCellValue(member['phone']?.toString() ?? ''),
+        xls.TextCellValue(shortDate(member['birth_date'])),
         xls.TextCellValue(member['carrier']?.toString() ?? ''),
         xls.TextCellValue(member['internet_type']?.toString() ?? ''),
         xls.IntCellValue(parseInt(member['gift_card'])),
@@ -399,6 +401,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
       14,
       12,
       16,
+      12,
       10,
       14,
       12,
@@ -418,7 +421,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
           .cellStyle = headerStyle;
     }
 
-    const moneyColumns = <int>[8, 9, 10, 11, 12];
+    const moneyColumns = <int>[9, 10, 11, 12, 13];
     for (var rowIndex = 1; rowIndex <= rows.length; rowIndex++) {
       for (final columnIndex in moneyColumns) {
         sheet
@@ -433,7 +436,8 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
 
       sheet
           .cell(
-            xls.CellIndex.indexByColumnRow(columnIndex: 9, rowIndex: rowIndex),
+            xls.CellIndex.indexByColumnRow(
+                columnIndex: 10, rowIndex: rowIndex),
           )
           .cellStyle = rebateStyle;
 
@@ -448,7 +452,8 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
 
       sheet
           .cell(
-            xls.CellIndex.indexByColumnRow(columnIndex: 12, rowIndex: rowIndex),
+            xls.CellIndex.indexByColumnRow(
+                columnIndex: 14, rowIndex: rowIndex),
           )
           .cellStyle = margin > 0
           ? marginPositiveStyle
@@ -701,6 +706,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
 
   Future<void> addMember({
     required DateTime? subscriptionDate,
+    required String? birthDate,
     required String carrier,
     required String activationCenter,
     required String seller,
@@ -741,6 +747,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
         'customer_name': subscriber,
         'phone': phone.trim(),
         'subscription_date': subscriptionDate?.toIso8601String(),
+        'birth_date': birthDate,
         'carrier': carrier.trim(),
         'activation_center': activationCenter.trim(),
         'seller': seller.trim(),
@@ -773,6 +780,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
     required String id,
     required String store,
     required DateTime? subscriptionDate,
+    required String? birthDate,
     required String carrier,
     required String activationCenter,
     required String seller,
@@ -813,6 +821,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
         'customer_name': subscriber.trim(),
         'phone': phone.trim(),
         'subscription_date': subscriptionDate?.toIso8601String(),
+        'birth_date': birthDate,
         'carrier': carrier.trim(),
         'activation_center': activationCenter.trim(),
         'seller': seller.trim(),
@@ -1001,6 +1010,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
     final sellerController = TextEditingController();
     final subscriberController = TextEditingController();
     final phoneController = TextEditingController();
+    final birthDateController = TextEditingController();
 
     final internetTypeController = TextEditingController();
     final giftCardController = TextEditingController();
@@ -1020,6 +1030,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
       sellerController,
       subscriberController,
       phoneController,
+      birthDateController,
       internetTypeController,
       giftCardController,
       prepaidAmountController,
@@ -1118,6 +1129,8 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                       },
                     ),
                     _wiredInput(
+                        label: '생년월일', controller: birthDateController),
+                    _wiredInput(
                         label: '인터넷유형', controller: internetTypeController),
                     _dialogSectionTitle('정산 정보'),
                     _wiredInput(
@@ -1207,6 +1220,9 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                 ),
                 onPressed: () => addMember(
                   subscriptionDate: subscriptionDate,
+                  birthDate: birthDateController.text.trim().isEmpty
+                      ? null
+                      : birthDateController.text.trim(),
                   carrier: carrierController.text.trim(),
                   activationCenter: activationCenterController.text.trim(),
                   seller: sellerController.text.trim(),
@@ -1247,6 +1263,8 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
         TextEditingController(text: item['subscriber']?.toString() ?? '');
     final phoneController =
         TextEditingController(text: item['phone']?.toString() ?? '');
+    final birthDateController =
+        TextEditingController(text: item['birth_date']?.toString() ?? '');
 
     final internetTypeController =
         TextEditingController(text: item['internet_type']?.toString() ?? '');
@@ -1275,6 +1293,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
       sellerController,
       subscriberController,
       phoneController,
+      birthDateController,
       internetTypeController,
       giftCardController,
       prepaidAmountController,
@@ -1375,6 +1394,8 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                       },
                     ),
                     _wiredInput(
+                        label: '생년월일', controller: birthDateController),
+                    _wiredInput(
                         label: '인터넷유형', controller: internetTypeController),
                     _dialogSectionTitle('정산 정보'),
                     _wiredInput(
@@ -1466,6 +1487,9 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                   id: item['id'].toString(),
                   store: item['store']?.toString() ?? '',
                   subscriptionDate: subscriptionDate,
+                  birthDate: birthDateController.text.trim().isEmpty
+                      ? null
+                      : birthDateController.text.trim(),
                   carrier: carrierController.text.trim(),
                   activationCenter: activationCenterController.text.trim(),
                   seller: sellerController.text.trim(),
@@ -1618,6 +1642,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                     _detailRow('판매자', item['seller']),
                     _detailRow('가입자', item['subscriber']),
                     _detailRow('번호', item['phone']),
+                    _detailRow('생년월일', shortDate(item['birth_date'])),
                   ]),
                   const SizedBox(height: 12),
                   _detailSection('상품 정보', [
