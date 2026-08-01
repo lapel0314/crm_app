@@ -26,7 +26,7 @@ build\app\outputs\flutter-apk\app-release.apk
 
 ## 2. 업데이트 테이블
 
-Supabase SQL Editor에서 `supabase_app_updates.sql`을 먼저 실행합니다. 기존 Windows 업데이트 컬럼은 유지하면서 Android용 컬럼을 추가합니다.
+Supabase SQL Editor에서 `supabase_app_updates.sql`과 `supabase/migrations/20260801020000_private_app_installers_storage.sql`을 먼저 실행합니다. APK는 공개 URL이 아니라 비공개 `app-installers` Storage 버킷에 올리고, `app_updates.storage_path`에 그 안의 오브젝트 경로만 기록합니다. 앱은 로그인한 세션으로만 signed URL을 발급받아 내려받습니다 (`lib/services/update_service_io.dart`).
 
 Android APK 예시:
 
@@ -38,34 +38,34 @@ where platform = 'android' and is_active = true;
 insert into public.app_updates (
   platform,
   version,
-  installer_url,
   latest_version,
   min_required_version,
-  apk_url,
+  storage_path,
   update_message
 )
 values (
   'android',
   '1.0.4',
-  'https://ysafjyubntkeorriywmu.supabase.co/storage/v1/object/public/installers/pinkphone-crm-1.0.4.apk',
   '1.0.4',
   '1.0.4',
-  'https://ysafjyubntkeorriywmu.supabase.co/storage/v1/object/public/installers/pinkphone-crm-1.0.4.apk',
+  'android/pinkphone-crm-1.0.4.apk',
   '새 Android 앱을 설치한 뒤 다시 실행해주세요.'
 );
 ```
 
-`min_required_version`보다 설치된 앱 버전이 낮으면 앱 시작 화면에서 업데이트 안내만 표시되고 본 화면에 진입할 수 없습니다.
+과거처럼 `installer_url`/`apk_url`에 공개 URL을 직접 넣는 방식도 하위 호환을 위해 계속 동작하지만, 새 배포는 `storage_path` 방식을 사용합니다.
+
+`min_required_version`보다 설치된 앱 버전이 낮으면 앱 시작 화면에서 업데이트 안내만 표시되고 본 화면에 진입할 수 없습니다. 세션이 없는 상태(로그인 전)에서 업데이트 버튼을 누르면 먼저 로그인 화면이 뜨고, 로그인에 성공하면 자동으로 다운로드가 이어집니다.
 
 ## 3. APK 업로드 절차
 
 1. `pubspec.yaml` 버전을 올립니다.
 2. `lib/services/update_service_base.dart`의 `appVersion`도 같은 버전으로 맞춥니다.
 3. `flutter build apk --release ...`를 실행합니다.
-4. 생성된 APK를 Supabase Storage public bucket에 업로드합니다.
+4. 생성된 APK를 Supabase Storage `app-installers`(비공개) 버킷에 업로드합니다.
 5. `app_updates`의 기존 `android` 활성 row를 비활성화합니다.
-6. 새 APK URL로 `android` row를 추가합니다.
-7. 구버전 기기에서 앱을 실행해 업데이트 화면이 뜨는지 확인합니다.
+6. 새 `storage_path`로 `android` row를 추가합니다.
+7. 구버전 기기에서 앱을 실행해 업데이트 화면이 뜨는지, 로그인 후 다운로드가 정상 진행되는지 확인합니다.
 
 ## 4. 업데이트 UX
 
@@ -74,7 +74,7 @@ values (
 - `platform = 'android'`
 - `is_active = true`
 - `current_version < min_required_version`이면 차단
-- 업데이트 버튼은 `apk_url`을 외부 브라우저로 엽니다.
+- 업데이트 버튼은 `storage_path`가 있으면 로그인한 세션으로 signed URL을 발급받아 외부 브라우저로 엽니다. 세션이 없으면 먼저 로그인 화면을 보여줍니다.
 - 사용자는 APK를 내려받아 직접 설치한 뒤 앱을 다시 실행합니다.
 
 Android 8 이상에서는 사용자가 브라우저 또는 파일 앱의 "알 수 없는 앱 설치" 권한을 허용해야 할 수 있습니다. 앱 내부 설치 권한을 강제로 요구하지 않고, 브라우저 다운로드 방식으로 안정성을 우선했습니다.

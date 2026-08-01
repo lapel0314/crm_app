@@ -18,6 +18,7 @@ class AppUpdateInfo {
   final String packageSha256;
   final String message;
   final bool isRequired;
+  final String? storagePath;
 
   const AppUpdateInfo({
     required this.platform,
@@ -28,7 +29,14 @@ class AppUpdateInfo {
     this.packageSha256 = '',
     required this.message,
     required this.isRequired,
+    this.storagePath,
   });
+}
+
+/// Thrown when downloading an update requires an authenticated Supabase
+/// session (private storage signed URL) but none is available yet.
+class UpdateAuthRequiredException implements Exception {
+  const UpdateAuthRequiredException();
 }
 
 abstract class UpdateServiceBase {

@@ -215,21 +215,37 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
   bool _failed = false;
   bool _isUpdating = false;
   bool _checkInProgress = false;
+  bool _needsLoginForUpdate = false;
   DateTime? _lastUpdateCheckAt;
   AppUpdateInfo? _blockedUpdate;
   String _updateStatus =
       '\uC5C5\uB370\uC774\uD2B8 \uBC84\uC804\uC744 \uD655\uC778\uD558\uACE0 \uC788\uC2B5\uB2C8\uB2E4.';
+  late final StreamSubscription<AuthState> _authSubscription;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _checkUpdate());
+    // storagePath \uAE30\uBC18(\uBE44\uACF5\uAC1C \uC2A4\uD1A0\uB9AC\uC9C0) \uC5C5\uB370\uC774\uD2B8 \uB2E4\uC6B4\uB85C\uB4DC\uB294 \uB85C\uADF8\uC778 \uC138\uC158\uC774 \uC788\uC5B4\uC57C
+    // signed URL\uC744 \uBC1B\uC744 \uC218 \uC788\uB2E4. \uAC15\uC81C \uC5C5\uB370\uC774\uD2B8 \uD654\uBA74\uC740 AuthGate\uBCF4\uB2E4 \uBA3C\uC800 \uB728\uBBC0\uB85C,
+    // \uB85C\uADF8\uC778 \uC131\uACF5\uC744 \uAC10\uC9C0\uD574 \uC5C5\uB370\uC774\uD2B8 \uC7AC\uC2DC\uB3C4\uB97C \uC774\uC5B4\uAC04\uB2E4.
+    _authSubscription = supabase.auth.onAuthStateChange.listen((data) {
+      if (!mounted || !_needsLoginForUpdate || data.session == null) return;
+      final blockedUpdate = _blockedUpdate;
+      setState(() {
+        _needsLoginForUpdate = false;
+      });
+      if (blockedUpdate != null) {
+        unawaited(_startUpdate(UpdateService(supabase), blockedUpdate));
+      }
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _authSubscription.cancel();
     super.dispose();
   }
 
@@ -311,6 +327,13 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
             '\uB2E4\uC6B4\uB85C\uB4DC\uD55C APK\uB97C \uC124\uCE58\uD55C \uB4A4 '
             '\uC571\uC744 \uB2E4\uC2DC \uC2E4\uD589\uD574 \uC8FC\uC138\uC694.';
       });
+    } on UpdateAuthRequiredException {
+      if (!mounted) return;
+      setState(() {
+        _isUpdating = false;
+        _needsLoginForUpdate = true;
+        _updateStatus = '\uC5C5\uB370\uC774\uD2B8 \uD30C\uC77C\uC744 \uBC1B\uC73C\uB824\uBA74 \uBA3C\uC800 \uB85C\uADF8\uC778\uD574 \uC8FC\uC138\uC694.';
+      });
     } catch (e) {
       debugPrint('update install failed: $e');
       if (!mounted) return;
@@ -338,6 +361,7 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     if (_ready) return widget.child;
+    if (_needsLoginForUpdate) return const LoginPage();
     final blockedUpdate = _blockedUpdate;
     final updateService = UpdateService(supabase);
 

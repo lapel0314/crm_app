@@ -72,7 +72,17 @@ Supabase `app_updates`에서 `platform = 'android'` 정책을 조회하고,
 2. `lib/services/update_service.dart`의 `appVersion`
 3. `installer.iss`와 `CRM_App_Setup.iss`의 `MyAppVersion`
 4. 새 Windows 설치파일
-5. Supabase `app_updates` 테이블의 `version`, `installer_url`
+5. Supabase `app_updates` 테이블의 `version`, `storage_path`
 
-Supabase Storage에는 기존 파일을 덮어쓰기보다 새 버전 파일명으로 업로드하는 것을
-권장합니다. 캐시 때문에 이전 설치파일이 내려가는 일을 줄일 수 있습니다.
+설치파일은 공개 GitHub Release 대신 비공개 Supabase Storage 버킷
+`app-installers`에 업로드합니다 (`supabase/migrations/20260801020000_private_app_installers_storage.sql`
+참고). `app_updates.storage_path`에는 버킷 안의 오브젝트 경로만 저장하고, 실제
+다운로드 URL은 앱이 로그인한 세션으로 `createSignedUrl()`을 호출해 그때그때
+발급받습니다 — 로그인 전에는 다운로드할 수 없고, 강제 업데이트 화면에서 로그인
+단계를 먼저 거치도록 되어 있습니다 (`lib/main.dart`의 `UpdateGate`).
+
+기존 파일을 덮어쓰기보다 새 버전 파일명(예: `windows/pinkphone-crm-1.1.9.exe`)으로
+업로드하는 것을 권장합니다. 과거 활성 row의 공개 URL(`installer_url`/`apk_url`)은
+하위 호환을 위해 계속 지원되지만, 새 배포부터는 `storage_path`만 채웁니다. 이전에
+공개 GitHub Release로 배포했던 설치파일은 Private Release로 아카이브합니다(수동
+작업, GitHub 저장소 설정에서 직접 진행).
