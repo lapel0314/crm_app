@@ -23,6 +23,7 @@ class _HomePageState extends State<HomePage> {
   final joinDateController = TextEditingController();
   final nameController = TextEditingController();
   final phoneController = TextEditingController();
+  final birthDateController = TextEditingController();
 
   final carrierController = TextEditingController();
   final modelController = TextEditingController();
@@ -79,6 +80,7 @@ class _HomePageState extends State<HomePage> {
       joinDateController,
       nameController,
       phoneController,
+      birthDateController,
       carrierController,
       modelController,
       planController,
@@ -125,6 +127,13 @@ class _HomePageState extends State<HomePage> {
     final parsed = DateTime.tryParse(text);
     if (parsed == null) return null;
     return DateTime(parsed.year, parsed.month, parsed.day);
+  }
+
+  // birth_date는 text 컬럼 — 카카오 자동화가 "700725" 같은 원문 그대로 저장하므로
+  // 여기서도 선택 입력이되 형식 강제 없이 입력값을 그대로 보존한다.
+  String? _formBirthDate() {
+    final text = birthDateController.text.trim();
+    return text.isEmpty ? null : text;
   }
 
   Future<void> _loadDefaultManagerName() async {
@@ -313,6 +322,7 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> save() async {
     final currentJoinDate = _formJoinDate();
+    final currentBirthDate = _formBirthDate();
 
     if (currentJoinDate == null ||
         nameController.text.trim().isEmpty ||
@@ -362,6 +372,7 @@ class _HomePageState extends State<HomePage> {
             : managerController.text.trim(),
         'name': nameController.text.trim(),
         'phone': phoneController.text.trim(),
+        'birth_date': currentBirthDate,
         'join_type': joinType,
         'carrier': carrierController.text.trim(),
         'previous_carrier': previousCarrier,
@@ -406,6 +417,7 @@ class _HomePageState extends State<HomePage> {
       managerController,
       nameController,
       phoneController,
+      birthDateController,
       carrierController,
       modelController,
       planController,
@@ -723,6 +735,16 @@ class _HomePageState extends State<HomePage> {
                             ),
                           );
                         },
+                      ),
+                    ),
+                  ], mobile: mobile),
+                  const SizedBox(height: 12),
+                  formRow([
+                    pair(
+                      label: '생년월일',
+                      field: inputBox(
+                        birthDateController,
+                        keyboardType: TextInputType.datetime,
                       ),
                     ),
                   ], mobile: mobile),

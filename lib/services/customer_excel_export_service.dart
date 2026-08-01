@@ -339,6 +339,12 @@ final List<_CustomerExcelColumn> _baseColumns = [
     value: (row) => row['phone'],
   ),
   _CustomerExcelColumn(
+    key: 'birth_date',
+    header: '생년월일',
+    width: 13,
+    value: (row) => CustomerExcelExportService.dateText(row['birth_date']),
+  ),
+  _CustomerExcelColumn(
     key: 'join_type',
     header: '가입유형',
     width: 12,

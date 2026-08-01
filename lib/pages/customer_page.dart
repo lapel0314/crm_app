@@ -255,6 +255,13 @@ class _CustomerPageState extends State<CustomerPage> {
     return formatted.isEmpty ? null : formatted;
   }
 
+  // birth_date는 text 컬럼 — 카카오 자동화가 "700725" 같은 원문 그대로 저장하므로
+  // 여기서도 파싱/재포맷 없이 입력값을 그대로 보존한다 (파싱 실패로 null 덮어쓰기 방지).
+  String? _normalizedBirthDateOrNull(String value) {
+    final text = value.trim();
+    return text.isEmpty ? null : text;
+  }
+
   String _maskName(String name) {
     if (name.isEmpty) return '';
     if (name.length == 1) return '*';
@@ -1585,6 +1592,8 @@ class _CustomerPageState extends State<CustomerPage> {
         TextEditingController(text: customer['name']?.toString() ?? '');
     final phoneController =
         TextEditingController(text: customer['phone']?.toString() ?? '');
+    final birthDateController =
+        TextEditingController(text: customer['birth_date']?.toString() ?? '');
     final carrierController =
         TextEditingController(text: customer['carrier']?.toString() ?? '');
     final previousCarrierController = TextEditingController(
@@ -1637,6 +1646,7 @@ class _CustomerPageState extends State<CustomerPage> {
     final controllers = [
       nameController,
       phoneController,
+      birthDateController,
       carrierController,
       previousCarrierController,
       modelController,
@@ -1753,6 +1763,11 @@ class _CustomerPageState extends State<CustomerPage> {
                               TextSelection.collapsed(offset: formatted.length),
                         );
                       },
+                    ),
+                    _input(
+                      '생년월일',
+                      birthDateController,
+                      keyboardType: TextInputType.datetime,
                     ),
                     _input('통신사/거래처', carrierController),
                     _input('기존통신사', previousCarrierController),
@@ -1906,6 +1921,8 @@ class _CustomerPageState extends State<CustomerPage> {
                         .update({
                           'name': nameController.text.trim(),
                           'phone': _normalizedPhoneOrNull(phoneController.text),
+                          'birth_date':
+                              _normalizedBirthDateOrNull(birthDateController.text),
                           'carrier': carrierController.text.trim(),
                           'previous_carrier':
                               previousCarrierController.text.trim(),
@@ -2099,6 +2116,7 @@ class _CustomerPageState extends State<CustomerPage> {
                       _detailRow('담당자', customer['staff']),
                       _detailRow('휴대폰번호',
                           _displayPhone(customer['phone']?.toString() ?? '')),
+                      _detailRow('생년월일', _date(customer['birth_date'])),
                       _detailRow('개통매장', customer['store']),
                     ],
                   ),
