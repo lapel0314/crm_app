@@ -73,7 +73,31 @@ class _AppLayoutState extends State<AppLayout> {
   static const Color _sidebarPinkSoft = Color(0xFFFCE7F3);
   static const Color _sidebarInactive = Color(0xFFC4C8DC);
 
+  // IndexedStack은 모든 자식을 항상 레이아웃하므로, 매 빌드마다 페이지 위젯을
+  // 새로 만들면 AppLayout이 리빌드될 때마다 (팝업/네비게이션 복귀 포함) 앱 전체
+  // 페이지가 다시 생성·레이아웃되어 모바일에서 프리징이 발생한다.
+  // 페이지 생성에 쓰이는 입력값이 그대로면 이전 인스턴스를 재사용한다.
+  List<_NavItem>? _cachedNavItems;
+  String _cachedNavItemsSignature = '';
+
   List<_NavItem> get items {
+    final signature = [
+      widget.role,
+      activeStore,
+      pageSearchNameQuery,
+      pageSearchPhoneQuery,
+      pageSearchKeyword,
+      globalNameQuery,
+      globalPhoneQuery,
+    ].join('\u0000');
+    if (_cachedNavItems == null || signature != _cachedNavItemsSignature) {
+      _cachedNavItemsSignature = signature;
+      _cachedNavItems = _buildNavItems();
+    }
+    return _cachedNavItems!;
+  }
+
+  List<_NavItem> _buildNavItems() {
     return [
       _NavItem(
         title: '고객등록',
@@ -734,7 +758,14 @@ class _AppLayoutState extends State<AppLayout> {
 
     if (!shouldExit) return;
 
-    await DesktopAuthSessionService.signOutAndClear(Supabase.instance.client);
+    // 데스크톱은 정책상 매 실행마다 새로 로그인하므로 종료 시 세션을 지운다.
+    // 모바일(Android/iOS)은 로그인 상태를 유지해야 하므로 로그아웃 없이
+    // 앱만 닫는다 — 종료 버튼이 사실상 로그아웃 버튼이 되어 매번 재로그인해야
+    // 했던 문제의 수정.
+    final isMobile = !kIsWeb && (Platform.isAndroid || Platform.isIOS);
+    if (!isMobile) {
+      await DesktopAuthSessionService.signOutAndClear(Supabase.instance.client);
+    }
 
     if (kIsWeb) return;
 
@@ -1081,21 +1112,21 @@ class _AppLayoutState extends State<AppLayout> {
                   width: 116,
                 ),
               ],
-              if (canUseGlobalSearch(widget.role)) ...[
-                const Spacer(),
-                compactSearch
-                    ? _quickSearchButton(
-                        width: 148,
-                        label: '통합검색',
-                        onPressed: _openGlobalSearchPage,
-                      )
-                    : Flexible(
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: _globalSearchBox(),
-                        ),
-                      ),
-              ],
+              // Spacer와 공간을 반씩 나누면 검색박스가 절반 폭에서 잘리므로,
+              // Expanded 하나가 남은 공간 전체를 갖고 오른쪽 정렬한다.
+              if (canUseGlobalSearch(widget.role))
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: compactSearch
+                        ? _quickSearchButton(
+                            width: 148,
+                            label: '통합검색',
+                            onPressed: _openGlobalSearchPage,
+                          )
+                        : _globalSearchBox(),
+                  ),
+                ),
             ],
           ),
         );
@@ -1104,8 +1135,11 @@ class _AppLayoutState extends State<AppLayout> {
   }
 
   Widget _globalSearchBox() {
+    // width: infinity + maxWidth — 사용 가능한 폭을 최대 680까지 항상 꽉 채운다.
+    // (이전에는 내용물의 최소 폭으로 수축해 입력칸이 아이콘만 보일 만큼 작아짐)
     return Container(
-      constraints: const BoxConstraints(maxWidth: 620),
+      width: double.infinity,
+      constraints: const BoxConstraints(maxWidth: 680),
       height: 44,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
@@ -1771,6 +1805,26 @@ class _AppLayoutState extends State<AppLayout> {
           ],
         ),
         actions: [
+          // v1.1.5에서 데스크톱 상단바만 개편되며 컴팩트(모바일) 레이아웃의
+          // 통합검색/리베이트 진입점이 사라졌던 회귀 — AppBar 버튼으로 복구한다.
+          if (canUseGlobalSearch(widget.role))
+            IconButton(
+              tooltip: '통합검색',
+              onPressed: _openGlobalSearchPage,
+              icon: const Icon(Icons.search_rounded),
+            ),
+          if (canViewRebate(widget.role))
+            IconButton(
+              tooltip: '리베이트',
+              onPressed: () {
+                final rebateIndex =
+                    items.indexWhere((item) => item.title == '리베이트');
+                if (rebateIndex >= 0) {
+                  setState(() => selectedIndex = rebateIndex);
+                }
+              },
+              icon: const Icon(Icons.image_rounded),
+            ),
           if (canUseCustomerDb(widget.role))
             IconButton(
               tooltip: '오늘 알림',

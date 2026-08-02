@@ -13,7 +13,9 @@ import 'package:crm_app/utils/debouncer.dart';
 import 'package:crm_app/utils/phone_utils.dart';
 import 'package:crm_app/utils/postgrest_filter_utils.dart';
 import 'package:crm_app/utils/store_utils.dart';
+import 'package:crm_app/utils/supabase_fetch_utils.dart';
 import 'package:crm_app/widgets/contact_action_buttons.dart';
+import 'package:crm_app/widgets/contact_toolbar_buttons.dart';
 import 'package:crm_app/widgets/compact_date_range_picker.dart';
 
 final supabase = Supabase.instance.client;
@@ -645,13 +647,13 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
 
     try {
       final List<dynamic> data = keyword.trim().isEmpty
-          ? await supabase
+          ? await fetchAllRows(() => supabase
               .from('wired_members')
               .select()
               .eq('is_deleted', false)
               .order('subscription_date', ascending: true)
-              .order('created_at', ascending: true)
-          : await supabase
+              .order('created_at', ascending: true))
+          : await fetchAllRows(() => supabase
               .from('wired_members')
               .select()
               .eq('is_deleted', false)
@@ -667,7 +669,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                 keyword,
               ))
               .order('subscription_date', ascending: true)
-              .order('created_at', ascending: true);
+              .order('created_at', ascending: true));
 
       final dateFilter = dateSearchController.text.trim();
       var nextMembers = data
@@ -1758,6 +1760,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
     final controller = TextEditingController(
       text: buildContactMessage(
         customerName: textValue(selected.first['subscriber']),
+        storeName: widget.currentStore,
       ),
     );
     await showDialog<void>(
@@ -1803,6 +1806,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
     }
     final message = buildContactMessage(
       customerName: textValue(selected.first['subscriber']),
+      storeName: widget.currentStore,
     );
     final result = await const ContactActionService().kakao(message);
     if (!mounted) return;
@@ -2190,6 +2194,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                                 ContactActionButtons(
                                   customerName: textValue(item['subscriber']),
                                   phone: textValue(item['phone']),
+                                  storeName: widget.currentStore,
                                   onMessage: showMessage,
                                   dense: true,
                                 ),
@@ -2317,6 +2322,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                 ContactActionButtons(
                   customerName: textValue(item['subscriber']),
                   phone: textValue(item['phone']),
+                  storeName: widget.currentStore,
                   onMessage: showMessage,
                   dense: true,
                 ),
@@ -2795,44 +2801,29 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                                   children: [
                                     Row(
                                       children: [
-                                        SizedBox(
-                                          width: 36,
-                                          height: 36,
-                                          child: OutlinedButton(
-                                            onPressed: selectedMemberCount == 0
-                                                ? null
-                                                : showSmsSendDialog,
-                                            style: OutlinedButton.styleFrom(
-                                              minimumSize: const Size(36, 36),
-                                              padding: EdgeInsets.zero,
-                                              visualDensity:
-                                                  VisualDensity.compact,
-                                            ),
-                                            child: const Icon(
-                                              Icons.sms_rounded,
-                                              size: 16,
-                                            ),
+                                        toolbarIconButton(
+                                          tooltip:
+                                              '문자 발송 ($selectedMemberCount명)',
+                                          onPressed: selectedMemberCount == 0
+                                              ? null
+                                              : showSmsSendDialog,
+                                          icon: const Icon(
+                                            Icons.sms_outlined,
+                                            size: 18,
+                                            color: Color(0xFF374151),
                                           ),
                                         ),
                                         const SizedBox(width: 6),
-                                        SizedBox(
-                                          width: 36,
-                                          height: 36,
-                                          child: OutlinedButton(
-                                            onPressed: selectedMemberCount == 0
-                                                ? null
-                                                : sendKakaoToSelectedMembers,
-                                            style: OutlinedButton.styleFrom(
-                                              minimumSize: const Size(36, 36),
-                                              padding: EdgeInsets.zero,
-                                              visualDensity:
-                                                  VisualDensity.compact,
-                                            ),
-                                            child: const Icon(
-                                              Icons.chat_bubble_rounded,
-                                              size: 16,
-                                            ),
-                                          ),
+                                        toolbarIconButton(
+                                          tooltip:
+                                              '카카오 발송 ($selectedMemberCount명)',
+                                          onPressed: selectedMemberCount == 0
+                                              ? null
+                                              : sendKakaoToSelectedMembers,
+                                          icon: kakaoTalkMark(),
+                                          backgroundColor:
+                                              kakaoButtonBackground,
+                                          borderColor: kakaoButtonBorder,
                                         ),
                                         const SizedBox(width: 6),
                                         Expanded(
@@ -2999,21 +2990,26 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                OutlinedButton.icon(
+                                toolbarIconButton(
+                                  tooltip: '문자 발송 ($selectedMemberCount명)',
                                   onPressed: selectedMemberCount == 0
                                       ? null
                                       : showSmsSendDialog,
-                                  icon: const Icon(Icons.sms_rounded, size: 17),
-                                  label: Text('문자 ($selectedMemberCount)'),
+                                  icon: const Icon(
+                                    Icons.sms_outlined,
+                                    size: 18,
+                                    color: Color(0xFF374151),
+                                  ),
                                 ),
                                 const SizedBox(width: 8),
-                                OutlinedButton.icon(
+                                toolbarIconButton(
+                                  tooltip: '카카오 발송 ($selectedMemberCount명)',
                                   onPressed: selectedMemberCount == 0
                                       ? null
                                       : sendKakaoToSelectedMembers,
-                                  icon: const Icon(Icons.chat_bubble_rounded,
-                                      size: 17),
-                                  label: Text('카카오 ($selectedMemberCount)'),
+                                  icon: kakaoTalkMark(),
+                                  backgroundColor: kakaoButtonBackground,
+                                  borderColor: kakaoButtonBorder,
                                 ),
                                 const SizedBox(width: 8),
                                 ElevatedButton.icon(

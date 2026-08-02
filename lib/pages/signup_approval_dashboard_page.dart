@@ -21,12 +21,46 @@ class _SignupApprovalDashboardPageState
   List<Map<String, dynamic>> users = [];
   bool isLoading = true;
 
+  // 집계는 fetch 시 1회만 계산한다 — 이전에는 매 빌드마다 users 전체를
+  // 4~6회 순회해서 좁은 화면에서 프레임 드랍을 유발했다.
+  List<Map<String, dynamic>> pendingUsers = [];
+  int pendingCount = 0;
+  int approvedCount = 0;
+  int rejectedCount = 0;
+  Map<String, int> roleCounts = {};
+  Map<String, int> storeCounts = {};
+
   bool get isAdmin => isPrivilegedRole(widget.role);
 
   @override
   void initState() {
     super.initState();
     fetchUsers();
+  }
+
+  void _recomputeStats() {
+    pendingUsers = [];
+    pendingCount = 0;
+    approvedCount = 0;
+    rejectedCount = 0;
+    roleCounts = {};
+    storeCounts = {};
+    for (final user in users) {
+      user['created_at_label'] = _date(user['created_at']);
+      final status = _status(user);
+      if (status == '대기') {
+        pendingCount++;
+        pendingUsers.add(user);
+      } else if (status == '승인') {
+        approvedCount++;
+      } else if (status == '반려') {
+        rejectedCount++;
+      }
+      final role = _text(user['role_code'] ?? user['role']);
+      roleCounts[role] = (roleCounts[role] ?? 0) + 1;
+      final store = _text(user['store']);
+      storeCounts[store] = (storeCounts[store] ?? 0) + 1;
+    }
   }
 
   Future<void> fetchUsers() async {
@@ -43,6 +77,7 @@ class _SignupApprovalDashboardPageState
       if (!mounted) return;
       setState(() {
         users = List<Map<String, dynamic>>.from(rows);
+        _recomputeStats();
         isLoading = false;
       });
     } catch (e) {
@@ -98,28 +133,6 @@ class _SignupApprovalDashboardPageState
   String _date(dynamic value) {
     final parsed = DateTime.tryParse(value?.toString() ?? '')?.toLocal();
     return parsed == null ? '-' : dateFormat.format(parsed);
-  }
-
-  int _countStatus(String status) {
-    return users.where((user) => _status(user) == status).length;
-  }
-
-  Map<String, int> get _roleCounts {
-    final counts = <String, int>{};
-    for (final user in users) {
-      final role = _text(user['role_code'] ?? user['role']);
-      counts[role] = (counts[role] ?? 0) + 1;
-    }
-    return counts;
-  }
-
-  Map<String, int> get _storeCounts {
-    final counts = <String, int>{};
-    for (final user in users) {
-      final store = _text(user['store']);
-      counts[store] = (counts[store] ?? 0) + 1;
-    }
-    return counts;
   }
 
   Widget _summaryTile(String label, int count, Color color) {
@@ -209,7 +222,57 @@ class _SignupApprovalDashboardPageState
     );
   }
 
-  Widget _pendingRow(Map<String, dynamic> user) {
+  Widget _pendingRow(Map<String, dynamic> user, {required bool mobile}) {
+    final approveButton = ElevatedButton(
+      onPressed: () => approveUser(user['id'].toString()),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFF111827),
+        foregroundColor: Colors.white,
+        elevation: 0,
+      ),
+      child: const Text('승인'),
+    );
+
+    if (mobile) {
+      // 좁은 화면에서는 고정폭 6열 Row가 잘리므로 카드형으로 표시한다.
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: Color(0xFFF1F3F5))),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${_text(user['name'])} · ${_text(user['role_code'] ?? user['role'])} · ${_text(user['store'])}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${_text(user['email'])}\n${_text(user['phone'])} · ${_text(user['created_at_label'])}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6B7280),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            SizedBox(width: 76, child: approveButton),
+          ],
+        ),
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: const BoxDecoration(
@@ -229,19 +292,8 @@ class _SignupApprovalDashboardPageState
           Expanded(child: Text(_text(user['phone']))),
           Expanded(child: Text(_text(user['store']))),
           Expanded(child: Text(_text(user['role_code'] ?? user['role']))),
-          SizedBox(width: 150, child: Text(_date(user['created_at']))),
-          SizedBox(
-            width: 92,
-            child: ElevatedButton(
-              onPressed: () => approveUser(user['id'].toString()),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF111827),
-                foregroundColor: Colors.white,
-                elevation: 0,
-              ),
-              child: const Text('승인'),
-            ),
-          ),
+          SizedBox(width: 150, child: Text(_text(user['created_at_label']))),
+          SizedBox(width: 92, child: approveButton),
         ],
       ),
     );
@@ -253,12 +305,12 @@ class _SignupApprovalDashboardPageState
       return const Scaffold(body: Center(child: Text('접근 권한 없음')));
     }
 
-    final pendingUsers = users.where((user) => _status(user) == '대기').toList();
+    final mobile = MediaQuery.of(context).size.width < 900;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F8),
       body: Padding(
-        padding: const EdgeInsets.all(28),
+        padding: EdgeInsets.all(mobile ? 14 : 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -310,32 +362,55 @@ class _SignupApprovalDashboardPageState
             if (isLoading)
               const Expanded(child: Center(child: CircularProgressIndicator()))
             else ...[
-              Row(
-                children: [
-                  _summaryTile('전체 가입', users.length, const Color(0xFF111827)),
-                  const SizedBox(width: 12),
-                  _summaryTile(
-                      '승인 대기', _countStatus('대기'), const Color(0xFFD97706)),
-                  const SizedBox(width: 12),
-                  _summaryTile(
-                      '승인 완료', _countStatus('승인'), const Color(0xFF059669)),
-                  const SizedBox(width: 12),
-                  _summaryTile(
-                      '반려', _countStatus('반려'), const Color(0xFFDC2626)),
-                ],
-              ),
-              const SizedBox(height: 14),
-              SizedBox(
-                height: 220,
-                child: Row(
+              if (mobile) ...[
+                Row(
                   children: [
-                    _breakdownPanel('권한별 현황', _roleCounts),
+                    _summaryTile(
+                        '전체 가입', users.length, const Color(0xFF111827)),
                     const SizedBox(width: 12),
-                    _breakdownPanel('매장별 현황', _storeCounts),
+                    _summaryTile('승인 대기', pendingCount,
+                        const Color(0xFFD97706)),
                   ],
                 ),
-              ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _summaryTile('승인 완료', approvedCount,
+                        const Color(0xFF059669)),
+                    const SizedBox(width: 12),
+                    _summaryTile('반려', rejectedCount, const Color(0xFFDC2626)),
+                  ],
+                ),
+              ] else
+                Row(
+                  children: [
+                    _summaryTile(
+                        '전체 가입', users.length, const Color(0xFF111827)),
+                    const SizedBox(width: 12),
+                    _summaryTile('승인 대기', pendingCount,
+                        const Color(0xFFD97706)),
+                    const SizedBox(width: 12),
+                    _summaryTile('승인 완료', approvedCount,
+                        const Color(0xFF059669)),
+                    const SizedBox(width: 12),
+                    _summaryTile('반려', rejectedCount, const Color(0xFFDC2626)),
+                  ],
+                ),
               const SizedBox(height: 14),
+              // 모바일에서는 권한/매장 분포 패널을 숨겨 승인 목록에 집중한다
+              // (220px 고정 높이 패널 2개가 좁은 화면 절반을 차지하던 문제).
+              if (!mobile)
+                SizedBox(
+                  height: 220,
+                  child: Row(
+                    children: [
+                      _breakdownPanel('권한별 현황', roleCounts),
+                      const SizedBox(width: 12),
+                      _breakdownPanel('매장별 현황', storeCounts),
+                    ],
+                  ),
+                ),
+              if (!mobile) const SizedBox(height: 14),
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
@@ -369,8 +444,10 @@ class _SignupApprovalDashboardPageState
                             Expanded(
                               child: ListView.builder(
                                 itemCount: pendingUsers.length,
-                                itemBuilder: (_, index) =>
-                                    _pendingRow(pendingUsers[index]),
+                                itemBuilder: (_, index) => _pendingRow(
+                                  pendingUsers[index],
+                                  mobile: mobile,
+                                ),
                               ),
                             ),
                           ],

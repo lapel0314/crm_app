@@ -8,6 +8,7 @@ import 'package:crm_app/utils/debouncer.dart';
 import 'package:crm_app/utils/phone_utils.dart';
 import 'package:crm_app/utils/postgrest_filter_utils.dart';
 import 'package:crm_app/utils/store_utils.dart';
+import 'package:crm_app/utils/supabase_fetch_utils.dart';
 import 'package:crm_app/widgets/contact_action_buttons.dart';
 import 'package:crm_app/widgets/compact_date_range_picker.dart';
 
@@ -328,13 +329,13 @@ class _LeadsPageState extends State<LeadsPage> {
 
     try {
       final List<dynamic> data = keyword.trim().isEmpty
-          ? await supabase
+          ? await fetchAllRows(() => supabase
               .from('leads')
               .select()
               .eq('is_deleted', false)
               .order('lead_date', ascending: true)
-              .order('created_at', ascending: true)
-          : await supabase
+              .order('created_at', ascending: true))
+          : await fetchAllRows(() => supabase
               .from('leads')
               .select()
               .eq('is_deleted', false)
@@ -350,7 +351,7 @@ class _LeadsPageState extends State<LeadsPage> {
                 keyword,
               ))
               .order('lead_date', ascending: true)
-              .order('created_at', ascending: true);
+              .order('created_at', ascending: true));
 
       final dateFilter = dateSearchController.text.trim();
       var nextLeads = data
@@ -855,6 +856,7 @@ class _LeadsPageState extends State<LeadsPage> {
     final controller = TextEditingController(
       text: buildContactMessage(
         customerName: textValue(selected.first['subscriber']),
+        storeName: widget.currentStore,
       ),
     );
     await showDialog<void>(
@@ -900,6 +902,7 @@ class _LeadsPageState extends State<LeadsPage> {
     }
     final message = buildContactMessage(
       customerName: textValue(selected.first['subscriber']),
+      storeName: widget.currentStore,
     );
     final result = await const ContactActionService().kakao(message);
     if (!mounted) return;
@@ -1203,6 +1206,7 @@ class _LeadsPageState extends State<LeadsPage> {
                                         customerName:
                                             textValue(item['subscriber']),
                                         phone: textValue(item['phone']),
+                                        storeName: widget.currentStore,
                                         onMessage: showMessage,
                                         dense: true,
                                       ),
@@ -1321,6 +1325,7 @@ class _LeadsPageState extends State<LeadsPage> {
                 ContactActionButtons(
                   customerName: textValue(item['subscriber']),
                   phone: textValue(item['phone']),
+                  storeName: widget.currentStore,
                   onMessage: showMessage,
                   dense: true,
                 ),

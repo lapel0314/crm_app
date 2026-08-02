@@ -1,3 +1,4 @@
+import 'package:crm_app/utils/supabase_fetch_utils.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class DataQualityIssue {
@@ -34,15 +35,14 @@ class DataQualityService {
   const DataQualityService(this.supabase);
 
   Future<List<Map<String, dynamic>>> fetchCustomers() async {
-    final rows = await supabase
+    return fetchAllRows(() => supabase
         .from('customers')
         .select(
           'id, name, phone, store, join_date, carrier, previous_carrier, created_at',
         )
         .eq('is_deleted', false)
         .order('join_date', ascending: false)
-        .order('created_at', ascending: false);
-    return List<Map<String, dynamic>>.from(rows);
+        .order('created_at', ascending: false));
   }
 
   List<DataQualityIssue> analyzeCustomers(List<Map<String, dynamic>> rows) {

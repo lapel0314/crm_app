@@ -13,7 +13,9 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/constants/message_templates.dart';
 import 'package:crm_app/utils/model_name_utils.dart';
 import 'package:crm_app/utils/store_utils.dart';
+import 'package:crm_app/utils/supabase_fetch_utils.dart';
 import 'package:crm_app/utils/debouncer.dart';
+import 'package:crm_app/widgets/contact_toolbar_buttons.dart';
 import 'package:crm_app/widgets/contact_action_buttons.dart';
 import 'package:crm_app/widgets/compact_date_range_picker.dart';
 
@@ -569,12 +571,12 @@ class _CustomerPageState extends State<CustomerPage> {
     try {
       final List<dynamic> data = isOpenView
           ? await supabase.rpc('customer_open_rows')
-          : await supabase
+          : await fetchAllRows(() => supabase
               .from('customers')
               .select()
               .eq('is_deleted', false)
               .order('join_date', ascending: true)
-              .order('created_at', ascending: true);
+              .order('created_at', ascending: true));
 
       final dateFilter = dateSearchController.text.trim();
       final nameFilter = searchController.text.trim().toLowerCase();
@@ -1008,7 +1010,10 @@ class _CustomerPageState extends State<CustomerPage> {
       return;
     }
     final controller = TextEditingController(
-      text: buildContactMessage(customerName: _text(selected.first['name'])),
+      text: buildContactMessage(
+        customerName: _text(selected.first['name']),
+        storeName: widget.currentStore,
+      ),
     );
     await showDialog<void>(
       context: context,
@@ -1143,7 +1148,10 @@ class _CustomerPageState extends State<CustomerPage> {
   Future<void> showKakaoSendDialog() async {
     final selected = _selectedCustomers();
     final messageController = TextEditingController(
-      text: buildContactMessage(customerName: ''),
+      text: buildContactMessage(
+        customerName: '',
+        storeName: widget.currentStore,
+      ),
     );
     var templates = await _loadKakaoTemplates();
     if (!mounted) return;
@@ -2099,6 +2107,7 @@ class _CustomerPageState extends State<CustomerPage> {
                           ContactActionButtons(
                             customerName: customer['name']?.toString() ?? '',
                             phone: customer['phone']?.toString() ?? '',
+                            storeName: widget.currentStore,
                             onMessage: _showCenterMessage,
                           ),
                       ],
@@ -2411,25 +2420,7 @@ class _CustomerPageState extends State<CustomerPage> {
     );
   }
 
-  Widget _kakaoTalkMark({bool busy = false}) {
-    if (busy) {
-      return const SizedBox(
-        width: 18,
-        height: 18,
-        child: CircularProgressIndicator(
-          strokeWidth: 2,
-          color: Color(0xFF111827),
-        ),
-      );
-    }
-
-    return Image.asset(
-      'assets/images/kakaotalk_logo.png',
-      width: 22,
-      height: 22,
-      fit: BoxFit.contain,
-    );
-  }
+  Widget _kakaoTalkMark({bool busy = false}) => kakaoTalkMark(busy: busy);
 
   Widget _toolbarIconButton({
     required String tooltip,
@@ -2438,28 +2429,12 @@ class _CustomerPageState extends State<CustomerPage> {
     Color backgroundColor = Colors.white,
     Color borderColor = const Color(0xFFE8E9EF),
   }) {
-    return Tooltip(
-      message: tooltip,
-      waitDuration: const Duration(milliseconds: 350),
-      child: SizedBox(
-        width: 38,
-        height: 38,
-        child: OutlinedButton(
-          onPressed: onPressed,
-          style: OutlinedButton.styleFrom(
-            backgroundColor: backgroundColor,
-            disabledBackgroundColor: const Color(0xFFF3F4F6),
-            minimumSize: const Size(38, 38),
-            padding: EdgeInsets.zero,
-            visualDensity: VisualDensity.compact,
-            side: BorderSide(color: borderColor),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-          child: icon,
-        ),
-      ),
+    return toolbarIconButton(
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: icon,
+      backgroundColor: backgroundColor,
+      borderColor: borderColor,
     );
   }
 
