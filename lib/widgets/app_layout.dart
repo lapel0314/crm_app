@@ -1112,21 +1112,21 @@ class _AppLayoutState extends State<AppLayout> {
                   width: 116,
                 ),
               ],
-              if (canUseGlobalSearch(widget.role)) ...[
-                const Spacer(),
-                compactSearch
-                    ? _quickSearchButton(
-                        width: 148,
-                        label: '통합검색',
-                        onPressed: _openGlobalSearchPage,
-                      )
-                    : Flexible(
-                        child: Align(
-                          alignment: Alignment.centerRight,
-                          child: _globalSearchBox(),
-                        ),
-                      ),
-              ],
+              // Spacer와 공간을 반씩 나누면 검색박스가 절반 폭에서 잘리므로,
+              // Expanded 하나가 남은 공간 전체를 갖고 오른쪽 정렬한다.
+              if (canUseGlobalSearch(widget.role))
+                Expanded(
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: compactSearch
+                        ? _quickSearchButton(
+                            width: 148,
+                            label: '통합검색',
+                            onPressed: _openGlobalSearchPage,
+                          )
+                        : _globalSearchBox(),
+                  ),
+                ),
             ],
           ),
         );
@@ -1135,8 +1135,11 @@ class _AppLayoutState extends State<AppLayout> {
   }
 
   Widget _globalSearchBox() {
+    // width: infinity + maxWidth — 사용 가능한 폭을 최대 680까지 항상 꽉 채운다.
+    // (이전에는 내용물의 최소 폭으로 수축해 입력칸이 아이콘만 보일 만큼 작아짐)
     return Container(
-      constraints: const BoxConstraints(maxWidth: 620),
+      width: double.infinity,
+      constraints: const BoxConstraints(maxWidth: 680),
       height: 44,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
