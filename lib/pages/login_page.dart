@@ -643,6 +643,8 @@ class _LoginPageState extends State<LoginPage>
         const SizedBox(height: 24),
         TextField(
           controller: emailController,
+          textInputAction: TextInputAction.next,
+          onSubmitted: (_) => FocusScope.of(context).nextFocus(),
           decoration: _inputDecoration(
             '\uC774\uBA54\uC77C',
             prefixIcon: Icons.mail_outline_rounded,
@@ -652,6 +654,8 @@ class _LoginPageState extends State<LoginPage>
         TextField(
           controller: passwordController,
           obscureText: obscureLoginPassword,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => isLoading ? null : login(),
           decoration: _inputDecoration(
             '\uBE44\uBC00\uBC88\uD638',
             prefixIcon: Icons.lock_outline_rounded,
