@@ -9,6 +9,7 @@ import 'package:crm_app/utils/store_utils.dart';
 import 'package:crm_app/widgets/app_layout.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -321,6 +322,17 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
       if (Platform.isWindows) {
         exit(0);
       }
+      if (Platform.isAndroid) {
+        // \uB2E4\uC6B4\uB85C\uB4DC \uD398\uC774\uC9C0\uB97C \uC5F0 \uB4A4 \uAD6C\uBC84\uC804 \uD504\uB85C\uC138\uC2A4\uB97C \uC885\uB8CC\uD55C\uB2E4 \u2014 \uC124\uCE58\uD558\uB294 \uB3D9\uC548
+        // \uC774\uC804 \uBC84\uC804\uC774 \uBC31\uADF8\uB77C\uC6B4\uB4DC\uC5D0 \uACC4\uC18D \uB5A0 \uC788\uC5B4 \uC0C8 \uBC84\uC804\uACFC \uB3D9\uC2DC\uC5D0 \uBCF4\uC774\uB358 \uBB38\uC81C.
+        setState(() {
+          _isUpdating = false;
+          _updateStatus = '\uB2E4\uC6B4\uB85C\uB4DC\uD55C APK\uB97C \uC124\uCE58\uD55C \uB4A4 \uC571\uC744 \uB2E4\uC2DC \uC2E4\uD589\uD574 \uC8FC\uC138\uC694.';
+        });
+        await Future<void>.delayed(const Duration(milliseconds: 1200));
+        await SystemNavigator.pop();
+        return;
+      }
       setState(() {
         _isUpdating = false;
         _updateStatus =
@@ -538,6 +550,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
   String? _authErrorMessage;
   bool _logoutScheduled = false;
   bool _policyCheckInProgress = false;
+  bool _profileErrorTransient = false;
 
   @override
   void initState() {
@@ -615,10 +628,16 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
     try {
       await loginPolicyService.checkLoginPolicy();
-    } catch (e) {
-      debugPrint('active login policy check failed: $e');
-      _authErrorMessage = e.toString().replaceFirst('Exception: ', '');
+    } on LoginPolicyException catch (e) {
+      // 정책이 명시적으로 거부한 경우만 로그아웃한다 (사원 IP 차단 등).
+      debugPrint('active login policy denied: $e');
+      _authErrorMessage = e.message;
       _scheduleSignOutOnce();
+    } catch (e) {
+      // 일시적 네트워크/서버 오류로는 세션을 유지한다. 다음 주기(1분) 또는
+      // 네트워크 변경 시 재검사되며, 진짜 거부라면 그때 로그아웃된다.
+      // (지하철/엘리베이터 같은 순간 끊김마다 로그아웃되던 문제의 수정)
+      debugPrint('active login policy check failed (transient, kept): $e');
     } finally {
       _policyCheckInProgress = false;
     }
@@ -630,6 +649,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
 
     try {
       _authErrorMessage = null;
+      _profileErrorTransient = false;
       final decision = await loginPolicyService.checkLoginPolicy();
       final profile = await supabase
           .from('profiles')
@@ -647,9 +667,15 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         'store': decision.storeName ?? profile['store'],
         'store_id': decision.storeId ?? profile['store_id'],
       };
+    } on LoginPolicyException catch (e) {
+      debugPrint('fetchProfile policy denied: $e');
+      _authErrorMessage = e.message;
+      return null;
     } catch (e) {
-      debugPrint('fetchProfile error: $e');
+      // 일시적 네트워크/서버 오류 — 세션을 지우지 않고 재시도 화면을 보여준다.
+      debugPrint('fetchProfile transient error: $e');
       _authErrorMessage = e.toString().replaceFirst('Exception: ', '');
+      _profileErrorTransient = true;
       return null;
     }
   }
@@ -696,6 +722,42 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
         final profile = snapshot.data;
 
         if (profile == null) {
+          // \uC77C\uC2DC\uC801 \uC624\uB958(\uB124\uD2B8\uC6CC\uD06C \uB4F1)\uB294 \uC138\uC158\uC744 \uC9C0\uC6B0\uC9C0 \uC54A\uACE0 \uC7AC\uC2DC\uB3C4\uB9CC \uD5C8\uC6A9\uD55C\uB2E4.
+          if (_profileErrorTransient) {
+            return Scaffold(
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        '\uB124\uD2B8\uC6CC\uD06C \uC5F0\uACB0\uC744 \uD655\uC778\uD574 \uC8FC\uC138\uC694.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _profileFuture = fetchProfile();
+                          });
+                        },
+                        icon: const Icon(Icons.refresh_rounded, size: 17),
+                        label: const Text('\uB2E4\uC2DC \uC2DC\uB3C4'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFC94C6E),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+
           final message = _authErrorMessage ??
               '\uD504\uB85C\uD544 \uC815\uBCF4\uB97C \uBD88\uB7EC\uC624\uC9C0 '
                   '\uBABB\uD588\uC2B5\uB2C8\uB2E4. \uB2E4\uC2DC \uB85C\uADF8\uC778\uD574 '

@@ -814,111 +814,116 @@ class _AdminPageState extends State<AdminPage> {
           children: [
             LayoutBuilder(
               builder: (context, constraints) {
+                // 고정폭(900) 강제 시 버튼 합계 폭이 더 크면 끝(모델명 관리 등)이
+                // 잘렸다. 콘텐츠 실제 폭만큼 넓히되 화면이 더 넓으면 꽉 채운다.
                 return SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
-                  child: SizedBox(
-                    width: mobile ? 900 : constraints.maxWidth,
-                    child: Row(
-                      children: [
-                        SizedBox(
-                          width: 360,
-                          height: 38,
-                          child: TextField(
-                            controller: searchController,
-                            style: const TextStyle(fontSize: 13),
-                            decoration: InputDecoration(
-                              hintText: '이름, 이메일, 전화, 직급, 매장 검색',
-                              prefixIcon: const Icon(
-                                Icons.search,
-                                size: 17,
-                                color: Color(0xFF9CA3AF),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: constraints.maxWidth),
+                    child: IntrinsicWidth(
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 360,
+                            height: 38,
+                            child: TextField(
+                              controller: searchController,
+                              style: const TextStyle(fontSize: 13),
+                              decoration: InputDecoration(
+                                hintText: '이름, 이메일, 전화, 직급, 매장 검색',
+                                prefixIcon: const Icon(
+                                  Icons.search,
+                                  size: 17,
+                                  color: Color(0xFF9CA3AF),
+                                ),
+                                filled: true,
+                                fillColor: Colors.white,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xFFE8E9EF)),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xFFE8E9EF)),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(
+                                      color: Color(0xFF6B7280)),
+                                ),
                               ),
-                              filled: true,
-                              fillColor: Colors.white,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide:
-                                    const BorderSide(color: Color(0xFFE8E9EF)),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide:
-                                    const BorderSide(color: Color(0xFFE8E9EF)),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide:
-                                    const BorderSide(color: Color(0xFF6B7280)),
-                              ),
+                              onChanged: (value) => fetchUsers(keyword: value),
                             ),
-                            onChanged: (value) => fetchUsers(keyword: value),
                           ),
-                        ),
-                        const Spacer(),
-                        const SizedBox(width: 12),
-                        _headerActionButton(
-                          icon: Icons.campaign_outlined,
-                          label: '공지사항 작성',
-                          onTap: showNoticeDialog,
-                        ),
-                        const SizedBox(width: 12),
-                        _headerActionButton(
-                          icon: Icons.delete_sweep_outlined,
-                          label: '공지사항 관리',
-                          onTap: showNoticeManagementDialog,
-                        ),
-                        const SizedBox(width: 12),
-                        _headerActionButton(
-                          icon: Icons.how_to_reg_rounded,
-                          label: '승인현황',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => SignupApprovalDashboardPage(
-                                    role: widget.role),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(width: 12),
-                        _headerActionButton(
-                          icon: Icons.receipt_long_outlined,
-                          label: '감사로그',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => AuditLogPage(role: widget.role),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(width: 12),
-                        _headerActionButton(
-                          icon: Icons.phone_iphone_rounded,
-                          label: '모델명 관리',
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    ModelNameMappingPage(role: widget.role),
-                              ),
-                            );
-                          },
-                        ),
-                        const SizedBox(width: 12),
-                        _headerActionButton(
-                          icon: Icons.refresh,
-                          label: '새로고침',
-                          onTap: () =>
-                              fetchUsers(keyword: searchController.text),
-                        ),
-                      ],
+                          const Spacer(),
+                          const SizedBox(width: 12),
+                          _headerActionButton(
+                            icon: Icons.campaign_outlined,
+                            label: '공지사항 작성',
+                            onTap: showNoticeDialog,
+                          ),
+                          const SizedBox(width: 12),
+                          _headerActionButton(
+                            icon: Icons.delete_sweep_outlined,
+                            label: '공지사항 관리',
+                            onTap: showNoticeManagementDialog,
+                          ),
+                          const SizedBox(width: 12),
+                          _headerActionButton(
+                            icon: Icons.how_to_reg_rounded,
+                            label: '승인현황',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => SignupApprovalDashboardPage(
+                                      role: widget.role),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 12),
+                          _headerActionButton(
+                            icon: Icons.receipt_long_outlined,
+                            label: '감사로그',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      AuditLogPage(role: widget.role),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 12),
+                          _headerActionButton(
+                            icon: Icons.phone_iphone_rounded,
+                            label: '모델명 관리',
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      ModelNameMappingPage(role: widget.role),
+                                ),
+                              );
+                            },
+                          ),
+                          const SizedBox(width: 12),
+                          _headerActionButton(
+                            icon: Icons.refresh,
+                            label: '새로고침',
+                            onTap: () =>
+                                fetchUsers(keyword: searchController.text),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 );

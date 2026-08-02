@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:crm_app/utils/debouncer.dart';
 import 'package:crm_app/utils/store_utils.dart';
 
 final supabase = Supabase.instance.client;
@@ -29,7 +30,12 @@ class _ChangedField {
 }
 
 class _AuditLogPageState extends State<AuditLogPage> {
+  // 무제한 조회는 로그가 쌓일수록 로딩/렌더링이 함께 느려진다.
+  // 최근 이력 확인 용도이므로 최신 500건만 가져온다.
+  static const int _fetchLimit = 500;
+
   final searchController = TextEditingController();
+  final searchDebouncer = Debouncer(const Duration(milliseconds: 300));
   final dateFormat = DateFormat('yyyy-MM-dd');
   final dateTimeFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
 
@@ -46,6 +52,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
 
   @override
   void dispose() {
+    searchDebouncer.dispose();
     searchController.dispose();
     super.dispose();
   }
@@ -61,11 +68,31 @@ class _AuditLogPageState extends State<AuditLogPage> {
       final data = await supabase
           .from('audit_logs')
           .select()
-          .order('created_at', ascending: false);
+          .order('created_at', ascending: false)
+          .limit(_fetchLimit);
 
       if (!mounted) return;
+      final rows = List<Map<String, dynamic>>.from(data);
+      // 표시용 문자열(액션/화면/대상/시간/상세 요약)은 행마다 비싼 JSON 순회를
+      // 동반하므로 빌드/검색마다 재계산하지 않고 여기서 1회만 계산해 둔다.
+      for (final log in rows) {
+        final action = _actionLabel(log['action']);
+        final table = _tableLabel(log['target_table']);
+        final target = _targetLabel(log);
+        final time = _timeLabel(log['created_at']);
+        final detail = _detailLabel(log['detail']);
+        log['_action_label'] = action;
+        log['_table_label'] = table;
+        log['_target_label'] = target;
+        log['_time_label'] = time;
+        log['_detail_label'] = detail;
+        log['_date_label'] = _dateLabel(log['created_at']);
+        log['_haystack'] =
+            '$action $table $target ${_value(log['target_id'])} $time $detail'
+                .toLowerCase();
+      }
       setState(() {
-        logs = List<Map<String, dynamic>>.from(data);
+        logs = rows;
         isLoading = false;
       });
     } catch (e) {
@@ -520,17 +547,9 @@ class _AuditLogPageState extends State<AuditLogPage> {
     final query = searchController.text.trim().toLowerCase();
     if (query.isEmpty) return logs;
 
-    return logs.where((log) {
-      final haystack = [
-        _actionLabel(log['action']),
-        _tableLabel(log['target_table']),
-        _targetLabel(log),
-        _value(log['target_id']),
-        _timeLabel(log['created_at']),
-        _detailLabel(log['detail']),
-      ].join(' ').toLowerCase();
-      return haystack.contains(query);
-    }).toList();
+    return logs
+        .where((log) => (log['_haystack'] as String? ?? '').contains(query))
+        .toList();
   }
 
   Map<String, List<Map<String, dynamic>>> _groupByDate(
@@ -538,7 +557,9 @@ class _AuditLogPageState extends State<AuditLogPage> {
   ) {
     final grouped = <String, List<Map<String, dynamic>>>{};
     for (final row in rows) {
-      grouped.putIfAbsent(_dateLabel(row['created_at']), () => []).add(row);
+      grouped
+          .putIfAbsent(row['_date_label'] as String? ?? '날짜 없음', () => [])
+          .add(row);
     }
     return grouped;
   }
@@ -548,7 +569,8 @@ class _AuditLogPageState extends State<AuditLogPage> {
       height: 42,
       child: TextField(
         controller: searchController,
-        onChanged: (_) => setState(() {}),
+        onChanged: (_) =>
+            searchDebouncer.run(() => mounted ? setState(() {}) : null),
         decoration: InputDecoration(
           hintText: '액션, 화면, 대상, 상세 내용 검색',
           prefixIcon: const Icon(Icons.search_rounded, size: 20),
@@ -584,7 +606,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
             SizedBox(
               width: 150,
               child: Text(
-                _actionLabel(log['action']),
+                log['_action_label'] as String? ?? '-',
                 style: const TextStyle(
                   fontWeight: FontWeight.w900,
                   color: Color(0xFF111827),
@@ -594,7 +616,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
             SizedBox(
               width: 120,
               child: Text(
-                _tableLabel(log['target_table']),
+                log['_table_label'] as String? ?? '-',
                 style: const TextStyle(
                   fontWeight: FontWeight.w800,
                   color: Color(0xFF374151),
@@ -604,7 +626,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
             SizedBox(
               width: 220,
               child: Text(
-                _targetLabel(log),
+                log['_target_label'] as String? ?? '-',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -616,7 +638,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
             SizedBox(
               width: 170,
               child: Text(
-                _timeLabel(log['created_at']),
+                log['_time_label'] as String? ?? '-',
                 style: const TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
@@ -626,7 +648,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
             ),
             Expanded(
               child: Text(
-                _detailLabel(log['detail']),
+                log['_detail_label'] as String? ?? '-',
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
@@ -758,14 +780,17 @@ class _AuditLogPageState extends State<AuditLogPage> {
                   ? const Center(child: CircularProgressIndicator())
                   : rows.isEmpty
                       ? const Center(child: Text('조건에 맞는 감사로그가 없습니다'))
-                      : SingleChildScrollView(
-                          child: Column(
-                            children: [
-                              for (final entry in grouped.entries)
-                                _dateSection(entry.key, entry.value),
-                            ],
-                          ),
-                        ),
+                      : Builder(builder: (context) {
+                          // 날짜 섹션 단위로 가상화 — 화면 밖 섹션은 빌드하지 않는다.
+                          final entries = grouped.entries.toList();
+                          return ListView.builder(
+                            itemCount: entries.length,
+                            itemBuilder: (_, index) => _dateSection(
+                              entries[index].key,
+                              entries[index].value,
+                            ),
+                          );
+                        }),
             ),
           ],
         ),

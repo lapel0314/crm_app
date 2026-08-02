@@ -1,3 +1,4 @@
+import 'package:crm_app/utils/debouncer.dart';
 import 'package:crm_app/utils/model_name_utils.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:flutter/material.dart';
@@ -15,6 +16,7 @@ class ModelNameMappingPage extends StatefulWidget {
 class _ModelNameMappingPageState extends State<ModelNameMappingPage> {
   final supabase = Supabase.instance.client;
   final searchController = TextEditingController();
+  final searchDebouncer = Debouncer(const Duration(milliseconds: 300));
 
   List<Map<String, dynamic>> mappings = [];
   bool isLoading = true;
@@ -29,6 +31,7 @@ class _ModelNameMappingPageState extends State<ModelNameMappingPage> {
 
   @override
   void dispose() {
+    searchDebouncer.dispose();
     searchController.dispose();
     super.dispose();
   }
@@ -46,8 +49,17 @@ class _ModelNameMappingPageState extends State<ModelNameMappingPage> {
           .select()
           .order('display_name', ascending: true);
       if (!mounted) return;
+      final rows = List<Map<String, dynamic>>.from(data);
+      // 별칭 조인 문자열은 검색/렌더링마다 만들지 않고 1회만 계산해 둔다
+      // (키 입력마다 전체 행을 재조인하던 프리징 원인).
+      for (final mapping in rows) {
+        final aliasesText = _aliasesText(mapping['registered_names']);
+        mapping['_aliases_text'] = aliasesText;
+        mapping['_search_text'] =
+            '${mapping['display_name'] ?? ''} $aliasesText'.toLowerCase();
+      }
       setState(() {
-        mappings = List<Map<String, dynamic>>.from(data);
+        mappings = rows;
         isLoading = false;
       });
     } catch (e) {
@@ -85,11 +97,10 @@ class _ModelNameMappingPageState extends State<ModelNameMappingPage> {
   List<Map<String, dynamic>> get filteredMappings {
     final query = searchController.text.trim().toLowerCase();
     if (query.isEmpty) return mappings;
-    return mappings.where((mapping) {
-      final displayName = mapping['display_name']?.toString().toLowerCase();
-      final aliases = _aliasesText(mapping['registered_names']).toLowerCase();
-      return displayName?.contains(query) == true || aliases.contains(query);
-    }).toList();
+    return mappings
+        .where((mapping) =>
+            (mapping['_search_text'] as String? ?? '').contains(query))
+        .toList();
   }
 
   Future<void> _saveMapping({
@@ -327,7 +338,8 @@ class _ModelNameMappingPageState extends State<ModelNameMappingPage> {
                       filled: true,
                       fillColor: Colors.white,
                     ),
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (_) => searchDebouncer
+                        .run(() => mounted ? setState(() {}) : null),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -356,9 +368,8 @@ class _ModelNameMappingPageState extends State<ModelNameMappingPage> {
                                 const Divider(height: 1),
                             itemBuilder: (context, index) {
                               final row = rows[index];
-                              final aliases = _aliasesText(
-                                row['registered_names'],
-                              );
+                              final aliases =
+                                  row['_aliases_text'] as String? ?? '';
                               return ListTile(
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 18,

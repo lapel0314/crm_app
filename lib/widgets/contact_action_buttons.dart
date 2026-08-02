@@ -7,6 +7,7 @@ import 'package:crm_app/utils/phone_utils.dart';
 class ContactActionButtons extends StatelessWidget {
   final String customerName;
   final String phone;
+  final String storeName;
   final String messageTemplate;
   final ValueChanged<String> onMessage;
   final bool dense;
@@ -16,6 +17,7 @@ class ContactActionButtons extends StatelessWidget {
     required this.customerName,
     required this.phone,
     required this.onMessage,
+    this.storeName = '',
     this.messageTemplate = defaultContactMessageTemplate,
     this.dense = false,
   });
@@ -36,6 +38,7 @@ class ContactActionButtons extends StatelessWidget {
     final normalized = normalizePhoneNumber(phone);
     final message = buildContactMessage(
       customerName: customerName,
+      storeName: storeName,
       template: messageTemplate,
     );
     final iconSize = dense ? 14.0 : 18.0;
