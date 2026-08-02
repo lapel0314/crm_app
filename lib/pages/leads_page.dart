@@ -11,6 +11,7 @@ import 'package:crm_app/utils/store_utils.dart';
 import 'package:crm_app/utils/supabase_fetch_utils.dart';
 import 'package:crm_app/widgets/contact_action_buttons.dart';
 import 'package:crm_app/widgets/compact_date_range_picker.dart';
+import 'package:crm_app/widgets/list_pagination.dart';
 
 final supabase = Supabase.instance.client;
 
@@ -1450,70 +1451,6 @@ class _LeadsPageState extends State<LeadsPage> {
     );
   }
 
-  Widget _pagination({
-    required int totalItems,
-    required int safePage,
-    required int totalPages,
-  }) {
-    final start = totalItems == 0 ? 0 : safePage * pageSize + 1;
-    var end = (safePage + 1) * pageSize;
-    if (end > totalItems) end = totalItems;
-
-    return Container(
-      height: 46,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      decoration: const BoxDecoration(
-        border: Border(
-          top: BorderSide(color: Color(0xFFF3F4F6)),
-        ),
-      ),
-      child: Row(
-        children: [
-          Text(
-            '$start-$end / 총 $totalItems건',
-            style: const TextStyle(
-              color: Color(0xFF9CA3AF),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const Spacer(),
-          IconButton(
-            tooltip: '이전',
-            onPressed: safePage <= 0
-                ? null
-                : () => setState(() => currentPage = safePage - 1),
-            icon: const Icon(Icons.chevron_left, size: 20),
-          ),
-          Container(
-            height: 28,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: const Color(0xFFC94C6E).withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              '${safePage + 1} / $totalPages',
-              style: const TextStyle(
-                color: Color(0xFFC94C6E),
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          IconButton(
-            tooltip: '다음',
-            onPressed: safePage >= totalPages - 1
-                ? null
-                : () => setState(() => currentPage = safePage + 1),
-            icon: const Icon(Icons.chevron_right, size: 20),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   void dispose() {
     _searchDebouncer.dispose();
@@ -1992,10 +1929,12 @@ class _LeadsPageState extends State<LeadsPage> {
                                       ),
                                     ),
                     ),
-                    _pagination(
+                    listPagination(
                       totalItems: filteredLeads.length,
                       safePage: safePage,
                       totalPages: totalPages,
+                      onPageChanged: (page) =>
+                          setState(() => currentPage = page),
                     ),
                   ],
                 ),
