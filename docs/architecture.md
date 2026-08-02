@@ -181,9 +181,10 @@ Responsibilities:
 
 ### Leads
 
-Key file:
+Key files:
 
 - `lib/pages/leads_page.dart`
+- `lib/pages/pre_reservation_page.dart`
 
 Responsibilities:
 
@@ -191,6 +192,7 @@ Responsibilities:
 - role/store filtering
 - phone formatting and contact actions
 - audit logging and soft deletion
+- pre-reservation management (entered from the leads page): reserved model/color, reservation number, receive date, ID-scan flag, and status (대기/완료/취소) backed by the `pre_reservations` table with store-scoped RLS
 
 ### Wired Members
 
@@ -251,6 +253,7 @@ Responsibilities:
 - employee profile approval/update/delete/password changes
 - signup/approval status summaries and pending-account approval from the employee management page
 - customer cleanup inspection for duplicate phones, invalid phone formats, missing join dates, and unusual carrier/vendor values
+- customer cleanup dismissals persisted in `data_quality_dismissals` (fingerprint-keyed so edited values re-trigger detection; duplicate groups re-trigger when the group grows)
 - notice creation and management
 - audit log inspection with field-level old/new detail view from the employee management page
 - representative/developer model-name mapping management for dashboard statistics
@@ -397,6 +400,8 @@ This flow is used for:
 
 ```text
 LoginPage.signup
+  -> store field is a dropdown fed by public.list_active_store_names()
+     (security definer, anon-executable, returns active store names only)
   -> supabase.auth.signUp(metadata)
   -> Supabase Auth creates auth.users row
   -> DB trigger public.handle_new_user inserts public.profiles row

@@ -72,7 +72,7 @@ void main() {
       final service = DataQualityService(
         SupabaseClient('https://example.supabase.co', 'test-key'),
       );
-      final issues = service.analyzeCustomers([
+      final analysis = service.analyzeCustomers([
         {
           'id': '1',
           'name': '홍길동',
@@ -102,10 +102,51 @@ void main() {
         },
       ]);
 
+      final issues = analysis.active;
       expect(issues.where((issue) => issue.type == 'duplicate'), hasLength(2));
       expect(issues.any((issue) => issue.type == 'phone'), isTrue);
       expect(issues.any((issue) => issue.type == 'join_date'), isTrue);
       expect(issues.any((issue) => issue.type == 'carrier'), isTrue);
+      expect(analysis.dismissed, isEmpty);
+    });
+
+    test('dismissed issues are separated and invalidated when value changes',
+        () {
+      final service = DataQualityService(
+        SupabaseClient('https://example.supabase.co', 'test-key'),
+      );
+      const rows = [
+        {
+          'id': '3',
+          'name': '오류고객',
+          'phone': '123',
+          'join_date': '2026-07-21',
+          'carrier': 'KT',
+          'previous_carrier': '',
+          'store': '본점',
+        },
+      ];
+
+      final dismissedMatch = service.analyzeCustomers(
+        rows,
+        dismissals: const [
+          DataQualityDismissal(issueType: 'phone', issueKey: '3:123'),
+        ],
+      );
+      expect(dismissedMatch.active.where((i) => i.type == 'phone'), isEmpty);
+      expect(dismissedMatch.dismissed, hasLength(1));
+
+      // 전화번호가 다른 값으로 바뀌면 지문이 달라져 다시 활성 이슈로 돌아온다.
+      final invalidated = service.analyzeCustomers(
+        rows,
+        dismissals: const [
+          DataQualityDismissal(issueType: 'phone', issueKey: '3:999'),
+        ],
+      );
+      expect(
+        invalidated.active.any((i) => i.type == 'phone'),
+        isTrue,
+      );
     });
   });
 
