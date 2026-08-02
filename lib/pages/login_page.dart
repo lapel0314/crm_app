@@ -36,6 +36,11 @@ class _LoginPageState extends State<LoginPage>
   final loginPolicyService = LoginPolicyService(supabase);
   Notice? latestNotice;
 
+  // 회원가입 매장 드롭다운용. 로드 실패 시 빈 리스트로 남고
+  // 기존 자유입력 필드로 폴백해 가입 자체는 막히지 않는다.
+  List<String> storeNameOptions = [];
+  String? signupStoreSelection;
+
   late final AnimationController _animationController;
   late final Animation<double> _fadeAnimation;
 
@@ -55,6 +60,20 @@ class _LoginPageState extends State<LoginPage>
 
     _animationController.forward();
     _loadLatestNotice();
+    _loadStoreNames();
+  }
+
+  Future<void> _loadStoreNames() async {
+    try {
+      final result = await supabase.rpc('list_active_store_names');
+      if (!mounted || result is! List) return;
+      setState(() {
+        storeNameOptions =
+            result.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+      });
+    } catch (e) {
+      debugPrint('store names load failed: $e');
+    }
   }
 
   Future<void> _loadLatestNotice() async {
@@ -263,6 +282,7 @@ class _LoginPageState extends State<LoginPage>
       signupEmailController.clear();
       signupPasswordController.clear();
       signupStoreController.clear();
+      signupStoreSelection = null;
       signupRole = null;
       agreedTerms = false;
     } catch (e) {
@@ -803,13 +823,34 @@ class _LoginPageState extends State<LoginPage>
           },
         ),
         const SizedBox(height: 14),
-        TextField(
-          controller: signupStoreController,
-          decoration: _inputDecoration(
-            '\uB9E4\uC7A5',
-            prefixIcon: Icons.storefront_outlined,
+        if (storeNameOptions.isNotEmpty)
+          DropdownButtonFormField<String>(
+            initialValue: storeNameOptions.contains(signupStoreSelection)
+                ? signupStoreSelection
+                : null,
+            decoration: _inputDecoration(
+              '\uB9E4\uC7A5',
+              prefixIcon: Icons.storefront_outlined,
+            ),
+            items: [
+              for (final name in storeNameOptions)
+                DropdownMenuItem(value: name, child: Text(name)),
+            ],
+            onChanged: (value) {
+              setState(() {
+                signupStoreSelection = value;
+                signupStoreController.text = value ?? '';
+              });
+            },
+          )
+        else
+          TextField(
+            controller: signupStoreController,
+            decoration: _inputDecoration(
+              '\uB9E4\uC7A5',
+              prefixIcon: Icons.storefront_outlined,
+            ),
           ),
-        ),
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(12),
