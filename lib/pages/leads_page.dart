@@ -9,6 +9,7 @@ import 'package:crm_app/utils/phone_utils.dart';
 import 'package:crm_app/utils/postgrest_filter_utils.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:crm_app/utils/supabase_fetch_utils.dart';
+import 'package:crm_app/pages/pre_reservation_page.dart';
 import 'package:crm_app/widgets/contact_action_buttons.dart';
 import 'package:crm_app/widgets/compact_date_range_picker.dart';
 import 'package:crm_app/widgets/list_pagination.dart';
@@ -276,6 +277,18 @@ class _LeadsPageState extends State<LeadsPage> {
 
   void logUiError(String text) {
     debugPrint(text);
+  }
+
+  void _openPreReservationPage() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PreReservationPage(
+          role: widget.role,
+          currentStore: widget.currentStore,
+        ),
+      ),
+    );
   }
 
   InputDecoration _dialogInputDecoration(String label) {
@@ -1733,6 +1746,30 @@ class _LeadsPageState extends State<LeadsPage> {
                                     const SizedBox(width: 6),
                                     Expanded(
                                       child: ElevatedButton.icon(
+                                        onPressed: _openPreReservationPage,
+                                        icon: const Icon(
+                                          Icons.event_available_rounded,
+                                          size: 14,
+                                        ),
+                                        label: const Text('사전예약'),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor:
+                                              const Color(0xFF111827),
+                                          foregroundColor: Colors.white,
+                                          elevation: 0,
+                                          minimumSize: const Size(0, 36),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 0,
+                                          ),
+                                          textStyle:
+                                              const TextStyle(fontSize: 12),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: ElevatedButton.icon(
                                         onPressed: showCreateDialog,
                                         icon: const Icon(Icons.add, size: 14),
                                         label: const Text('등록'),
@@ -1875,6 +1912,18 @@ class _LeadsPageState extends State<LeadsPage> {
                                       size: 17),
                                   label:
                                       Text('카카오 (${selectedLeadIds.length})'),
+                                ),
+                                const SizedBox(width: 8),
+                                ElevatedButton.icon(
+                                  onPressed: _openPreReservationPage,
+                                  icon: const Icon(Icons.event_available_rounded,
+                                      size: 17),
+                                  label: const Text('사전예약'),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF111827),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                  ),
                                 ),
                                 const SizedBox(width: 8),
                                 ElevatedButton.icon(
