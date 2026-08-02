@@ -38,6 +38,7 @@ class _PreReservationPageState extends State<PreReservationPage> {
   static const int pageSize = 20;
 
   bool get canView => canUseLeads(widget.role);
+  bool get canDelete => canDeleteLead(widget.role);
 
   @override
   void initState() {
@@ -688,12 +689,14 @@ class _PreReservationPageState extends State<PreReservationPage> {
                       tooltip: '수정',
                       visualDensity: VisualDensity.compact,
                     ),
-                    IconButton(
-                      onPressed: () => _deleteReservation(row),
-                      icon: const Icon(Icons.delete_outline_rounded, size: 17),
-                      tooltip: '삭제',
-                      visualDensity: VisualDensity.compact,
-                    ),
+                    if (canDelete)
+                      IconButton(
+                        onPressed: () => _deleteReservation(row),
+                        icon: const Icon(Icons.delete_outline_rounded,
+                            size: 17),
+                        tooltip: '삭제',
+                        visualDensity: VisualDensity.compact,
+                      ),
                   ],
                 ),
               ),
@@ -742,15 +745,16 @@ class _PreReservationPageState extends State<PreReservationPage> {
                 constraints:
                     const BoxConstraints.tightFor(width: 30, height: 30),
               ),
-              IconButton(
-                onPressed: () => _deleteReservation(row),
-                icon: const Icon(Icons.delete_outline_rounded, size: 17),
-                tooltip: '삭제',
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints:
-                    const BoxConstraints.tightFor(width: 30, height: 30),
-              ),
+              if (canDelete)
+                IconButton(
+                  onPressed: () => _deleteReservation(row),
+                  icon: const Icon(Icons.delete_outline_rounded, size: 17),
+                  tooltip: '삭제',
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints:
+                      const BoxConstraints.tightFor(width: 30, height: 30),
+                ),
             ],
           ),
           const SizedBox(height: 6),

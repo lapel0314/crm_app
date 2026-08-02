@@ -67,9 +67,15 @@ class _LoginPageState extends State<LoginPage>
     try {
       final result = await supabase.rpc('list_active_store_names');
       if (!mounted || result is! List) return;
+      final names =
+          result.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
       setState(() {
-        storeNameOptions =
-            result.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+        storeNameOptions = names;
+        // 드롭다운으로 전환되기 전 자유입력 필드에 남아있던 값이
+        // 화면엔 안 보이는 채로 가입 제출에 섞여 들어가지 않도록 비운다.
+        if (names.isNotEmpty) {
+          signupStoreController.clear();
+        }
       });
     } catch (e) {
       debugPrint('store names load failed: $e');
