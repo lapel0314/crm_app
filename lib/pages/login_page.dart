@@ -36,6 +36,11 @@ class _LoginPageState extends State<LoginPage>
   final loginPolicyService = LoginPolicyService(supabase);
   Notice? latestNotice;
 
+  // 회원가입 매장 드롭다운용. 로드 실패 시 빈 리스트로 남고
+  // 기존 자유입력 필드로 폴백해 가입 자체는 막히지 않는다.
+  List<String> storeNameOptions = [];
+  String? signupStoreSelection;
+
   late final AnimationController _animationController;
   late final Animation<double> _fadeAnimation;
 
@@ -55,6 +60,26 @@ class _LoginPageState extends State<LoginPage>
 
     _animationController.forward();
     _loadLatestNotice();
+    _loadStoreNames();
+  }
+
+  Future<void> _loadStoreNames() async {
+    try {
+      final result = await supabase.rpc('list_active_store_names');
+      if (!mounted || result is! List) return;
+      final names =
+          result.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
+      setState(() {
+        storeNameOptions = names;
+        // 드롭다운으로 전환되기 전 자유입력 필드에 남아있던 값이
+        // 화면엔 안 보이는 채로 가입 제출에 섞여 들어가지 않도록 비운다.
+        if (names.isNotEmpty) {
+          signupStoreController.clear();
+        }
+      });
+    } catch (e) {
+      debugPrint('store names load failed: $e');
+    }
   }
 
   Future<void> _loadLatestNotice() async {
@@ -263,6 +288,7 @@ class _LoginPageState extends State<LoginPage>
       signupEmailController.clear();
       signupPasswordController.clear();
       signupStoreController.clear();
+      signupStoreSelection = null;
       signupRole = null;
       agreedTerms = false;
     } catch (e) {
@@ -643,6 +669,8 @@ class _LoginPageState extends State<LoginPage>
         const SizedBox(height: 24),
         TextField(
           controller: emailController,
+          textInputAction: TextInputAction.next,
+          onSubmitted: (_) => FocusScope.of(context).nextFocus(),
           decoration: _inputDecoration(
             '\uC774\uBA54\uC77C',
             prefixIcon: Icons.mail_outline_rounded,
@@ -652,6 +680,8 @@ class _LoginPageState extends State<LoginPage>
         TextField(
           controller: passwordController,
           obscureText: obscureLoginPassword,
+          textInputAction: TextInputAction.done,
+          onSubmitted: (_) => isLoading ? null : login(),
           decoration: _inputDecoration(
             '\uBE44\uBC00\uBC88\uD638',
             prefixIcon: Icons.lock_outline_rounded,
@@ -799,13 +829,34 @@ class _LoginPageState extends State<LoginPage>
           },
         ),
         const SizedBox(height: 14),
-        TextField(
-          controller: signupStoreController,
-          decoration: _inputDecoration(
-            '\uB9E4\uC7A5',
-            prefixIcon: Icons.storefront_outlined,
+        if (storeNameOptions.isNotEmpty)
+          DropdownButtonFormField<String>(
+            initialValue: storeNameOptions.contains(signupStoreSelection)
+                ? signupStoreSelection
+                : null,
+            decoration: _inputDecoration(
+              '\uB9E4\uC7A5',
+              prefixIcon: Icons.storefront_outlined,
+            ),
+            items: [
+              for (final name in storeNameOptions)
+                DropdownMenuItem(value: name, child: Text(name)),
+            ],
+            onChanged: (value) {
+              setState(() {
+                signupStoreSelection = value;
+                signupStoreController.text = value ?? '';
+              });
+            },
+          )
+        else
+          TextField(
+            controller: signupStoreController,
+            decoration: _inputDecoration(
+              '\uB9E4\uC7A5',
+              prefixIcon: Icons.storefront_outlined,
+            ),
           ),
-        ),
         const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(12),

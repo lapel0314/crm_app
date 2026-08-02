@@ -30,7 +30,9 @@ class _DataQualityPageState extends State<DataQualityPage> {
   final service = DataQualityService(supabase);
   final searchController = TextEditingController();
   List<DataQualityIssue> issues = [];
+  List<DataQualityIssue> dismissedIssues = [];
   bool isLoading = true;
+  bool showDismissed = false;
   String selectedType = '전체';
 
   bool get isAdmin => isPrivilegedRole(widget.role);
@@ -56,6 +58,7 @@ class _DataQualityPageState extends State<DataQualityPage> {
     setState(() => isLoading = true);
     try {
       final rows = await service.fetchCustomers();
+      final dismissals = await service.fetchDismissals();
       final scopedRows = rows.where((row) {
         return includesStoreForRole(
           role: widget.role,
@@ -63,16 +66,76 @@ class _DataQualityPageState extends State<DataQualityPage> {
           rowStore: row['store'],
         );
       }).toList();
-      final nextIssues = service.analyzeCustomers(scopedRows);
+      final analysis =
+          service.analyzeCustomers(scopedRows, dismissals: dismissals);
       if (!mounted) return;
       setState(() {
-        issues = nextIssues;
+        issues = analysis.active;
+        dismissedIssues = analysis.dismissed;
         isLoading = false;
       });
     } catch (e) {
       debugPrint('data quality load failed: $e');
       if (!mounted) return;
       setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _dismissIssue(DataQualityIssue issue) async {
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (_) => AlertDialog(
+            backgroundColor: Colors.white,
+            title: const Text(
+              '이슈 무시',
+              style: TextStyle(fontWeight: FontWeight.w900),
+            ),
+            content: Text(
+              issue.type == 'duplicate'
+                  ? '${issue.phone} 번호의 중복(${issue.memberCount ?? 0}건)을 확인 완료로 처리할까요?\n같은 번호의 중복 이슈가 모두 숨겨지며, 새 중복이 추가되면 다시 표시됩니다.'
+                  : '${issue.name} 고객의 "${issue.title}" 이슈를 확인 완료로 처리할까요?\n해당 값이 수정되면 다시 검사됩니다.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('취소'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF111827),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('무시'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+
+    try {
+      await service.dismissIssue(issue);
+      await fetchIssues();
+    } catch (e) {
+      debugPrint('dismiss failed: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('무시 처리에 실패했습니다. 다시 시도해 주세요.')),
+      );
+    }
+  }
+
+  Future<void> _restoreIssue(DataQualityIssue issue) async {
+    try {
+      await service.restoreIssue(issue);
+      await fetchIssues();
+    } catch (e) {
+      debugPrint('restore failed: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('해제에 실패했습니다. 다시 시도해 주세요.')),
+      );
     }
   }
 
@@ -96,7 +159,8 @@ class _DataQualityPageState extends State<DataQualityPage> {
 
   List<DataQualityIssue> get filteredIssues {
     final query = searchController.text.trim().toLowerCase();
-    return issues.where((issue) {
+    final source = showDismissed ? dismissedIssues : issues;
+    return source.where((issue) {
       final matchesType =
           selectedType == '전체' || _typeLabel(issue.type) == selectedType;
       if (!matchesType) return false;
@@ -115,7 +179,15 @@ class _DataQualityPageState extends State<DataQualityPage> {
     }).toList();
   }
 
+  // 필터 칩용 — 현재 보고 있는 목록(활성/무시됨) 기준.
   int _count(String type) {
+    final source = showDismissed ? dismissedIssues : issues;
+    if (type == '전체') return source.length;
+    return source.where((issue) => _typeLabel(issue.type) == type).length;
+  }
+
+  // 요약 타일용 — 무시됨 보기와 무관하게 활성 이슈 기준.
+  int _activeCount(String type) {
     if (type == '전체') return issues.length;
     return issues.where((issue) => _typeLabel(issue.type) == type).length;
   }
@@ -273,6 +345,17 @@ class _DataQualityPageState extends State<DataQualityPage> {
             icon: const Icon(Icons.open_in_new_rounded, size: 18),
             tooltip: '고객DB에서 보기',
           ),
+          showDismissed
+              ? IconButton(
+                  onPressed: () => _restoreIssue(issue),
+                  icon: const Icon(Icons.undo_rounded, size: 18),
+                  tooltip: '무시 해제',
+                )
+              : IconButton(
+                  onPressed: () => _dismissIssue(issue),
+                  icon: const Icon(Icons.visibility_off_outlined, size: 18),
+                  tooltip: '확인 완료(무시)',
+                ),
         ],
       ),
     );
@@ -316,6 +399,29 @@ class _DataQualityPageState extends State<DataQualityPage> {
                   height: 32,
                 ),
               ),
+              showDismissed
+                  ? IconButton(
+                      onPressed: () => _restoreIssue(issue),
+                      icon: const Icon(Icons.undo_rounded, size: 18),
+                      tooltip: '무시 해제',
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 32,
+                        height: 32,
+                      ),
+                    )
+                  : IconButton(
+                      onPressed: () => _dismissIssue(issue),
+                      icon: const Icon(Icons.visibility_off_outlined, size: 18),
+                      tooltip: '확인 완료(무시)',
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints.tightFor(
+                        width: 32,
+                        height: 32,
+                      ),
+                    ),
             ],
           ),
           const SizedBox(height: 8),
@@ -478,13 +584,14 @@ class _DataQualityPageState extends State<DataQualityPage> {
         children: [
           _summaryTile('전체 이슈', issues.length, Icons.storefront_rounded,
               expand: false, compact: true),
-          _summaryTile('중복 의심', _count('중복'), Icons.contact_phone_rounded,
+          _summaryTile('중복 의심', _activeCount('중복'), Icons.contact_phone_rounded,
               expand: false, compact: true),
-          _summaryTile('전화번호', _count('전화번호'), Icons.phone_android_rounded,
+          _summaryTile(
+              '전화번호', _activeCount('전화번호'), Icons.phone_android_rounded,
               expand: false, compact: true),
           _summaryTile(
             '가입일/통신사',
-            _count('가입일') + _count('통신사'),
+            _activeCount('가입일') + _activeCount('통신사'),
             Icons.sim_card_rounded,
             expand: false,
             compact: true,
@@ -497,13 +604,13 @@ class _DataQualityPageState extends State<DataQualityPage> {
       children: [
         _summaryTile('전체 이슈', issues.length, Icons.storefront_rounded),
         const SizedBox(width: 12),
-        _summaryTile('중복 의심', _count('중복'), Icons.contact_phone_rounded),
+        _summaryTile('중복 의심', _activeCount('중복'), Icons.contact_phone_rounded),
         const SizedBox(width: 12),
-        _summaryTile('전화번호', _count('전화번호'), Icons.phone_android_rounded),
+        _summaryTile('전화번호', _activeCount('전화번호'), Icons.phone_android_rounded),
         const SizedBox(width: 12),
         _summaryTile(
           '가입일/통신사',
-          _count('가입일') + _count('통신사'),
+          _activeCount('가입일') + _activeCount('통신사'),
           Icons.sim_card_rounded,
         ),
       ],
@@ -540,6 +647,14 @@ class _DataQualityPageState extends State<DataQualityPage> {
                     selected: selectedType == type,
                     onSelected: (_) => setState(() => selectedType = type),
                   ),
+                FilterChip(
+                  label: Text('무시됨 ${dismissedIssues.length}'),
+                  selected: showDismissed,
+                  onSelected: (value) =>
+                      setState(() => showDismissed = value),
+                  selectedColor: const Color(0xFFE5E7EB),
+                  checkmarkColor: const Color(0xFF374151),
+                ),
               ],
             ),
             const SizedBox(height: 14),
@@ -553,7 +668,10 @@ class _DataQualityPageState extends State<DataQualityPage> {
                 child: isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : rows.isEmpty
-                        ? const Center(child: Text('조건에 맞는 품질 이슈가 없습니다'))
+                        ? Center(
+                            child: Text(showDismissed
+                                ? '무시 처리된 이슈가 없습니다'
+                                : '조건에 맞는 품질 이슈가 없습니다'))
                         : ListView.builder(
                             padding: EdgeInsets.only(bottom: mobile ? 10 : 0),
                             itemCount: rows.length,

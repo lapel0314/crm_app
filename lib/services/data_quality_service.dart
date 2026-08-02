@@ -14,6 +14,13 @@ class DataQualityIssue {
   final String previousCarrier;
   final String detail;
 
+  /// 무시(dismissal) 저장/매칭에 쓰는 안정 키.
+  /// 검사 대상 값의 지문을 포함해 값이 수정되면 자동으로 다시 검출된다.
+  final String issueKey;
+
+  /// duplicate 유형에서 같은 번호 그룹의 행 수 (그 외 유형은 null).
+  final int? memberCount;
+
   const DataQualityIssue({
     required this.type,
     required this.title,
@@ -26,7 +33,36 @@ class DataQualityIssue {
     required this.carrier,
     required this.previousCarrier,
     required this.detail,
+    required this.issueKey,
+    this.memberCount,
   });
+}
+
+class DataQualityDismissal {
+  final String issueType;
+  final String issueKey;
+  final int? memberCount;
+
+  const DataQualityDismissal({
+    required this.issueType,
+    required this.issueKey,
+    this.memberCount,
+  });
+
+  factory DataQualityDismissal.fromMap(Map<String, dynamic> map) {
+    return DataQualityDismissal(
+      issueType: DataQualityService.text(map['issue_type']),
+      issueKey: DataQualityService.text(map['issue_key']),
+      memberCount: map['member_count'] is int ? map['member_count'] : null,
+    );
+  }
+}
+
+class DataQualityAnalysis {
+  final List<DataQualityIssue> active;
+  final List<DataQualityIssue> dismissed;
+
+  const DataQualityAnalysis({required this.active, required this.dismissed});
 }
 
 class DataQualityService {
@@ -45,7 +81,42 @@ class DataQualityService {
         .order('created_at', ascending: false));
   }
 
-  List<DataQualityIssue> analyzeCustomers(List<Map<String, dynamic>> rows) {
+  Future<List<DataQualityDismissal>> fetchDismissals() async {
+    final rows = await fetchAllRows(() => supabase
+        .from('data_quality_dismissals')
+        .select('issue_type, issue_key, member_count')
+        .order('created_at', ascending: false));
+    return rows.map(DataQualityDismissal.fromMap).toList();
+  }
+
+  Future<void> dismissIssue(DataQualityIssue issue) async {
+    await supabase.from('data_quality_dismissals').upsert(
+      {
+        'issue_type': issue.type,
+        'issue_key': issue.issueKey,
+        'customer_id': issue.customerId.isEmpty ? null : issue.customerId,
+        'customer_name': issue.name == '-' ? '' : issue.name,
+        'customer_phone': issue.phone == '-' ? '' : issue.phone,
+        'customer_store': issue.store == '-' ? '' : issue.store,
+        'member_count': issue.memberCount,
+        'created_by': supabase.auth.currentUser?.id,
+      },
+      onConflict: 'issue_type,issue_key',
+    );
+  }
+
+  Future<void> restoreIssue(DataQualityIssue issue) async {
+    await supabase
+        .from('data_quality_dismissals')
+        .delete()
+        .eq('issue_type', issue.type)
+        .eq('issue_key', issue.issueKey);
+  }
+
+  DataQualityAnalysis analyzeCustomers(
+    List<Map<String, dynamic>> rows, {
+    List<DataQualityDismissal> dismissals = const [],
+  }) {
     final issues = <DataQualityIssue>[];
     final phoneGroups = <String, List<Map<String, dynamic>>>{};
 
@@ -62,6 +133,7 @@ class DataQualityService {
           title: phoneDigits.isEmpty ? '전화번호 누락' : '전화번호 형식 오류',
           severity: '높음',
           detail: '전화번호는 숫자 기준 10~11자리 국내 번호여야 합니다.',
+          issueKey: '${text(row['id'])}:$phoneDigits',
         ));
       }
 
@@ -72,6 +144,7 @@ class DataQualityService {
           title: '가입일 누락/오류',
           severity: '높음',
           detail: '가입일이 비어 있거나 날짜로 해석되지 않습니다.',
+          issueKey: '${text(row['id'])}:${text(row['join_date'])}',
         ));
       }
 
@@ -85,6 +158,8 @@ class DataQualityService {
           title: '통신사/거래처 이상값',
           severity: '보통',
           detail: 'SK, KT, LG, 유피, 알뜰폰 계열 키워드가 확인되지 않습니다.',
+          issueKey:
+              '${text(row['id'])}:${_normCarrier(carrierText)}|${_normCarrier(previousCarrierText)}',
         ));
       }
     }
@@ -98,6 +173,8 @@ class DataQualityService {
           title: '중복 고객 의심',
           severity: '보통',
           detail: '같은 전화번호 고객이 ${entry.value.length}건 있습니다.',
+          issueKey: entry.key,
+          memberCount: entry.value.length,
         ));
       }
     }
@@ -109,7 +186,31 @@ class DataQualityService {
       if (severity != 0) return severity;
       return a.name.compareTo(b.name);
     });
-    return issues;
+
+    // 무시 목록 매칭. duplicate는 그룹 단위 키라서, 무시 이후 그룹이 더
+    // 커졌으면(새 중복 발생) 무시를 무효화해 다시 검출한다.
+    final dismissalByKey = <String, DataQualityDismissal>{
+      for (final d in dismissals) '${d.issueType}::${d.issueKey}': d,
+    };
+    final active = <DataQualityIssue>[];
+    final dismissed = <DataQualityIssue>[];
+    for (final issue in issues) {
+      final match = dismissalByKey['${issue.type}::${issue.issueKey}'];
+      final stillDismissed = match != null &&
+          (issue.type != 'duplicate' ||
+              (match.memberCount != null &&
+                  (issue.memberCount ?? 0) <= match.memberCount!));
+      if (stillDismissed) {
+        dismissed.add(issue);
+      } else {
+        active.add(issue);
+      }
+    }
+    return DataQualityAnalysis(active: active, dismissed: dismissed);
+  }
+
+  String _normCarrier(String value) {
+    return value.toLowerCase().replaceAll(RegExp(r'\s+'), '');
   }
 
   static String text(dynamic value) {
@@ -164,11 +265,15 @@ class DataQualityService {
     required String title,
     required String severity,
     required String detail,
+    required String issueKey,
+    int? memberCount,
   }) {
     return DataQualityIssue(
       type: type,
       title: title,
       severity: severity,
+      issueKey: issueKey,
+      memberCount: memberCount,
       customerId: text(row['id']),
       name: text(row['name']).isEmpty ? '-' : text(row['name']),
       phone: text(row['phone']).isEmpty ? '-' : text(row['phone']),
