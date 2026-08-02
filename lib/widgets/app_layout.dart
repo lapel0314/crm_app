@@ -1119,11 +1119,7 @@ class _AppLayoutState extends State<AppLayout> {
                   child: Align(
                     alignment: Alignment.centerRight,
                     child: compactSearch
-                        ? _quickSearchButton(
-                            width: 148,
-                            label: '통합검색',
-                            onPressed: _openGlobalSearchPage,
-                          )
+                        ? _compactGlobalSearchBar()
                         : _globalSearchBox(),
                   ),
                 ),
@@ -1131,6 +1127,35 @@ class _AppLayoutState extends State<AppLayout> {
           ),
         );
       },
+    );
+  }
+
+  // 좁은 데스크톱 창 폭에서도 검색창을 페이지 이동 없이 바로 쓸 수 있도록
+  // 고객명/번호 입력칸을 축소한 채 인라인으로 남겨둔다.
+  Widget _compactGlobalSearchBar() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _quickSearchField(
+          controller: globalNameSearchController,
+          hint: '고객명',
+          icon: Icons.person_search_outlined,
+          width: 100,
+        ),
+        const SizedBox(width: 6),
+        _quickSearchField(
+          controller: globalPhoneSearchController,
+          hint: '번호',
+          icon: Icons.phone_iphone_outlined,
+          width: 116,
+        ),
+        const SizedBox(width: 8),
+        _quickSearchButton(
+          width: 128,
+          label: '통합검색',
+          onPressed: _runGlobalSearch,
+        ),
+      ],
     );
   }
 
