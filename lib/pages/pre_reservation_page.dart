@@ -433,13 +433,10 @@ class _PreReservationPageState extends State<PreReservationPage> {
         );
       },
     );
-
-    nameController.dispose();
-    phoneController.dispose();
-    carrierController.dispose();
-    modelController.dispose();
-    colorController.dispose();
-    numberController.dispose();
+    // 컨트롤러는 의도적으로 dispose하지 않는다 — showDialog future가
+    // 닫힘 애니메이션 도중 완료되어, 여기서 dispose하면 애니메이션 중
+    // 리빌드되는 TextField가 disposed controller 에러를 낸다.
+    // (leads_page 등 기존 다이얼로그들과 동일한 패턴)
   }
 
   Widget _segmentedFilter() {
