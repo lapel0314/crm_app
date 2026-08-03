@@ -45,6 +45,8 @@ class PlanChangeAlertEntry {
     return date == null ? '-' : DateFormat('yyyy-MM-dd').format(date);
   }
 
+  String get dueDateLabel => DateFormat('yyyy-MM-dd').format(dueDate);
+
   PlanChangeAlertEntry copyWith({PlanChangeTask? task}) {
     return PlanChangeAlertEntry(
       customer: customer,
@@ -263,6 +265,32 @@ class PlanChangeAlertService {
     );
   }
 
+  /// 고객 상세보기 카드에서 "미기록"(task row 자체가 없는) 지난 항목을
+  /// 참고용으로 완료 기입할 때 쓴다. row가 없으면 만들고, 있으면(이미
+  /// pending으로 잡혀있던 경우) 그 row를 그대로 완료 처리한다.
+  Future<void> recordManualCompletion({
+    required PlanChangeAlertEntry entry,
+    required String afterValue,
+    String note = '',
+  }) async {
+    await _insertMissingTasks([entry]);
+    final tasks = await fetchCustomerTasks([entry.customerId]);
+    final taskTypeCodeValue = taskTypeCode(entry.type);
+    PlanChangeTask? match;
+    for (final task in tasks[entry.customerId] ?? const <PlanChangeTask>[]) {
+      if (task.taskType == taskTypeCodeValue &&
+          _sameDate(task.dueDate, entry.dueDate)) {
+        match = task;
+        break;
+      }
+    }
+    if (match == null) {
+      throw StateError('task row 생성에 실패했습니다.');
+    }
+    if (match.status == PlanChangeTaskStatus.done) return;
+    await completeTask(task: match, afterValue: afterValue, note: note);
+  }
+
   Future<int> completePendingTasksForCustomerChange({
     required String customerId,
     required String planBefore,
@@ -401,6 +429,11 @@ class PlanChangeAlertService {
   static List<PlanChangeAlertEntry> entriesForCustomer({
     required Map<String, dynamic> customer,
     required DateTime today,
+    // 오늘 알림 팝업/대시보드 히어로는 절대 이 값을 true로 넘기지 않는다 —
+    // 처리율이 낮은 알림이라 지난 항목까지 집계하면 카운트가 계속 쌓여
+    // "오늘 할 일"의 의미가 없어짐. true는 고객 상세보기 카드에서
+    // 그 고객 1명만 참고용으로 조회할 때만 쓴다(결과를 저장/집계하지 않음).
+    bool includeOverdue = false,
   }) {
     final joinDate = parseDate(customer['join_date']);
     if (joinDate == null) return const [];
@@ -414,7 +447,10 @@ class PlanChangeAlertService {
 
     void addIfDue(PlanChangeAlertType type, DateTime dueDate) {
       final normalizedDueDate = _dateOnly(dueDate);
-      if (!_sameDate(normalizedDueDate, normalizedToday)) return;
+      final isDue = includeOverdue
+          ? !normalizedDueDate.isAfter(normalizedToday)
+          : _sameDate(normalizedDueDate, normalizedToday);
+      if (!isDue) return;
       entries.add(
         PlanChangeAlertEntry(
           customer: customer,
