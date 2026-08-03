@@ -11,6 +11,7 @@ class AppTheme {
   static const Color primaryDark = Color(0xFF115E59); // teal-800
   static const Color primaryTint = Color(0xFFF0FDFA); // teal-50, 연한 배경
   static const Color primaryTintStrong = Color(0xFFCCFBF1); // teal-100
+  static const Color primaryBright = Color(0xFF2DD4BF); // teal-400, 다크 배경용
 
   // 배경/면/테두리 (기존 실사용 값 그대로).
   static const Color background = Color(0xFFF4F5F8);

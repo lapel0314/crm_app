@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
 import 'package:crm_app/widgets/app_toast.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -276,7 +277,7 @@ class _RecycleBinPageState extends State<RecycleBinPage> {
             ),
             child: const Icon(
               Icons.restore_from_trash_rounded,
-              color: Color(0xFFC94C6E),
+              color: AppTheme.primary,
             ),
           ),
           const SizedBox(width: 12),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
 import 'package:crm_app/widgets/app_toast.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -142,7 +143,7 @@ class _LoginPageState extends State<LoginPage>
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFC94C6E),
+              backgroundColor: AppTheme.primary,
               foregroundColor: Colors.white,
               elevation: 0,
             ),
@@ -447,7 +448,7 @@ class _LoginPageState extends State<LoginPage>
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFFC94C6E), width: 1.6),
+        borderSide: const BorderSide(color: AppTheme.primary, width: 1.6),
       ),
       labelStyle: const TextStyle(
         color: Color(0xFF6B7280),
@@ -566,16 +567,17 @@ class _LoginPageState extends State<LoginPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 브랜드 로고 — 핑크폰 아이덴티티라 핑크 유지, 히어로라 크게.
           Container(
-            width: 48,
-            height: 48,
+            width: 64,
+            height: 64,
             decoration: BoxDecoration(
-              color: const Color(0xFFC94C6E),
-              borderRadius: BorderRadius.circular(8),
+              color: AppTheme.brandPink,
+              borderRadius: BorderRadius.circular(12),
             ),
             child: const Icon(
               Icons.phone_iphone_rounded,
-              size: 24,
+              size: 32,
               color: Colors.white,
             ),
           ),
@@ -707,7 +709,7 @@ class _LoginPageState extends State<LoginPage>
           child: ElevatedButton(
             onPressed: isLoading ? null : login,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFC94C6E),
+              backgroundColor: AppTheme.primary,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -874,7 +876,7 @@ class _LoginPageState extends State<LoginPage>
             children: [
               Checkbox(
                 value: agreedTerms,
-                activeColor: const Color(0xFFC94C6E),
+                activeColor: AppTheme.primary,
                 onChanged: (value) {
                   setState(() {
                     agreedTerms = value ?? false;
@@ -904,7 +906,7 @@ class _LoginPageState extends State<LoginPage>
           child: ElevatedButton(
             onPressed: isLoading || !agreedTerms ? null : signup,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFC94C6E),
+              backgroundColor: AppTheme.primary,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -938,7 +940,7 @@ class _LoginPageState extends State<LoginPage>
             width: 58,
             height: 58,
             decoration: BoxDecoration(
-              color: const Color(0xFFC94C6E),
+              color: AppTheme.brandPink,
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(

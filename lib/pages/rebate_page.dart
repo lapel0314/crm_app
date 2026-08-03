@@ -1,5 +1,6 @@
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
 import 'package:crm_app/widgets/app_toast.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -112,11 +113,11 @@ class _RebatePageState extends State<RebatePage> {
               height: 36,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: selected ? const Color(0xFFC94C6E) : Colors.white,
+                color: selected ? AppTheme.primary : Colors.white,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: selected
-                      ? const Color(0xFFC94C6E)
+                      ? AppTheme.primary
                       : const Color(0xFFE8E9EF),
                 ),
               ),
@@ -255,12 +256,12 @@ class _RebatePageState extends State<RebatePage> {
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 color: selected
-                                    ? const Color(0xFFC94C6E)
+                                    ? AppTheme.primary
                                     : const Color(0xFFF9FAFB),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
                                   color: selected
-                                      ? const Color(0xFFC94C6E)
+                                      ? AppTheme.primary
                                       : const Color(0xFFE5E7EB),
                                 ),
                               ),
@@ -303,7 +304,7 @@ class _RebatePageState extends State<RebatePage> {
                         children: [
                           const Icon(
                             Icons.calendar_month_rounded,
-                            color: Color(0xFFC94C6E),
+                            color: AppTheme.primary,
                             size: 19,
                           ),
                           const SizedBox(width: 10),
@@ -332,7 +333,7 @@ class _RebatePageState extends State<RebatePage> {
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFC94C6E),
+                  backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -488,7 +489,7 @@ class _RebatePageState extends State<RebatePage> {
                 children: [
                   const Icon(
                     Icons.calendar_month_rounded,
-                    color: Color(0xFFC94C6E),
+                    color: AppTheme.primary,
                     size: 20,
                   ),
                   const SizedBox(width: 10),
@@ -632,12 +633,12 @@ class _RebatePageState extends State<RebatePage> {
             width: 64,
             height: 64,
             decoration: BoxDecoration(
-              color: const Color(0xFFC94C6E).withValues(alpha: 0.10),
+              color: AppTheme.primary.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
               Icons.image_not_supported_outlined,
-              color: Color(0xFFC94C6E),
+              color: AppTheme.primary,
               size: 30,
             ),
           ),
@@ -903,9 +904,9 @@ class _CompactMonthPickerState extends State<_CompactMonthPicker> {
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       color: selected
-                          ? const Color(0xFFC94C6E)
+                          ? AppTheme.primary
                           : today
-                              ? const Color(0xFFC94C6E).withValues(alpha: 0.10)
+                              ? AppTheme.primary.withValues(alpha: 0.10)
                               : const Color(0xFFF9FAFB),
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: const Color(0xFFE8E9EF)),

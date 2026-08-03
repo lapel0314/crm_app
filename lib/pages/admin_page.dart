@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
 import 'package:crm_app/widgets/app_toast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/services/notice_service.dart';
@@ -720,7 +721,7 @@ class _AdminPageState extends State<AdminPage> {
   ButtonStyle _primaryButtonStyle({bool danger = false}) {
     return ElevatedButton.styleFrom(
       backgroundColor:
-          danger ? const Color(0xFFDC2626) : const Color(0xFFC94C6E),
+          danger ? const Color(0xFFDC2626) : AppTheme.primary,
       foregroundColor: Colors.white,
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -744,7 +745,7 @@ class _AdminPageState extends State<AdminPage> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFFC94C6E), width: 1.4),
+        borderSide: const BorderSide(color: AppTheme.primary, width: 1.4),
       ),
     );
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
 import 'package:intl/intl.dart';
 
 import 'package:crm_app/services/plan_change_alert_service.dart';
@@ -58,12 +59,12 @@ class _PlanChangeAlertDialogState extends State<PlanChangeAlertDialog> {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: const Color(0xFFC94C6E).withValues(alpha: 0.12),
+              color: AppTheme.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(
               Icons.event_available_rounded,
-              color: Color(0xFFC94C6E),
+              color: AppTheme.primary,
               size: 19,
             ),
           ),
@@ -157,7 +158,7 @@ class _PlanChangeAlertDialogState extends State<PlanChangeAlertDialog> {
                 : const Icon(Icons.table_view_rounded, size: 17),
             label: Text(isExporting ? '출력 중' : '엑셀 출력'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFC94C6E),
+              backgroundColor: AppTheme.primary,
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
@@ -471,7 +472,7 @@ class _TypeHeader extends StatelessWidget {
           Text(
             '$count명',
             style: const TextStyle(
-              color: Color(0xFFC94C6E),
+              color: AppTheme.primary,
               fontSize: 12,
               fontWeight: FontWeight.w900,
             ),
@@ -639,7 +640,7 @@ class _CarrierBadge extends StatelessWidget {
     final color = switch (carrier) {
       'SK' => const Color(0xFF2563EB),
       'KT' => const Color(0xFFEF4444),
-      'LG' => const Color(0xFFC94C6E),
+      'LG' => AppTheme.primary,
       _ => const Color(0xFF6B7280),
     };
     return Container(

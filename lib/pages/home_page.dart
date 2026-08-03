@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/services/rate_card_service.dart';
@@ -290,7 +291,7 @@ class _HomePageState extends State<HomePage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.info_outline_rounded,
-                    color: Color(0xFFC94C6E), size: 20),
+                    color: AppTheme.primary, size: 20),
                 const SizedBox(width: 10),
                 Flexible(
                   child: Text(
@@ -543,7 +544,7 @@ class _HomePageState extends State<HomePage> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFC94C6E)),
+          borderSide: const BorderSide(color: AppTheme.primary),
         ),
       ),
     );
@@ -575,7 +576,7 @@ class _HomePageState extends State<HomePage> {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFC94C6E)),
+          borderSide: const BorderSide(color: AppTheme.primary),
         ),
       ),
       items: items
@@ -843,7 +844,7 @@ class _HomePageState extends State<HomePage> {
                       child: Text(
                         rateCardMessage,
                         style: const TextStyle(
-                          color: Color(0xFFC94C6E),
+                          color: AppTheme.primary,
                           fontSize: 12,
                           fontWeight: FontWeight.w800,
                         ),
@@ -947,8 +948,8 @@ class _HomePageState extends State<HomePage> {
                         });
                       },
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFC94C6E),
-                        side: const BorderSide(color: Color(0xFFC94C6E)),
+                        foregroundColor: AppTheme.primary,
+                        side: const BorderSide(color: AppTheme.primary),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -1058,7 +1059,7 @@ class _HomePageState extends State<HomePage> {
                       child: ElevatedButton(
                         onPressed: save,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFC94C6E),
+                          backgroundColor: AppTheme.primary,
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(

@@ -2,6 +2,7 @@ import 'package:crm_app/utils/debouncer.dart';
 import 'package:crm_app/utils/model_name_utils.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
 import 'package:crm_app/widgets/app_toast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -299,7 +300,7 @@ class _ModelNameMappingPageState extends State<ModelNameMappingPage> {
         style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w700,
-          color: isActive ? const Color(0xFFC94C6E) : const Color(0xFF6B7280),
+          color: isActive ? AppTheme.primary : const Color(0xFF6B7280),
         ),
       ),
     );

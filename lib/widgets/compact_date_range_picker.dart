@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
 import 'package:intl/intl.dart';
 
 Future<DateTimeRange?> showCompactDateRangePicker({
@@ -166,7 +167,7 @@ class _CompactDateRangePickerDialogState
                         Text(
                           _selectedLabel,
                           style: const TextStyle(
-                            color: Color(0xFFC94C6E),
+                            color: AppTheme.primary,
                             fontSize: 12,
                             fontWeight: FontWeight.w800,
                           ),
@@ -234,7 +235,7 @@ class _CompactDateRangePickerDialogState
                                 onPressed: () =>
                                     Navigator.of(context).pop(_selectedRange),
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFC94C6E),
+                                  backgroundColor: AppTheme.primary,
                                   foregroundColor: Colors.white,
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
@@ -267,7 +268,7 @@ class _CompactDateRangePickerDialogState
                         ElevatedButton(
                           onPressed: () => Navigator.of(context).pop(_selectedRange),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFC94C6E),
+                            backgroundColor: AppTheme.primary,
                             foregroundColor: Colors.white,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
@@ -384,13 +385,13 @@ class _CompactDateRangePickerDialogState
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: selected
-                ? const Color(0xFFC94C6E)
+                ? AppTheme.primary
                 : inRange
-                    ? const Color(0xFFFFEEF4)
+                    ? AppTheme.primaryTint
                     : Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: today && !selected
-                ? Border.all(color: const Color(0xFFC94C6E))
+                ? Border.all(color: AppTheme.primary)
                 : null,
           ),
           child: Text(

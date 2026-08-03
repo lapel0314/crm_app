@@ -3,6 +3,7 @@ import 'package:crm_app/services/login_policy_service.dart';
 import 'package:crm_app/services/desktop_auth_session_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
 import 'package:crm_app/widgets/app_toast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -133,7 +134,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFC94C6E),
+                  backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -267,7 +268,7 @@ class _SettingsPageState extends State<SettingsPage> {
               Navigator.pop(context, text.isEmpty ? '현장 네트워크 등록 요청' : text);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFC94C6E),
+              backgroundColor: AppTheme.primary,
               foregroundColor: Colors.white,
               elevation: 0,
             ),
@@ -393,7 +394,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
                   color: tab.$2 == '내 정보'
-                      ? const Color(0xFFC94C6E).withValues(alpha: 0.10)
+                      ? AppTheme.primary.withValues(alpha: 0.10)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -403,7 +404,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       tab.$1,
                       size: 17,
                       color: tab.$2 == '내 정보'
-                          ? const Color(0xFFC94C6E)
+                          ? AppTheme.primary
                           : const Color(0xFF6B7280),
                     ),
                     const SizedBox(width: 10),
@@ -411,7 +412,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       tab.$2,
                       style: TextStyle(
                         color: tab.$2 == '내 정보'
-                            ? const Color(0xFFC94C6E)
+                            ? AppTheme.primary
                             : const Color(0xFF6B7280),
                         fontSize: 13,
                         fontWeight: tab.$2 == '내 정보'
@@ -531,7 +532,7 @@ class _SettingsPageState extends State<SettingsPage> {
       height: 64,
       alignment: Alignment.center,
       decoration: const BoxDecoration(
-        color: Color(0xFFC94C6E),
+        color: AppTheme.primary,
         shape: BoxShape.circle,
       ),
       child: Text(
@@ -709,7 +710,7 @@ class _SettingsPageState extends State<SettingsPage> {
             height: 36,
             alignment: Alignment.center,
             decoration: const BoxDecoration(
-              color: Color(0xFFC94C6E),
+              color: AppTheme.primary,
               shape: BoxShape.circle,
             ),
             child: Text(
@@ -757,13 +758,13 @@ class _SettingsPageState extends State<SettingsPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFC94C6E).withValues(alpha: 0.10),
+        color: AppTheme.primary.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         value.isEmpty ? '-' : value,
         style: const TextStyle(
-          color: Color(0xFFC94C6E),
+          color: AppTheme.primary,
           fontSize: 12,
           fontWeight: FontWeight.w800,
         ),
@@ -854,7 +855,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           ? _registerCurrentNetwork
                           : _requestCurrentNetwork,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFC94C6E),
+                    backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(

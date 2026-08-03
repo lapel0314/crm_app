@@ -442,7 +442,7 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
                           : '\uC5C5\uB370\uC774\uD2B8',
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFC94C6E),
+                      backgroundColor: AppTheme.primary,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -465,7 +465,7 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
                   child: ElevatedButton(
                     onPressed: _retryCheck,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFC94C6E),
+                      backgroundColor: AppTheme.primary,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -477,7 +477,7 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
                 )
               else
                 const LinearProgressIndicator(
-                  color: Color(0xFFC94C6E),
+                  color: AppTheme.primary,
                   backgroundColor: Color(0xFFF3F4F6),
                 ),
             ],
@@ -739,7 +739,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
                         icon: const Icon(Icons.refresh_rounded, size: 17),
                         label: const Text('\uB2E4\uC2DC \uC2DC\uB3C4'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFC94C6E),
+                          backgroundColor: AppTheme.primary,
                           foregroundColor: Colors.white,
                           elevation: 0,
                         ),

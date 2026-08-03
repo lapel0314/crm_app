@@ -2,6 +2,7 @@ import 'dart:io' show Platform, exit;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
 import 'package:crm_app/widgets/app_toast.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -70,8 +71,8 @@ class _AppLayoutState extends State<AppLayout> {
   bool get isAdminRole => isPrivilegedRole(widget.role);
   bool get canAddStores => isPrivilegedRole(widget.role);
   String get displayStore => activeStore.isEmpty ? '전체 매장' : activeStore;
-  static const Color _sidebarPink = Color(0xFFEC4899);
-  static const Color _sidebarPinkSoft = Color(0xFFFCE7F3);
+  static const Color _sidebarAccent = AppTheme.primaryBright;
+  static const Color _sidebarAccentSoft = AppTheme.primaryTintStrong;
   static const Color _sidebarInactive = Color(0xFFC4C8DC);
 
   // IndexedStack은 모든 자식을 항상 레이아웃하므로, 매 빌드마다 페이지 위젯을
@@ -510,7 +511,7 @@ class _AppLayoutState extends State<AppLayout> {
               icon: const Icon(Icons.add_rounded, size: 18),
               label: const Text('추가'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFC94C6E),
+                backgroundColor: AppTheme.primary,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(
@@ -698,7 +699,7 @@ class _AppLayoutState extends State<AppLayout> {
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFC94C6E),
+                  backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -738,7 +739,7 @@ class _AppLayoutState extends State<AppLayout> {
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFC94C6E),
+                  backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -1160,12 +1161,12 @@ class _AppLayoutState extends State<AppLayout> {
       decoration: BoxDecoration(
         color: const Color(0xFF1F2233),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFC94C6E), width: 1.2),
+        border: Border.all(color: AppTheme.primary, width: 1.2),
       ),
       child: Row(
         children: [
           const Icon(Icons.manage_search_rounded,
-              size: 19, color: Color(0xFFFFD6E1)),
+              size: 19, color: AppTheme.primaryTintStrong),
           const SizedBox(width: 8),
           const Text(
             '통합검색',
@@ -1215,7 +1216,7 @@ class _AppLayoutState extends State<AppLayout> {
         icon: const Icon(Icons.search_rounded, size: 16),
         label: Text(label),
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFC94C6E),
+          backgroundColor: AppTheme.primary,
           foregroundColor: Colors.white,
           elevation: 0,
           textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
@@ -1238,7 +1239,7 @@ class _AppLayoutState extends State<AppLayout> {
     final color = accent
         ? const Color(0xFFDC2626)
         : selected
-            ? _sidebarPink
+            ? _sidebarAccent
             : _sidebarInactive;
     return InkWell(
       onTap: onTap,
@@ -1313,7 +1314,7 @@ class _AppLayoutState extends State<AppLayout> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFC94C6E)),
+            borderSide: const BorderSide(color: AppTheme.primary),
           ),
         ),
       ),
@@ -1332,16 +1333,19 @@ class _AppLayoutState extends State<AppLayout> {
         ),
         child: Row(
           children: [
+            // 브랜드 로고 — 핑크폰 아이덴티티라 핑크 유지 (UI 액션색과 분리).
             Container(
-              width: 42,
-              height: 42,
+              width: 46,
+              height: 46,
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: _sidebarPinkSoft),
+                border: Border.all(
+                  color: AppTheme.brandPink.withValues(alpha: 0.45),
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: _sidebarPink.withValues(alpha: 0.30),
+                    color: AppTheme.brandPink.withValues(alpha: 0.35),
                     blurRadius: 16,
                     offset: const Offset(0, 7),
                   ),
@@ -1391,7 +1395,7 @@ class _AppLayoutState extends State<AppLayout> {
                         width: 4,
                         height: 4,
                         decoration: const BoxDecoration(
-                          color: _sidebarPink,
+                          color: AppTheme.brandPink,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -1400,7 +1404,7 @@ class _AppLayoutState extends State<AppLayout> {
                         'CRM',
                         style: TextStyle(
                           fontSize: 11,
-                          color: _sidebarPinkSoft,
+                          color: _sidebarAccentSoft,
                           fontWeight: FontWeight.w900,
                           height: 1,
                         ),
@@ -1421,18 +1425,18 @@ class _AppLayoutState extends State<AppLayout> {
       width: 34,
       height: 34,
       decoration: BoxDecoration(
-        color: selected ? _sidebarPink : _sidebarPink.withValues(alpha: 0.14),
+        color: selected ? _sidebarAccent : _sidebarAccent.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(9),
         border: Border.all(
           color: selected
-              ? _sidebarPinkSoft.withValues(alpha: 0.45)
-              : _sidebarPink.withValues(alpha: 0.30),
+              ? _sidebarAccentSoft.withValues(alpha: 0.45)
+              : _sidebarAccent.withValues(alpha: 0.30),
         ),
       ),
       child: Icon(
         Icons.storefront_rounded,
         size: 18,
-        color: selected ? Colors.white : _sidebarPinkSoft,
+        color: selected ? Colors.white : _sidebarAccentSoft,
       ),
     );
   }
@@ -1441,14 +1445,14 @@ class _AppLayoutState extends State<AppLayout> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
       decoration: BoxDecoration(
-        color: _sidebarPink.withValues(alpha: 0.14),
+        color: _sidebarAccent.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: _sidebarPink.withValues(alpha: 0.28)),
+        border: Border.all(color: _sidebarAccent.withValues(alpha: 0.28)),
       ),
       child: const Text(
         '변경',
         style: TextStyle(
-          color: _sidebarPinkSoft,
+          color: _sidebarAccentSoft,
           fontSize: 10,
           fontWeight: FontWeight.w900,
           height: 1,
@@ -1470,12 +1474,12 @@ class _AppLayoutState extends State<AppLayout> {
               padding: const EdgeInsets.all(11),
               decoration: BoxDecoration(
                 color: isStoreAccordionOpen
-                    ? _sidebarPink.withValues(alpha: 0.14)
+                    ? _sidebarAccent.withValues(alpha: 0.14)
                     : const Color(0xFF202336),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: isStoreAccordionOpen
-                      ? _sidebarPink.withValues(alpha: 0.45)
+                      ? _sidebarAccent.withValues(alpha: 0.45)
                       : const Color(0xFF303349),
                 ),
               ),
@@ -1633,7 +1637,7 @@ class _AppLayoutState extends State<AppLayout> {
         padding: const EdgeInsets.symmetric(horizontal: 9),
         decoration: BoxDecoration(
           color: selected
-              ? _sidebarPink.withValues(alpha: 0.16)
+              ? _sidebarAccent.withValues(alpha: 0.16)
               : Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(7),
         ),
@@ -1644,7 +1648,7 @@ class _AppLayoutState extends State<AppLayout> {
                   ? Icons.all_inbox_rounded
                   : Icons.storefront_rounded,
               size: 15,
-              color: selected ? _sidebarPink : _sidebarInactive,
+              color: selected ? _sidebarAccent : _sidebarInactive,
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -1672,10 +1676,10 @@ class _AppLayoutState extends State<AppLayout> {
         height: 36,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: _sidebarPink.withValues(alpha: 0.16),
+          color: _sidebarAccent.withValues(alpha: 0.16),
           borderRadius: BorderRadius.circular(7),
           border: Border.all(
-            color: _sidebarPink.withValues(alpha: 0.34),
+            color: _sidebarAccent.withValues(alpha: 0.34),
           ),
         ),
         child: Row(
@@ -1690,7 +1694,7 @@ class _AppLayoutState extends State<AppLayout> {
               const Icon(
                 Icons.add_business_rounded,
                 size: 16,
-                color: _sidebarPink,
+                color: _sidebarAccent,
               ),
             const SizedBox(width: 8),
             const Expanded(
@@ -1855,7 +1859,7 @@ class _AppLayoutState extends State<AppLayout> {
                       top: -1,
                       child: DecoratedBox(
                         decoration: BoxDecoration(
-                          color: Color(0xFFC94C6E),
+                          color: AppTheme.primary,
                           shape: BoxShape.circle,
                         ),
                         child: SizedBox(width: 8, height: 8),
@@ -1909,7 +1913,7 @@ class _AppLayoutState extends State<AppLayout> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(
           color: selected
-              ? _sidebarPink.withValues(alpha: 0.18)
+              ? _sidebarAccent.withValues(alpha: 0.18)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
         ),
@@ -1974,11 +1978,11 @@ class _AppLayoutState extends State<AppLayout> {
       width: 30,
       height: 30,
       decoration: BoxDecoration(
-        color: selected ? _sidebarPink : Colors.white.withValues(alpha: 0.08),
+        color: selected ? _sidebarAccent : Colors.white.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: selected
-              ? _sidebarPinkSoft.withValues(alpha: 0.45)
+              ? _sidebarAccentSoft.withValues(alpha: 0.45)
               : const Color(0xFF313449),
         ),
       ),
@@ -2077,7 +2081,7 @@ class _AppLayoutState extends State<AppLayout> {
                             ),
                             decoration: BoxDecoration(
                               color: selected
-                                  ? _sidebarPink.withValues(alpha: 0.18)
+                                  ? _sidebarAccent.withValues(alpha: 0.18)
                                   : Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                             ),
@@ -2124,7 +2128,7 @@ class _AppLayoutState extends State<AppLayout> {
                               ),
                               decoration: BoxDecoration(
                                 color: selectedIndex == settingsIndex
-                                    ? _sidebarPink.withValues(alpha: 0.18)
+                                    ? _sidebarAccent.withValues(alpha: 0.18)
                                     : Colors.white.withValues(alpha: 0.05),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(

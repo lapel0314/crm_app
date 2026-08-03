@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
 import 'package:crm_app/widgets/empty_state.dart';
 import 'package:intl/intl.dart';
 import 'package:crm_app/services/customer_excel_export_service.dart';
@@ -396,7 +397,7 @@ class _CustomerPageState extends State<CustomerPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.info_outline_rounded,
-                    color: Color(0xFFC94C6E), size: 20),
+                    color: AppTheme.primary, size: 20),
                 const SizedBox(width: 10),
                 Flexible(
                   child: Text(
@@ -452,7 +453,7 @@ class _CustomerPageState extends State<CustomerPage> {
     final carrier = _normalizeCarrier(_text(value));
     if (carrier.contains('SK')) return const Color(0xFF2563EB);
     if (carrier.contains('KT')) return const Color(0xFFEF4444);
-    if (carrier.contains('LG')) return const Color(0xFFC94C6E);
+    if (carrier.contains('LG')) return AppTheme.primary;
     return const Color(0xFF6B7280);
   }
 
@@ -557,7 +558,7 @@ class _CustomerPageState extends State<CustomerPage> {
       Color(0xFF10B981),
       Color(0xFFF59E0B),
       Color(0xFF8B5CF6),
-      Color(0xFFC94C6E),
+      AppTheme.primary,
       Color(0xFFEF4444),
       Color(0xFF14B8A6),
     ];
@@ -2340,7 +2341,7 @@ class _CustomerPageState extends State<CustomerPage> {
                   onPressed: onIconPressed,
                   icon: Icon(icon, size: 17),
                   color: hasText
-                      ? const Color(0xFFC94C6E)
+                      ? AppTheme.primary
                       : const Color(0xFF9CA3AF),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(
@@ -2374,7 +2375,7 @@ class _CustomerPageState extends State<CustomerPage> {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: Color(0xFFC94C6E)),
+            borderSide: const BorderSide(color: AppTheme.primary),
           ),
         ),
       ),
@@ -2404,7 +2405,7 @@ class _CustomerPageState extends State<CustomerPage> {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: active ? const Color(0xFFC94C6E) : Colors.transparent,
+                color: active ? AppTheme.primary : Colors.transparent,
                 borderRadius: BorderRadius.circular(7),
               ),
               child: Text(
@@ -2915,7 +2916,7 @@ class _CustomerPageState extends State<CustomerPage> {
     );
   }
 
-  Widget _tableBadge(String value, {Color color = const Color(0xFFC94C6E)}) {
+  Widget _tableBadge(String value, {Color color = AppTheme.primary}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(

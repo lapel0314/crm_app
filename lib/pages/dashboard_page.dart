@@ -1,6 +1,7 @@
 import 'package:crm_app/utils/model_name_utils.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -83,7 +84,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final carrier = _normalizeCarrier(_text(value));
     if (carrier.contains('SK')) return const Color(0xFF2563EB);
     if (carrier.contains('KT')) return const Color(0xFFEF4444);
-    if (carrier.contains('LG')) return const Color(0xFFC94C6E);
+    if (carrier.contains('LG')) return AppTheme.primary;
     return const Color(0xFF6B7280);
   }
 
@@ -477,7 +478,7 @@ class _DashboardPageState extends State<DashboardPage> {
       Color(0xFF2563EB),
       Color(0xFF10B981),
       Color(0xFFF59E0B),
-      Color(0xFFC94C6E),
+      AppTheme.primary,
       Color(0xFFEF4444),
       Color(0xFF8B5CF6),
     ];
@@ -570,19 +571,19 @@ class _DashboardPageState extends State<DashboardPage> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: active
-                  ? const Color(0xFFC94C6E).withValues(alpha: 0.10)
+                  ? AppTheme.primary.withValues(alpha: 0.10)
                   : const Color(0xFFF9FAFB),
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
                 color:
-                    active ? const Color(0xFFC94C6E) : const Color(0xFFE5E7EB),
+                    active ? AppTheme.primary : const Color(0xFFE5E7EB),
               ),
             ),
             child: Text(
               source,
               style: TextStyle(
                 color:
-                    active ? const Color(0xFFC94C6E) : const Color(0xFF6B7280),
+                    active ? AppTheme.primary : const Color(0xFF6B7280),
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
               ),
@@ -1110,7 +1111,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   _settlementActionRow(
                     label: '대납 · 유통망지원금',
                     value: monthSupportMoney,
-                    color: const Color(0xFFC94C6E),
+                    color: AppTheme.primary,
                     onTap: () => _showAdvanceDetailDialog(
                       title: '유통망지원금',
                       monthKey: selectedMonth,
@@ -1359,7 +1360,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 final entry = item.value;
                 final ratio = maxCount == 0 ? 0.0 : entry.value / maxCount;
                 final colors = [
-                  const Color(0xFFC94C6E),
+                  AppTheme.primary,
                   const Color(0xFF2563EB),
                   const Color(0xFFEF4444),
                   const Color(0xFF10B981),

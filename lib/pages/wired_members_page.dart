@@ -4,6 +4,7 @@ import 'package:excel/excel.dart' as xls;
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
 import 'package:crm_app/widgets/empty_state.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -590,7 +591,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.info_outline_rounded,
-                    color: Color(0xFFC94C6E), size: 20),
+                    color: AppTheme.primary, size: 20),
                 const SizedBox(width: 10),
                 Flexible(
                   child: Text(
@@ -903,7 +904,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFFC94C6E), width: 1.4),
+        borderSide: const BorderSide(color: AppTheme.primary, width: 1.4),
       ),
     );
   }
@@ -1215,7 +1216,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFC94C6E),
+                  backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -1480,7 +1481,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFC94C6E),
+                  backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -1841,7 +1842,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
     final carrier = _normalizeCarrier(textValue(value));
     if (carrier.contains('SK')) return const Color(0xFF2563EB);
     if (carrier.contains('KT')) return const Color(0xFFEF4444);
-    if (carrier.contains('LG')) return const Color(0xFFC94C6E);
+    if (carrier.contains('LG')) return AppTheme.primary;
     return const Color(0xFF6B7280);
   }
 
@@ -1929,9 +1930,9 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
             icon: const Icon(Icons.calendar_month_outlined, size: 18),
             style: IconButton.styleFrom(
               backgroundColor:
-                  hasDate ? const Color(0xFFFFEEF4) : const Color(0xFFF9FAFB),
+                  hasDate ? AppTheme.primaryTint : const Color(0xFFF9FAFB),
               foregroundColor:
-                  hasDate ? const Color(0xFFC94C6E) : const Color(0xFF6B7280),
+                  hasDate ? AppTheme.primary : const Color(0xFF6B7280),
               side: const BorderSide(color: Color(0xFFE8E9EF)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -1976,7 +1977,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: const BorderSide(
-                  color: Color(0xFFC94C6E),
+                  color: AppTheme.primary,
                 ),
               ),
             ),
@@ -2009,7 +2010,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: active ? const Color(0xFFC94C6E) : Colors.transparent,
+                color: active ? AppTheme.primary : Colors.transparent,
                 borderRadius: BorderRadius.circular(7),
               ),
               child: Text(
@@ -2186,7 +2187,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                           ),
                           _tableCell(
                             _tableText(money(item['postpaid_amount']),
-                                color: const Color(0xFFC94C6E), strong: true),
+                                color: AppTheme.primary, strong: true),
                             widths[9],
                           ),
                           _tableCell(
@@ -2464,7 +2465,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
     );
   }
 
-  Widget _tableBadge(String value, {Color color = const Color(0xFFC94C6E)}) {
+  Widget _tableBadge(String value, {Color color = AppTheme.primary}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -2580,7 +2581,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                         _summaryTile(
                           label: '후입금',
                           value: money(totalPostpaid),
-                          color: const Color(0xFFC94C6E),
+                          color: AppTheme.primary,
                           compact: true,
                         ),
                       ],
@@ -2635,7 +2636,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                   _summaryTile(
                     label: '후입금',
                     value: money(totalPostpaid),
-                    color: const Color(0xFFC94C6E),
+                    color: AppTheme.primary,
                   ),
                 ],
               ),
@@ -2709,7 +2710,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                                               borderRadius:
                                                   BorderRadius.circular(8),
                                               borderSide: const BorderSide(
-                                                color: Color(0xFFC94C6E),
+                                                color: AppTheme.primary,
                                               ),
                                             ),
                                           ),
@@ -2772,7 +2773,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                                             label: const Text('등록'),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor:
-                                                  const Color(0xFFC94C6E),
+                                                  AppTheme.primary,
                                               foregroundColor: Colors.white,
                                               elevation: 0,
                                               minimumSize: const Size(0, 36),
@@ -2901,7 +2902,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                                                 borderRadius:
                                                     BorderRadius.circular(8),
                                                 borderSide: const BorderSide(
-                                                  color: Color(0xFFC94C6E),
+                                                  color: AppTheme.primary,
                                                 ),
                                               ),
                                             ),
@@ -2955,7 +2956,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                                   icon: const Icon(Icons.add, size: 17),
                                   label: const Text('가입 등록'),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFC94C6E),
+                                    backgroundColor: AppTheme.primary,
                                     foregroundColor: Colors.white,
                                     elevation: 0,
                                   ),
