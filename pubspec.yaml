@@ -49,3 +49,9 @@ flutter:
           weight: 600
         - asset: assets/fonts/Pretendard-Bold.otf
           weight: 700
+        # w800/w900은 별도 폰트 파일이 없어 Bold로 매핑한다.
+        # (미매핑 시 웹 렌더러가 해당 웨이트 글리프를 못 찾아 깨져 보임)
+        - asset: assets/fonts/Pretendard-Bold.otf
+          weight: 800
+        - asset: assets/fonts/Pretendard-Bold.otf
+          weight: 900
