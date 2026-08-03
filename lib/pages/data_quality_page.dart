@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/widgets/empty_state.dart';
 import 'package:crm_app/widgets/app_toast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/services/data_quality_service.dart';
@@ -665,10 +666,15 @@ class _DataQualityPageState extends State<DataQualityPage> {
                 child: isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : rows.isEmpty
-                        ? Center(
-                            child: Text(showDismissed
+                        ? EmptyState(
+                            icon: Icons.task_alt_rounded,
+                            title: showDismissed
                                 ? '무시 처리된 이슈가 없습니다'
-                                : '조건에 맞는 품질 이슈가 없습니다'))
+                                : '조건에 맞는 품질 이슈가 없습니다',
+                            subtitle: showDismissed
+                                ? '이슈를 무시 처리하면 여기에 모입니다'
+                                : '데이터가 깨끗하거나 필터에 걸린 이슈가 없습니다',
+                          )
                         : ListView.builder(
                             padding: EdgeInsets.only(bottom: mobile ? 10 : 0),
                             itemCount: rows.length,

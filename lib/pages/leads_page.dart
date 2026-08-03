@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/widgets/empty_state.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/constants/message_templates.dart';
@@ -1960,7 +1961,7 @@ class _LeadsPageState extends State<LeadsPage> {
                       child: isLoading
                           ? const Center(child: CircularProgressIndicator())
                           : filteredLeads.isEmpty
-                              ? const Center(child: Text('등록된 가망고객이 없습니다'))
+                              ? const EmptyState(icon: Icons.person_add_alt_rounded, title: '등록된 가망고객이 없습니다', subtitle: '리드 등록 버튼으로 첫 가망고객을 추가해 보세요')
                               : mobile
                                   ? ListView.builder(
                                       padding:

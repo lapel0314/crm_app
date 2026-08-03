@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:crm_app/widgets/empty_state.dart';
 import 'package:intl/intl.dart';
 import 'package:crm_app/services/customer_excel_export_service.dart';
 import 'package:crm_app/services/kakao_talk_service.dart';
@@ -3488,7 +3489,7 @@ class _CustomerPageState extends State<CustomerPage> {
                       child: isLoading
                           ? const Center(child: CircularProgressIndicator())
                           : customers.isEmpty
-                              ? const Center(child: Text('고객 정보가 없습니다'))
+                              ? const EmptyState(icon: Icons.people_outline_rounded, title: '고객 정보가 없습니다', subtitle: '고객등록 메뉴에서 첫 고객을 등록해 보세요')
                               : Scrollbar(
                                   thumbVisibility: true,
                                   child: SingleChildScrollView(

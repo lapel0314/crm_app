@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/widgets/empty_state.dart';
 import 'package:crm_app/widgets/app_toast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/utils/debouncer.dart';
@@ -909,7 +910,7 @@ class _PreReservationPageState extends State<PreReservationPage> {
                       child: isLoading
                           ? const Center(child: CircularProgressIndicator())
                           : visibleRows.isEmpty
-                              ? const Center(child: Text('등록된 사전예약이 없습니다'))
+                              ? const EmptyState(icon: Icons.event_busy_rounded, title: '등록된 사전예약이 없습니다', subtitle: '예약 등록 버튼으로 첫 예약을 추가해 보세요')
                               : mobile
                                   ? ListView.builder(
                                       padding:

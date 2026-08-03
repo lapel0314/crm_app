@@ -4,6 +4,7 @@ import 'package:excel/excel.dart' as xls;
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:crm_app/widgets/empty_state.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/constants/message_templates.dart';
@@ -3000,7 +3001,7 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
                       child: isLoading
                           ? const Center(child: CircularProgressIndicator())
                           : members.isEmpty
-                              ? const Center(child: Text('등록된 유선회원이 없습니다'))
+                              ? const EmptyState(icon: Icons.router_outlined, title: '등록된 유선회원이 없습니다', subtitle: '등록 버튼으로 첫 유선회원을 추가해 보세요')
                               : mobile
                                   ? ListView.builder(
                                       padding:

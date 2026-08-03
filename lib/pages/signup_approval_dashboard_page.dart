@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/widgets/empty_state.dart';
 import 'package:crm_app/widgets/app_toast.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -416,7 +417,7 @@ class _SignupApprovalDashboardPageState
                     border: Border.all(color: const Color(0xFFE5E7EB)),
                   ),
                   child: pendingUsers.isEmpty
-                      ? const Center(child: Text('승인 대기 계정이 없습니다'))
+                      ? const EmptyState(icon: Icons.how_to_reg_rounded, title: '승인 대기 계정이 없습니다', subtitle: '새 가입 요청이 오면 여기에 표시됩니다')
                       : Column(
                           children: [
                             Container(
