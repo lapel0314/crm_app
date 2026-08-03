@@ -505,32 +505,90 @@ class _CustomerPageState extends State<CustomerPage> {
     return _tableBadge('보류', color: const Color(0xFF6B7280));
   }
 
-  List<Widget> _planTaskDetailRows(Map<String, dynamic> customer) {
-    final tasks = _tasksForCustomer(customer);
-    if (tasks.isEmpty) {
+  bool _sameDueDate(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  /// 요금제/부가 처리 섹션 내용. `_tasksForCustomer`(이미 만들어진 DB 기록)에
+  /// 더해, 이 고객에게 지금 적용 가능한 유형을 즉석 계산(`includeOverdue:
+  /// true`)해서 기록이 아직 없는 지난 항목도 참고용으로 보여준다 — 이 계산은
+  /// 이 카드를 여는 순간에만 실행되고 어디에도 집계/저장되지 않는다("오늘
+  /// 알림"/대시보드 카운트와 완전히 무관).
+  List<Widget> _planTaskDetailRows(
+    Map<String, dynamic> customer, {
+    required bool canRecord,
+    required void Function(PlanChangeAlertEntry entry, PlanChangeTask? task)
+        onAction,
+  }) {
+    final existingTasks = _tasksForCustomer(customer);
+    final computedEntries = PlanChangeAlertService.entriesForCustomer(
+      customer: customer,
+      today: DateTime.now(),
+      includeOverdue: true,
+    );
+
+    if (existingTasks.isEmpty && computedEntries.isEmpty) {
       return [_detailRow('처리상태', '대상 없음')];
     }
 
-    final today = DateTime.now();
-    final pendingCount = tasks
-        .where((task) => task.status == PlanChangeTaskStatus.pending)
-        .length;
-    final overdueCount = tasks.where((task) => task.isOverdue(today)).length;
-    final doneCount =
-        tasks.where((task) => task.status == PlanChangeTaskStatus.done).length;
-    final rows = <Widget>[
-      _detailRow(
-        '요약',
-        '미처리 $pendingCount건 · 지연 $overdueCount건 · 완료 $doneCount건',
-      ),
-    ];
+    final rows = <Widget>[];
+    final matchedTaskIds = <String>{};
 
-    for (final task in tasks.take(4)) {
+    for (final entry in computedEntries) {
+      final typeCode = PlanChangeAlertService.taskTypeCode(entry.type);
+      PlanChangeTask? matched;
+      for (final task in existingTasks) {
+        if (task.taskType == typeCode &&
+            _sameDueDate(task.dueDate, entry.dueDate)) {
+          matched = task;
+          break;
+        }
+      }
+      if (matched != null) matchedTaskIds.add(matched.id);
+
       rows.add(
         _detailRow(
-          task.typeLabel,
-          '${_date(task.dueDate)} · ${task.statusLabel}',
+          entry.type.label,
+          matched == null
+              ? '${entry.dueDateLabel} 기준 대상 · 미기록'
+              : '${_date(matched.dueDate)} · ${matched.statusLabel}',
         ),
+      );
+      if (matched != null) {
+        rows.add(_detailRow('변경내용', _taskChangeText(matched)));
+        if (matched.completedAt != null) {
+          rows.add(_detailRow('처리일', _date(matched.completedAt)));
+        }
+        if (matched.note.isNotEmpty) {
+          rows.add(_detailRow('메모', matched.note));
+        }
+      }
+      if (canRecord && matched?.status != PlanChangeTaskStatus.done) {
+        rows.add(
+          _FullWidthBlock(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                onPressed: () => onAction(entry, matched),
+                icon: const Icon(Icons.check_rounded, size: 15),
+                label: Text(matched == null ? '완료 기입' : '처리완료'),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 30),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+    }
+
+    // 지금 계산 결과엔 안 걸리지만(예: 부가서비스가 이후 해지돼 조건이
+    // 바뀐 경우) DB에 남아있는 과거 기록도 이력으로 계속 보여준다.
+    for (final task in existingTasks) {
+      if (matchedTaskIds.contains(task.id)) continue;
+      rows.add(
+        _detailRow(task.typeLabel, '${_date(task.dueDate)} · ${task.statusLabel}'),
       );
       rows.add(_detailRow('변경내용', _taskChangeText(task)));
       if (task.completedAt != null) {
@@ -540,6 +598,7 @@ class _CustomerPageState extends State<CustomerPage> {
         rows.add(_detailRow('메모', task.note));
       }
     }
+
     return rows;
   }
 
@@ -549,6 +608,106 @@ class _CustomerPageState extends State<CustomerPage> {
     }
     final before = task.beforeValue.isEmpty ? '-' : task.beforeValue;
     return '$before -> ${task.afterValue}';
+  }
+
+  /// "완료 기입"(task 없음) / "처리완료"(task pending) 공용 핸들러.
+  /// 팝업(`plan_change_alert_dialog.dart`)의 `_completeEntry`와 동일한
+  /// 변경 후 값 + 메모 입력 UX. 완료 후 시트를 닫지 않고 그 자리에서 갱신.
+  Future<void> _handlePlanTaskAction({
+    required BuildContext sheetContext,
+    required Map<String, dynamic> customer,
+    required PlanChangeAlertEntry entry,
+    required PlanChangeTask? task,
+    required void Function(void Function()) setSheetState,
+  }) async {
+    final afterController = TextEditingController(
+      text: entry.type == PlanChangeAlertType.addServiceDelete
+          ? '없음'
+          : entry.currentValue,
+    );
+    final noteController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: sheetContext,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('처리완료 기록'),
+        content: SizedBox(
+          width: 380,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _detailRow('유형', entry.type.label),
+              _detailRow('기한', entry.dueDateLabel),
+              _detailRow('변경 전', entry.currentValue),
+              const SizedBox(height: 10),
+              TextField(
+                controller: afterController,
+                decoration: const InputDecoration(
+                  labelText: '변경 후',
+                  isDense: true,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: noteController,
+                maxLines: 2,
+                decoration: const InputDecoration(
+                  labelText: '메모',
+                  isDense: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('취소'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('기록'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) {
+      afterController.dispose();
+      noteController.dispose();
+      return;
+    }
+
+    final afterValue = afterController.text.trim();
+    final note = noteController.text.trim();
+    afterController.dispose();
+    noteController.dispose();
+
+    try {
+      if (task == null) {
+        await planAlertService.recordManualCompletion(
+          entry: entry,
+          afterValue: afterValue,
+          note: note,
+        );
+      } else {
+        await planAlertService.completeTask(
+          task: task,
+          afterValue: afterValue,
+          note: note,
+        );
+      }
+      final customerId = entry.customerId;
+      final refreshed = await planAlertService.fetchCustomerTasks([customerId]);
+      setState(() {
+        planChangeTasksByCustomerId[customerId] = refreshed[customerId] ?? [];
+      });
+      setSheetState(() {});
+      _showCenterMessage('처리완료로 기록했습니다.');
+    } catch (e) {
+      final message = e is PostgrestException ? e.message : e.toString();
+      _showCenterMessage('처리 실패: $message');
+      _logUiError('요금제/부가 처리 실패: $e');
+    }
   }
 
   Color _staffColor(dynamic value) {
@@ -1507,6 +1666,11 @@ class _CustomerPageState extends State<CustomerPage> {
                         width: constraints.maxWidth,
                         child: _detailDivider(),
                       )
+                    else if (child is _FullWidthBlock)
+                      SizedBox(
+                        width: constraints.maxWidth,
+                        child: child.child,
+                      )
                     else
                       child,
                 ],
@@ -1594,6 +1758,36 @@ class _CustomerPageState extends State<CustomerPage> {
             )
             .toList(),
         onChanged: onChanged,
+      ),
+    );
+  }
+
+  /// `_sectionCard`와 같은 카드 스타일(흰 배경/테두리/라운드8/제목)이되,
+  /// 수정 다이얼로그의 풀폭 `TextField`/드롭다운은 `Wrap`이 아니라
+  /// `Column`으로 세로 배치해야 해서 별도로 둔다.
+  Widget _editSection({required String title, required List<Widget> children}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE8E9EF)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+              color: Color(0xFF111827),
+            ),
+          ),
+          const SizedBox(height: 4),
+          ...children,
+        ],
       ),
     );
   }
@@ -1761,141 +1955,174 @@ class _CustomerPageState extends State<CustomerPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _input('고객명', nameController),
-                    _input(
-                      '휴대폰번호',
-                      phoneController,
-                      keyboardType: TextInputType.phone,
-                      onChanged: (value) {
-                        final formatted = _formatPhone(value);
-                        phoneController.value = TextEditingValue(
-                          text: formatted,
-                          selection:
-                              TextSelection.collapsed(offset: formatted.length),
-                        );
-                      },
+                    _editSection(
+                      title: '기본 정보',
+                      children: [
+                        _input('고객명', nameController),
+                        _input(
+                          '휴대폰번호',
+                          phoneController,
+                          keyboardType: TextInputType.phone,
+                          onChanged: (value) {
+                            final formatted = _formatPhone(value);
+                            phoneController.value = TextEditingValue(
+                              text: formatted,
+                              selection: TextSelection.collapsed(
+                                  offset: formatted.length),
+                            );
+                          },
+                        ),
+                        _input(
+                          '생년월일',
+                          birthDateController,
+                          keyboardType: TextInputType.datetime,
+                        ),
+                        _input('개통매장', storeController),
+                        _input('담당자', staffController),
+                      ],
                     ),
-                    _input(
-                      '생년월일',
-                      birthDateController,
-                      keyboardType: TextInputType.datetime,
+                    const SizedBox(height: 12),
+                    _editSection(
+                      title: '개통 정보',
+                      children: [
+                        _input('통신사/거래처', carrierController),
+                        _input('기존통신사', previousCarrierController),
+                        _input('모델명', modelController),
+                        _input('요금제', planController),
+                        _input('부가서비스', addServiceController),
+                        _dropdown<String>(
+                          label: '가입유형',
+                          value: joinType,
+                          items: const ['신규', '번호이동', '기변'],
+                          onChanged: (v) => setDialogState(() => joinType = v),
+                        ),
+                        _dropdown<String>(
+                          label: '공시/선약',
+                          value: contractType,
+                          items: const ['공시', '선약'],
+                          onChanged: (v) =>
+                              setDialogState(() => contractType = v),
+                        ),
+                        _dropdown<int>(
+                          label: '할부개월',
+                          value: installment,
+                          items: const [0, 12, 24, 36, 48],
+                          onChanged: (v) =>
+                              setDialogState(() => installment = v),
+                        ),
+                        _dropdown<String>(
+                          label: '중고폰반납',
+                          value: tradeIn,
+                          items: const ['O', 'X'],
+                          onChanged: (v) => setDialogState(() => tradeIn = v),
+                        ),
+                        _input('반납모델', tradeModelController),
+                      ],
                     ),
-                    _input('통신사/거래처', carrierController),
-                    _input('기존통신사', previousCarrierController),
-                    _input('모델명', modelController),
-                    _input('요금제', planController),
-                    _input('부가서비스', addServiceController),
-                    _dropdown<String>(
-                      label: '가입유형',
-                      value: joinType,
-                      items: const ['신규', '번호이동', '기변'],
-                      onChanged: (v) => setDialogState(() => joinType = v),
-                    ),
-                    _dropdown<String>(
-                      label: '공시/선약',
-                      value: contractType,
-                      items: const ['공시', '선약'],
-                      onChanged: (v) => setDialogState(() => contractType = v),
-                    ),
-                    _dropdown<int>(
-                      label: '할부개월',
-                      value: installment,
-                      items: const [0, 12, 24, 36, 48],
-                      onChanged: (v) => setDialogState(() => installment = v),
-                    ),
-                    _dropdown<String>(
-                      label: '중고폰반납',
-                      value: tradeIn,
-                      items: const ['O', 'X'],
-                      onChanged: (v) => setDialogState(() => tradeIn = v),
-                    ),
-                    _input(
-                      '리베이트',
-                      rebateController,
-                      keyboardType: TextInputType.number,
-                      onChanged: (v) => onMoneyChanged(rebateController, v),
-                    ),
-                    _input(
-                      '부가리베이트',
-                      addRebateController,
-                      keyboardType: TextInputType.number,
-                      onChanged: (v) => onMoneyChanged(addRebateController, v),
-                    ),
-                    _input(
-                      '히든리베이트',
-                      hiddenRebateController,
-                      keyboardType: TextInputType.number,
-                      onChanged: (v) =>
-                          onMoneyChanged(hiddenRebateController, v),
-                    ),
-                    _input(
-                      '차감항목',
-                      deductionController,
-                      keyboardType: TextInputType.number,
-                      onChanged: (v) => onMoneyChanged(deductionController, v),
-                    ),
-                    _input(
-                      '유통망지원금',
-                      supportMoneyController,
-                      keyboardType: TextInputType.number,
-                      onChanged: (v) =>
-                          onMoneyChanged(supportMoneyController, v),
-                    ),
-                    _input(
-                      '결제',
-                      paymentController,
-                      keyboardType: TextInputType.number,
-                      onChanged: (v) => onMoneyChanged(paymentController, v),
-                    ),
-                    _input(
-                      '입금',
-                      depositController,
-                      keyboardType: TextInputType.number,
-                      onChanged: (v) => onMoneyChanged(depositController, v),
-                    ),
-                    _input(
-                      '매입금액',
-                      tradePriceController,
-                      keyboardType: TextInputType.number,
-                      onChanged: (v) => onMoneyChanged(tradePriceController, v),
-                    ),
-                    _input('히든내용', hiddenNoteController),
-                    _input('차감내용', deductionNoteController),
-                    _input('결제내용', paymentNoteController),
-                    _input('은행/계좌/예금주', bankInfoController),
-                    _input('반납모델', tradeModelController),
-                    _input('메모', memoController, maxLines: 4),
-                    _input(
-                      '요변/부가삭제',
-                      planChangeAddServiceDeleteController,
-                    ),
-                    _input('개통매장', storeController),
-                    _input('모바일', mobileController),
-                    _input('2nd', secondController),
-                    _input('담당자', staffController),
-                    const SizedBox(height: 8),
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: const Color(0xFFE5E7EB)),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '총리베이트: ${_money(currentTotalRebate())}',
-                            style: const TextStyle(fontWeight: FontWeight.w800),
+                    const SizedBox(height: 12),
+                    _editSection(
+                      title: '정산 정보',
+                      children: [
+                        _input(
+                          '리베이트',
+                          rebateController,
+                          keyboardType: TextInputType.number,
+                          onChanged: (v) => onMoneyChanged(rebateController, v),
+                        ),
+                        _input(
+                          '부가리베이트',
+                          addRebateController,
+                          keyboardType: TextInputType.number,
+                          onChanged: (v) =>
+                              onMoneyChanged(addRebateController, v),
+                        ),
+                        _input(
+                          '히든리베이트',
+                          hiddenRebateController,
+                          keyboardType: TextInputType.number,
+                          onChanged: (v) =>
+                              onMoneyChanged(hiddenRebateController, v),
+                        ),
+                        _input(
+                          '차감항목',
+                          deductionController,
+                          keyboardType: TextInputType.number,
+                          onChanged: (v) =>
+                              onMoneyChanged(deductionController, v),
+                        ),
+                        _input(
+                          '유통망지원금',
+                          supportMoneyController,
+                          keyboardType: TextInputType.number,
+                          onChanged: (v) =>
+                              onMoneyChanged(supportMoneyController, v),
+                        ),
+                        _input(
+                          '결제',
+                          paymentController,
+                          keyboardType: TextInputType.number,
+                          onChanged: (v) =>
+                              onMoneyChanged(paymentController, v),
+                        ),
+                        _input(
+                          '입금',
+                          depositController,
+                          keyboardType: TextInputType.number,
+                          onChanged: (v) =>
+                              onMoneyChanged(depositController, v),
+                        ),
+                        _input(
+                          '매입금액',
+                          tradePriceController,
+                          keyboardType: TextInputType.number,
+                          onChanged: (v) =>
+                              onMoneyChanged(tradePriceController, v),
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: const Color(0xFFE5E7EB)),
                           ),
-                          const SizedBox(height: 6),
-                          Text(
-                            '마진: ${_money(currentMargin())}',
-                            style: const TextStyle(fontWeight: FontWeight.w800),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '총리베이트: ${_money(currentTotalRebate())}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w800),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                '마진: ${_money(currentMargin())}',
+                                style: const TextStyle(
+                                    fontWeight: FontWeight.w800),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    _editSection(
+                      title: '추가 / 메모 정보',
+                      children: [
+                        _input('히든내용', hiddenNoteController),
+                        _input('차감내용', deductionNoteController),
+                        _input('결제내용', paymentNoteController),
+                        _input('은행/계좌/예금주', bankInfoController),
+                        _input('메모', memoController, maxLines: 4),
+                        _input(
+                          '요변/부가삭제',
+                          planChangeAddServiceDeleteController,
+                        ),
+                        _input('모바일', mobileController),
+                        _input('2nd', secondController),
+                      ],
                     ),
                   ],
                 ),
@@ -2027,6 +2254,8 @@ class _CustomerPageState extends State<CustomerPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (sheetContext, setSheetState) {
         return SafeArea(
           child: SizedBox(
             height: MediaQuery.of(sheetContext).size.height * 0.9,
@@ -2150,7 +2379,17 @@ class _CustomerPageState extends State<CustomerPage> {
                     const SizedBox(height: 16),
                     _sectionCard(
                       title: '요금제/부가 처리',
-                      children: _planTaskDetailRows(customer),
+                      children: _planTaskDetailRows(
+                        customer,
+                        canRecord: canEdit,
+                        onAction: (entry, task) => _handlePlanTaskAction(
+                          sheetContext: sheetContext,
+                          customer: customer,
+                          entry: entry,
+                          task: task,
+                          setSheetState: setSheetState,
+                        ),
+                      ),
                     ),
                   ],
                   const SizedBox(height: 16),
@@ -2236,6 +2475,8 @@ class _CustomerPageState extends State<CustomerPage> {
               ),
             ),
           ),
+        );
+          },
         );
       },
     );
@@ -3521,4 +3762,15 @@ class _CustomerPageState extends State<CustomerPage> {
       ),
     );
   }
+}
+
+/// `_sectionCard`의 Wrap 안에서 label-value 쌍이 아니라 버튼처럼
+/// 한 줄 전체를 차지해야 하는 요소를 표시하기 위한 마커.
+class _FullWidthBlock extends StatelessWidget {
+  final Widget child;
+
+  const _FullWidthBlock({required this.child});
+
+  @override
+  Widget build(BuildContext context) => child;
 }
