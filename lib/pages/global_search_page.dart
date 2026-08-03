@@ -284,7 +284,7 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
   }) {
     return Expanded(
       child: Container(
-        height: 84,
+        height: 88,
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
