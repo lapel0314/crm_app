@@ -1840,9 +1840,9 @@ class _WiredMembersPageState extends State<WiredMembersPage> {
 
   Color _carrierColor(dynamic value) {
     final carrier = _normalizeCarrier(textValue(value));
-    if (carrier.contains('SK')) return const Color(0xFF2563EB);
-    if (carrier.contains('KT')) return const Color(0xFFEF4444);
-    if (carrier.contains('LG')) return AppTheme.primary;
+    if (carrier.contains('SK')) return AppTheme.carrierSk;
+    if (carrier.contains('KT')) return AppTheme.carrierKt;
+    if (carrier.contains('LG')) return AppTheme.carrierLg;
     return const Color(0xFF6B7280);
   }
 

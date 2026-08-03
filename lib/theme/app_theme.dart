@@ -6,12 +6,17 @@ class AppTheme {
   // 브랜드 마크(로고) 전용 — UI 액션색으로 쓰지 않는다.
   static const Color brandPink = Color(0xFFC94C6E);
 
-  // Primary (틸) — 주요 액션/선택/포커스.
-  static const Color primary = Color(0xFF0F766E); // teal-700, 흰배경 대비 ~5.9:1
-  static const Color primaryDark = Color(0xFF115E59); // teal-800
-  static const Color primaryTint = Color(0xFFF0FDFA); // teal-50, 연한 배경
-  static const Color primaryTintStrong = Color(0xFFCCFBF1); // teal-100
-  static const Color primaryBright = Color(0xFF2DD4BF); // teal-400, 다크 배경용
+  // Primary (핑크) — 주요 액션/선택/포커스. (틸 시안 후 사용자 결정으로 핑크 유지)
+  static const Color primary = Color(0xFFC94C6E); // 흰배경 대비 ~4.6:1
+  static const Color primaryDark = Color(0xFFA83A59);
+  static const Color primaryTint = Color(0xFFFFEEF4); // 연한 배경
+  static const Color primaryTintStrong = Color(0xFFFFD6E1);
+  static const Color primaryBright = Color(0xFFEC4899); // 다크 배경용
+
+  // 통신사 배지 색 — 테마와 무관하게 고정 (LG 핑크 / SK 파랑 / KT 빨강).
+  static const Color carrierLg = Color(0xFFC94C6E);
+  static const Color carrierSk = Color(0xFF2563EB);
+  static const Color carrierKt = Color(0xFFEF4444);
 
   // 배경/면/테두리 (기존 실사용 값 그대로).
   static const Color background = Color(0xFFF4F5F8);
