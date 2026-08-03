@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -212,7 +213,7 @@ class RateCardRulesPanelState extends State<RateCardRulesPanel> {
                         value: isActive,
                         title: const Text('사용'),
                         contentPadding: EdgeInsets.zero,
-                        activeThumbColor: const Color(0xFFC94C6E),
+                        activeThumbColor: AppTheme.primary,
                         onChanged: (value) {
                           setDialogState(() => isActive = value);
                         },
@@ -556,14 +557,14 @@ class RateCardRulesPanelState extends State<RateCardRulesPanel> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFFC94C6E), width: 1.4),
+        borderSide: const BorderSide(color: AppTheme.primary, width: 1.4),
       ),
     );
   }
 
   ButtonStyle _primaryButtonStyle() {
     return ElevatedButton.styleFrom(
-      backgroundColor: const Color(0xFFC94C6E),
+      backgroundColor: AppTheme.primary,
       foregroundColor: Colors.white,
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),

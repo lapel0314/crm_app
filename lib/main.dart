@@ -5,6 +5,7 @@ import 'package:crm_app/pages/login_page.dart';
 import 'package:crm_app/services/desktop_auth_session_service.dart';
 import 'package:crm_app/services/login_policy_service.dart';
 import 'package:crm_app/services/update_service.dart';
+import 'package:crm_app/theme/app_theme.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:crm_app/widgets/app_layout.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -185,15 +186,7 @@ class MyApp extends StatelessWidget {
         Locale('ko', 'KR'),
         Locale('en', 'US'),
       ],
-      theme: ThemeData(
-        useMaterial3: true,
-        fontFamily: 'Pretendard',
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFFC94C6E),
-          primary: const Color(0xFFC94C6E),
-        ),
-        scaffoldBackgroundColor: const Color(0xFFF4F5F8),
-      ),
+      theme: AppTheme.lightTheme,
       home: const UpdateGate(child: AuthGate()),
     );
   }
@@ -449,7 +442,7 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
                           : '\uC5C5\uB370\uC774\uD2B8',
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFC94C6E),
+                      backgroundColor: AppTheme.primary,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -472,7 +465,7 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
                   child: ElevatedButton(
                     onPressed: _retryCheck,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFC94C6E),
+                      backgroundColor: AppTheme.primary,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -484,7 +477,7 @@ class _UpdateGateState extends State<UpdateGate> with WidgetsBindingObserver {
                 )
               else
                 const LinearProgressIndicator(
-                  color: Color(0xFFC94C6E),
+                  color: AppTheme.primary,
                   backgroundColor: Color(0xFFF3F4F6),
                 ),
             ],
@@ -746,7 +739,7 @@ class _AuthGateState extends State<AuthGate> with WidgetsBindingObserver {
                         icon: const Icon(Icons.refresh_rounded, size: 17),
                         label: const Text('\uB2E4\uC2DC \uC2DC\uB3C4'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFC94C6E),
+                          backgroundColor: AppTheme.primary,
                           foregroundColor: Colors.white,
                           elevation: 0,
                         ),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
+import 'package:crm_app/widgets/empty_state.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/constants/message_templates.dart';
@@ -249,7 +251,7 @@ class _LeadsPageState extends State<LeadsPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(Icons.info_outline_rounded,
-                    color: Color(0xFFC94C6E), size: 20),
+                    color: AppTheme.primary, size: 20),
                 const SizedBox(width: 10),
                 Flexible(
                   child: Text(
@@ -558,7 +560,7 @@ class _LeadsPageState extends State<LeadsPage> {
                       width: compactIos ? dialogWidth : 240,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFC94C6E),
+                          backgroundColor: AppTheme.primary,
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -631,7 +633,7 @@ class _LeadsPageState extends State<LeadsPage> {
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFC94C6E),
+                  backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -712,7 +714,7 @@ class _LeadsPageState extends State<LeadsPage> {
                       width: compactIos ? dialogWidth : 240,
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFC94C6E),
+                          backgroundColor: AppTheme.primary,
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -785,7 +787,7 @@ class _LeadsPageState extends State<LeadsPage> {
               ),
               ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFC94C6E),
+                  backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -929,9 +931,9 @@ class _LeadsPageState extends State<LeadsPage> {
 
   Color _carrierColor(dynamic value) {
     final carrier = _normalizeCarrier(textValue(value));
-    if (carrier.contains('SK')) return const Color(0xFF2563EB);
-    if (carrier.contains('KT')) return const Color(0xFFEF4444);
-    if (carrier.contains('LG')) return const Color(0xFFC94C6E);
+    if (carrier.contains('SK')) return AppTheme.carrierSk;
+    if (carrier.contains('KT')) return AppTheme.carrierKt;
+    if (carrier.contains('LG')) return AppTheme.carrierLg;
     return const Color(0xFF6B7280);
   }
 
@@ -1005,9 +1007,9 @@ class _LeadsPageState extends State<LeadsPage> {
             icon: const Icon(Icons.calendar_month_outlined, size: 18),
             style: IconButton.styleFrom(
               backgroundColor:
-                  hasDate ? const Color(0xFFFFEEF4) : const Color(0xFFF9FAFB),
+                  hasDate ? AppTheme.primaryTint : const Color(0xFFF9FAFB),
               foregroundColor:
-                  hasDate ? const Color(0xFFC94C6E) : const Color(0xFF6B7280),
+                  hasDate ? AppTheme.primary : const Color(0xFF6B7280),
               side: const BorderSide(color: Color(0xFFE8E9EF)),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8),
@@ -1052,7 +1054,7 @@ class _LeadsPageState extends State<LeadsPage> {
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(8),
                 borderSide: const BorderSide(
-                  color: Color(0xFFC94C6E),
+                  color: AppTheme.primary,
                 ),
               ),
             ),
@@ -1085,7 +1087,7 @@ class _LeadsPageState extends State<LeadsPage> {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: active ? const Color(0xFFC94C6E) : Colors.transparent,
+                color: active ? AppTheme.primary : Colors.transparent,
                 borderRadius: BorderRadius.circular(7),
               ),
               child: Text(
@@ -1429,7 +1431,7 @@ class _LeadsPageState extends State<LeadsPage> {
     );
   }
 
-  Widget _tableBadge(String value, {Color color = const Color(0xFFC94C6E)}) {
+  Widget _tableBadge(String value, {Color color = AppTheme.primary}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
@@ -1683,7 +1685,7 @@ class _LeadsPageState extends State<LeadsPage> {
                                               borderRadius:
                                                   BorderRadius.circular(8),
                                               borderSide: const BorderSide(
-                                                color: Color(0xFFC94C6E),
+                                                color: AppTheme.primary,
                                               ),
                                             ),
                                           ),
@@ -1775,7 +1777,7 @@ class _LeadsPageState extends State<LeadsPage> {
                                         label: const Text('등록'),
                                         style: ElevatedButton.styleFrom(
                                           backgroundColor:
-                                              const Color(0xFFC94C6E),
+                                              AppTheme.primary,
                                           foregroundColor: Colors.white,
                                           elevation: 0,
                                           minimumSize: const Size(0, 36),
@@ -1869,7 +1871,7 @@ class _LeadsPageState extends State<LeadsPage> {
                                                 borderRadius:
                                                     BorderRadius.circular(8),
                                                 borderSide: const BorderSide(
-                                                  color: Color(0xFFC94C6E),
+                                                  color: AppTheme.primary,
                                                 ),
                                               ),
                                             ),
@@ -1931,7 +1933,7 @@ class _LeadsPageState extends State<LeadsPage> {
                                   icon: const Icon(Icons.add, size: 17),
                                   label: const Text('리드 등록'),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFFC94C6E),
+                                    backgroundColor: AppTheme.primary,
                                     foregroundColor: Colors.white,
                                     elevation: 0,
                                   ),
@@ -1960,7 +1962,7 @@ class _LeadsPageState extends State<LeadsPage> {
                       child: isLoading
                           ? const Center(child: CircularProgressIndicator())
                           : filteredLeads.isEmpty
-                              ? const Center(child: Text('등록된 가망고객이 없습니다'))
+                              ? const EmptyState(icon: Icons.person_add_alt_rounded, title: '등록된 가망고객이 없습니다', subtitle: '리드 등록 버튼으로 첫 가망고객을 추가해 보세요')
                               : mobile
                                   ? ListView.builder(
                                       padding:

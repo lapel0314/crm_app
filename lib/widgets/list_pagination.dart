@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
 
 /// 고객DB/가망고객/유선회원 목록 하단 페이지네이션 바.
 /// (세 페이지에 동일하게 복붙돼 있던 _pagination을 공용으로 승격,
@@ -51,13 +52,13 @@ Widget listPagination({
           padding: const EdgeInsets.symmetric(horizontal: 12),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: const Color(0xFFC94C6E).withValues(alpha: 0.08),
+            color: AppTheme.primary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(
             '${safePage + 1} / $totalPages',
             style: const TextStyle(
-              color: Color(0xFFC94C6E),
+              color: AppTheme.primary,
               fontSize: 12,
               fontWeight: FontWeight.w800,
             ),

@@ -3,6 +3,8 @@ import 'package:crm_app/services/login_policy_service.dart';
 import 'package:crm_app/services/desktop_auth_session_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
+import 'package:crm_app/widgets/app_toast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final supabase = Supabase.instance.client;
@@ -132,7 +134,7 @@ class _SettingsPageState extends State<SettingsPage> {
               ElevatedButton(
                 onPressed: () => Navigator.pop(context, true),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFC94C6E),
+                  backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   shape: RoundedRectangleBorder(
@@ -192,14 +194,10 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         networkSnapshot = snapshot;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('현재 네트워크를 허용 목록에 등록했습니다.')),
-      );
+      showToast(context, '현재 네트워크를 허용 목록에 등록했습니다.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('네트워크 등록에 실패했습니다: $e')),
-      );
+      showToast(context, '네트워크 등록에 실패했습니다: $e', error: true);
     }
   }
 
@@ -217,14 +215,10 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         networkSnapshot = snapshot;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('현재 네트워크 등록을 요청했습니다.')),
-      );
+      showToast(context, '현재 네트워크 등록을 요청했습니다.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('네트워크 등록 요청에 실패했습니다: $e')),
-      );
+      showToast(context, '네트워크 등록 요청에 실패했습니다: $e', error: true);
     }
   }
 
@@ -274,7 +268,7 @@ class _SettingsPageState extends State<SettingsPage> {
               Navigator.pop(context, text.isEmpty ? '현장 네트워크 등록 요청' : text);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFC94C6E),
+              backgroundColor: AppTheme.primary,
               foregroundColor: Colors.white,
               elevation: 0,
             ),
@@ -296,14 +290,10 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         networkSnapshot = snapshot;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('네트워크 등록 요청을 승인했습니다.')),
-      );
+      showToast(context, '네트워크 등록 요청을 승인했습니다.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('네트워크 요청 승인에 실패했습니다: $e')),
-      );
+      showToast(context, '네트워크 요청 승인에 실패했습니다: $e', error: true);
     }
   }
 
@@ -316,14 +306,10 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         networkSnapshot = snapshot;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('네트워크 등록 요청을 거절했습니다.')),
-      );
+      showToast(context, '네트워크 등록 요청을 거절했습니다.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('네트워크 요청 거절에 실패했습니다: $e')),
-      );
+      showToast(context, '네트워크 요청 거절에 실패했습니다: $e', error: true);
     }
   }
 
@@ -337,14 +323,10 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         networkSnapshot = snapshot;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('허용 네트워크를 비활성화했습니다.')),
-      );
+      showToast(context, '허용 네트워크를 비활성화했습니다.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('네트워크 비활성화에 실패했습니다: $e')),
-      );
+      showToast(context, '네트워크 비활성화에 실패했습니다: $e', error: true);
     }
   }
 
@@ -412,7 +394,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
                   color: tab.$2 == '내 정보'
-                      ? const Color(0xFFC94C6E).withValues(alpha: 0.10)
+                      ? AppTheme.primary.withValues(alpha: 0.10)
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
                 ),
@@ -422,7 +404,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       tab.$1,
                       size: 17,
                       color: tab.$2 == '내 정보'
-                          ? const Color(0xFFC94C6E)
+                          ? AppTheme.primary
                           : const Color(0xFF6B7280),
                     ),
                     const SizedBox(width: 10),
@@ -430,7 +412,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       tab.$2,
                       style: TextStyle(
                         color: tab.$2 == '내 정보'
-                            ? const Color(0xFFC94C6E)
+                            ? AppTheme.primary
                             : const Color(0xFF6B7280),
                         fontSize: 13,
                         fontWeight: tab.$2 == '내 정보'
@@ -550,7 +532,7 @@ class _SettingsPageState extends State<SettingsPage> {
       height: 64,
       alignment: Alignment.center,
       decoration: const BoxDecoration(
-        color: Color(0xFFC94C6E),
+        color: AppTheme.primary,
         shape: BoxShape.circle,
       ),
       child: Text(
@@ -728,7 +710,7 @@ class _SettingsPageState extends State<SettingsPage> {
             height: 36,
             alignment: Alignment.center,
             decoration: const BoxDecoration(
-              color: Color(0xFFC94C6E),
+              color: AppTheme.primary,
               shape: BoxShape.circle,
             ),
             child: Text(
@@ -776,13 +758,13 @@ class _SettingsPageState extends State<SettingsPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFC94C6E).withValues(alpha: 0.10),
+        color: AppTheme.primary.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         value.isEmpty ? '-' : value,
         style: const TextStyle(
-          color: Color(0xFFC94C6E),
+          color: AppTheme.primary,
           fontSize: 12,
           fontWeight: FontWeight.w800,
         ),
@@ -873,7 +855,7 @@ class _SettingsPageState extends State<SettingsPage> {
                           ? _registerCurrentNetwork
                           : _requestCurrentNetwork,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFC94C6E),
+                    backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     shape: RoundedRectangleBorder(

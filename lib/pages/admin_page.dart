@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
+import 'package:crm_app/widgets/app_toast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/services/notice_service.dart';
 import 'package:crm_app/utils/postgrest_filter_utils.dart';
@@ -118,10 +120,7 @@ class _AdminPageState extends State<AdminPage> {
     } catch (e) {
       debugPrint('admin approve failed: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('직원 승인 실패: $e')),
-      );
+      showToast(context, '직원 승인 실패: $e', error: true);
     }
   }
 
@@ -133,10 +132,7 @@ class _AdminPageState extends State<AdminPage> {
     } catch (e) {
       debugPrint('admin delete failed: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('직원 삭제 실패: $e')),
-      );
+      showToast(context, '직원 삭제 실패: $e', error: true);
     }
   }
 
@@ -230,19 +226,11 @@ class _AdminPageState extends State<AdminPage> {
                         final password = passwordController.text;
                         final confirm = confirmController.text;
                         if (password.length < 8) {
-                          ScaffoldMessenger.of(context).clearSnackBars();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('비밀번호는 8자 이상이어야 합니다.')),
-                          );
+                          showToast(context, '비밀번호는 8자 이상이어야 합니다.', error: true);
                           return;
                         }
                         if (password != confirm) {
-                          ScaffoldMessenger.of(context).clearSnackBars();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                                content: Text('비밀번호 확인이 일치하지 않습니다.')),
-                          );
+                          showToast(context, '비밀번호 확인이 일치하지 않습니다.', error: true);
                           return;
                         }
                         setDialogState(() {
@@ -255,19 +243,13 @@ class _AdminPageState extends State<AdminPage> {
                           );
                           if (!context.mounted) return;
                           Navigator.pop(context);
-                          ScaffoldMessenger.of(this.context).clearSnackBars();
-                          ScaffoldMessenger.of(this.context).showSnackBar(
-                            const SnackBar(content: Text('비밀번호가 변경되었습니다.')),
-                          );
+                          showToast(this.context, '비밀번호가 변경되었습니다.');
                         } catch (e) {
                           if (!context.mounted) return;
                           setDialogState(() {
                             isSaving = false;
                           });
-                          ScaffoldMessenger.of(context).clearSnackBars();
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('비밀번호 변경 실패: $e')),
-                          );
+                          showToast(context, '비밀번호 변경 실패: $e', error: true);
                         }
                       },
                 child: isSaving
@@ -379,17 +361,11 @@ class _AdminPageState extends State<AdminPage> {
                     );
                     if (!mounted) return;
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).clearSnackBars();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('공지사항이 등록되었습니다.')),
-                    );
+                    showToast(context, '공지사항이 등록되었습니다.');
                   } catch (e) {
                     debugPrint('notice create failed: $e');
                     if (!mounted) return;
-                    ScaffoldMessenger.of(context).clearSnackBars();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('공지사항 등록 실패: $e')),
-                    );
+                    showToast(context, '공지사항 등록 실패: $e', error: true);
                   }
                 },
                 child: const Text('등록'),
@@ -523,23 +499,11 @@ class _AdminPageState extends State<AdminPage> {
                                   try {
                                     await noticeService.deleteNotice(notice);
                                     if (!context.mounted) return;
-                                    ScaffoldMessenger.of(context)
-                                        .clearSnackBars();
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      const SnackBar(
-                                        content: Text('공지사항이 삭제되었습니다.'),
-                                      ),
-                                    );
+                                    showToast(context, '공지사항이 삭제되었습니다.');
                                     await reloadNotices();
                                   } catch (e) {
                                     if (!context.mounted) return;
-                                    ScaffoldMessenger.of(context)
-                                        .clearSnackBars();
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('공지사항 삭제 실패: $e'),
-                                      ),
-                                    );
+                                    showToast(context, '공지사항 삭제 실패: $e', error: true);
                                   }
                                 },
                                 icon: const Icon(Icons.delete_outline),
@@ -711,10 +675,7 @@ class _AdminPageState extends State<AdminPage> {
                   } catch (e) {
                     debugPrint('admin update failed: $e');
                     if (!mounted) return;
-                    ScaffoldMessenger.of(context).clearSnackBars();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('직원 수정 실패: $e')),
-                    );
+                    showToast(context, '직원 수정 실패: $e', error: true);
                   }
                 },
                 child: const Text('저장'),
@@ -760,7 +721,7 @@ class _AdminPageState extends State<AdminPage> {
   ButtonStyle _primaryButtonStyle({bool danger = false}) {
     return ElevatedButton.styleFrom(
       backgroundColor:
-          danger ? const Color(0xFFDC2626) : const Color(0xFFC94C6E),
+          danger ? const Color(0xFFDC2626) : AppTheme.primary,
       foregroundColor: Colors.white,
       elevation: 0,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -784,7 +745,7 @@ class _AdminPageState extends State<AdminPage> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: Color(0xFFC94C6E), width: 1.4),
+        borderSide: const BorderSide(color: AppTheme.primary, width: 1.4),
       ),
     );
   }

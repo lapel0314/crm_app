@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/utils/postgrest_filter_utils.dart';
@@ -99,9 +100,9 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
 
   Color _carrierColor(dynamic value) {
     final carrier = _normalizeCarrier(_text(value));
-    if (carrier.contains('SK')) return const Color(0xFF2563EB);
-    if (carrier.contains('KT')) return const Color(0xFFEF4444);
-    if (carrier.contains('LG')) return const Color(0xFFC94C6E);
+    if (carrier.contains('SK')) return AppTheme.carrierSk;
+    if (carrier.contains('KT')) return AppTheme.carrierKt;
+    if (carrier.contains('LG')) return AppTheme.carrierLg;
     return const Color(0xFF6B7280);
   }
 
@@ -283,7 +284,7 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
   }) {
     return Expanded(
       child: Container(
-        height: 84,
+        height: 88,
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -384,7 +385,7 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
                       icon: const Icon(Icons.open_in_new_rounded, size: 15),
                       label: Text('$pageTitle로 이동'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFC94C6E),
+                        foregroundColor: AppTheme.primary,
                         side: const BorderSide(color: Color(0xFFFFCAD8)),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
@@ -738,7 +739,7 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
                       icon: const Icon(Icons.open_in_new_rounded, size: 15),
                       label: Text('$pageTitle\uB85C \uC774\uB3D9'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFC94C6E),
+                        foregroundColor: AppTheme.primary,
                         side: const BorderSide(color: Color(0xFFFFCAD8)),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),

@@ -1,6 +1,8 @@
 import 'package:crm_app/services/login_policy_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
+import 'package:crm_app/widgets/app_toast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final supabase = Supabase.instance.client;
@@ -315,7 +317,7 @@ class _StoreManagementPageState extends State<StoreManagementPage> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, controller.text.trim()),
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFC94C6E),
+              backgroundColor: AppTheme.primary,
               foregroundColor: Colors.white,
               elevation: 0,
             ),
@@ -330,9 +332,7 @@ class _StoreManagementPageState extends State<StoreManagementPage> {
 
   void _showSnack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    showToast(context, message);
   }
 
   BoxDecoration _cardDecoration() {
@@ -421,7 +421,7 @@ class _StoreManagementPageState extends State<StoreManagementPage> {
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     color: selected
-                        ? const Color(0xFFC94C6E).withValues(alpha: 0.10)
+                        ? AppTheme.primary.withValues(alpha: 0.10)
                         : Colors.transparent,
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -433,7 +433,7 @@ class _StoreManagementPageState extends State<StoreManagementPage> {
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: selected
-                                ? const Color(0xFFC94C6E)
+                                ? AppTheme.primary
                                 : const Color(0xFF374151),
                             fontWeight:
                                 selected ? FontWeight.w900 : FontWeight.w700,
@@ -531,7 +531,7 @@ class _StoreManagementPageState extends State<StoreManagementPage> {
                                 ? _registerCurrentNetwork
                                 : null,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFFC94C6E),
+                              backgroundColor: AppTheme.primary,
                               foregroundColor: Colors.white,
                               elevation: 0,
                             ),

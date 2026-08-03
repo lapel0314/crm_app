@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
+import 'package:crm_app/widgets/empty_state.dart';
+import 'package:crm_app/widgets/app_toast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/utils/debouncer.dart';
 import 'package:crm_app/utils/phone_utils.dart';
@@ -54,9 +57,7 @@ class _PreReservationPageState extends State<PreReservationPage> {
 
   void _showMessage(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    showToast(context, message);
   }
 
   Future<void> fetchReservations({bool silent = false}) async {
@@ -422,7 +423,7 @@ class _PreReservationPageState extends State<PreReservationPage> {
                     },
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFC94C6E),
+                    backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.white,
                     elevation: 0,
                   ),
@@ -463,7 +464,7 @@ class _PreReservationPageState extends State<PreReservationPage> {
               padding: const EdgeInsets.symmetric(horizontal: 14),
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: active ? const Color(0xFFC94C6E) : Colors.transparent,
+                color: active ? AppTheme.primary : Colors.transparent,
                 borderRadius: BorderRadius.circular(7),
               ),
               child: Text(
@@ -868,7 +869,7 @@ class _PreReservationPageState extends State<PreReservationPage> {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                           borderSide:
-                              const BorderSide(color: Color(0xFFC94C6E)),
+                              const BorderSide(color: AppTheme.primary),
                         ),
                       ),
                     ),
@@ -880,7 +881,7 @@ class _PreReservationPageState extends State<PreReservationPage> {
                   icon: const Icon(Icons.add, size: 16),
                   label: const Text('예약 등록'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFC94C6E),
+                    backgroundColor: AppTheme.primary,
                     foregroundColor: Colors.white,
                     elevation: 0,
                     minimumSize: const Size(0, 38),
@@ -910,7 +911,7 @@ class _PreReservationPageState extends State<PreReservationPage> {
                       child: isLoading
                           ? const Center(child: CircularProgressIndicator())
                           : visibleRows.isEmpty
-                              ? const Center(child: Text('등록된 사전예약이 없습니다'))
+                              ? const EmptyState(icon: Icons.event_busy_rounded, title: '등록된 사전예약이 없습니다', subtitle: '예약 등록 버튼으로 첫 예약을 추가해 보세요')
                               : mobile
                                   ? ListView.builder(
                                       padding:

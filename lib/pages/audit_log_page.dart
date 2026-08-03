@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:crm_app/widgets/empty_state.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/utils/debouncer.dart';
@@ -779,7 +780,7 @@ class _AuditLogPageState extends State<AuditLogPage> {
               child: isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : rows.isEmpty
-                      ? const Center(child: Text('조건에 맞는 감사로그가 없습니다'))
+                      ? const EmptyState(icon: Icons.history_rounded, title: '조건에 맞는 감사로그가 없습니다', subtitle: '검색어나 기간을 바꿔 다시 확인해 보세요')
                       : Builder(builder: (context) {
                           // 날짜 섹션 단위로 가상화 — 화면 밖 섹션은 빌드하지 않는다.
                           final entries = grouped.entries.toList();

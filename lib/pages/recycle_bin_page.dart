@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
+import 'package:crm_app/widgets/app_toast.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/utils/store_utils.dart';
@@ -82,8 +84,7 @@ class _RecycleBinPageState extends State<RecycleBinPage> {
   }
 
   void _showMessage(String text) {
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    showToast(context, text);
   }
 
   String _tableLabel(dynamic value) {
@@ -215,6 +216,7 @@ class _RecycleBinPageState extends State<RecycleBinPage> {
 
   void _showRestoreMessage(Map<String, dynamic> record) {
     final pageTitle = _targetPageTitle(record['target_table']);
+    // 액션 버튼이 필요해 showToast 대신 SnackBar 직접 사용 (스타일은 테마가 적용).
     ScaffoldMessenger.of(context).clearSnackBars();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -275,7 +277,7 @@ class _RecycleBinPageState extends State<RecycleBinPage> {
             ),
             child: const Icon(
               Icons.restore_from_trash_rounded,
-              color: Color(0xFFC94C6E),
+              color: AppTheme.primary,
             ),
           ),
           const SizedBox(width: 12),

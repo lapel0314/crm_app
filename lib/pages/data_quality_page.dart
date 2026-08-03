@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
+import 'package:crm_app/widgets/empty_state.dart';
+import 'package:crm_app/widgets/app_toast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/services/data_quality_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
@@ -120,9 +123,7 @@ class _DataQualityPageState extends State<DataQualityPage> {
     } catch (e) {
       debugPrint('dismiss failed: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('무시 처리에 실패했습니다. 다시 시도해 주세요.')),
-      );
+      showToast(context, '무시 처리에 실패했습니다. 다시 시도해 주세요.', error: true);
     }
   }
 
@@ -133,9 +134,7 @@ class _DataQualityPageState extends State<DataQualityPage> {
     } catch (e) {
       debugPrint('restore failed: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('해제에 실패했습니다. 다시 시도해 주세요.')),
-      );
+      showToast(context, '해제에 실패했습니다. 다시 시도해 주세요.', error: true);
     }
   }
 
@@ -224,13 +223,13 @@ class _DataQualityPageState extends State<DataQualityPage> {
             width: compact ? 30 : 36,
             height: compact ? 30 : 36,
             decoration: BoxDecoration(
-              color: const Color(0xFFFCE7F3),
+              color: AppTheme.primaryTint,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFF9A8D4)),
+              border: Border.all(color: AppTheme.primaryTintStrong),
             ),
             child: Icon(
               icon,
-              color: const Color(0xFFEC4899),
+              color: AppTheme.primary,
               size: compact ? 17 : 21,
             ),
           ),
@@ -668,10 +667,15 @@ class _DataQualityPageState extends State<DataQualityPage> {
                 child: isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : rows.isEmpty
-                        ? Center(
-                            child: Text(showDismissed
+                        ? EmptyState(
+                            icon: Icons.task_alt_rounded,
+                            title: showDismissed
                                 ? '무시 처리된 이슈가 없습니다'
-                                : '조건에 맞는 품질 이슈가 없습니다'))
+                                : '조건에 맞는 품질 이슈가 없습니다',
+                            subtitle: showDismissed
+                                ? '이슈를 무시 처리하면 여기에 모입니다'
+                                : '데이터가 깨끗하거나 필터에 걸린 이슈가 없습니다',
+                          )
                         : ListView.builder(
                             padding: EdgeInsets.only(bottom: mobile ? 10 : 0),
                             itemCount: rows.length,
@@ -698,14 +702,14 @@ class _IssuePill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: const Color(0xFFFCE7F3),
+        color: AppTheme.primaryTint,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xFFF9A8D4)),
+        border: Border.all(color: AppTheme.primaryTintStrong),
       ),
       child: Text(
         label,
         style: const TextStyle(
-          color: Color(0xFFEC4899),
+          color: AppTheme.primary,
           fontSize: 11,
           fontWeight: FontWeight.w900,
         ),

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/widgets/empty_state.dart';
+import 'package:crm_app/widgets/app_toast.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/utils/store_utils.dart';
@@ -105,15 +107,11 @@ class _SignupApprovalDashboardPageState
       }
       await fetchUsers();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('직원 계정을 승인했습니다.')),
-      );
+      showToast(context, '직원 계정을 승인했습니다.');
     } catch (e) {
       debugPrint('dashboard approve failed: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('승인 실패: $e')),
-      );
+      showToast(context, '승인 실패: $e', error: true);
     }
   }
 
@@ -419,7 +417,7 @@ class _SignupApprovalDashboardPageState
                     border: Border.all(color: const Color(0xFFE5E7EB)),
                   ),
                   child: pendingUsers.isEmpty
-                      ? const Center(child: Text('승인 대기 계정이 없습니다'))
+                      ? const EmptyState(icon: Icons.how_to_reg_rounded, title: '승인 대기 계정이 없습니다', subtitle: '새 가입 요청이 오면 여기에 표시됩니다')
                       : Column(
                           children: [
                             Container(

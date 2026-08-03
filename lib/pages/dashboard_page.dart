@@ -1,6 +1,9 @@
+import 'package:crm_app/pages/pre_reservation_page.dart';
+import 'package:crm_app/services/plan_change_alert_service.dart';
 import 'package:crm_app/utils/model_name_utils.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:flutter/material.dart';
+import 'package:crm_app/theme/app_theme.dart';
 import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -9,11 +12,13 @@ final supabase = Supabase.instance.client;
 class DashboardPage extends StatefulWidget {
   final String role;
   final String currentStore;
+  final VoidCallback? onOpenTodayAlert;
 
   const DashboardPage({
     super.key,
     required this.role,
     required this.currentStore,
+    this.onOpenTodayAlert,
   });
 
   @override
@@ -34,6 +39,11 @@ class _DashboardPageState extends State<DashboardPage> {
   int todayMargin = 0;
   int monthRebate = 0;
   int monthMargin = 0;
+
+  // 오늘 할 일 히어로용.
+  int pendingAlertCount = 0;
+  int pendingReservationCount = 0;
+  final planAlertService = PlanChangeAlertService(Supabase.instance.client);
 
   bool _isCompactIosDialogContext(BuildContext context) {
     return MediaQuery.of(context).size.width < 900;
@@ -81,9 +91,9 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Color _carrierColor(dynamic value) {
     final carrier = _normalizeCarrier(_text(value));
-    if (carrier.contains('SK')) return const Color(0xFF2563EB);
-    if (carrier.contains('KT')) return const Color(0xFFEF4444);
-    if (carrier.contains('LG')) return const Color(0xFFC94C6E);
+    if (carrier.contains('SK')) return AppTheme.carrierSk;
+    if (carrier.contains('KT')) return AppTheme.carrierKt;
+    if (carrier.contains('LG')) return AppTheme.carrierLg;
     return const Color(0xFF6B7280);
   }
 
@@ -248,7 +258,28 @@ class _DashboardPageState extends State<DashboardPage> {
             .from('model_name_mappings')
             .select('display_name, registered_names, is_active')
             .eq('is_active', true),
+        supabase
+            .from('pre_reservations')
+            .select('store, status')
+            .eq('is_deleted', false)
+            .eq('status', '대기'),
       ]);
+
+      // 오늘 할 일: 미처리 요금제/부가 알림 + 대기 중 사전예약.
+      var alertCount = 0;
+      try {
+        final alertResult = await planAlertService.fetchTodayAlerts(
+          role: widget.role,
+          currentStore: widget.currentStore,
+        );
+        alertCount =
+            alertResult.entries.where((e) => !e.isCompleted).length;
+      } catch (e) {
+        debugPrint('dashboard alert count failed: $e');
+      }
+      final reservationCount = _filterStoreRows(
+        result[5].map((e) => Map<String, dynamic>.from(e)).toList(),
+      ).length;
 
       final customerList = _filterStoreRows(
         result[0].map((e) => Map<String, dynamic>.from(e)).toList(),
@@ -311,6 +342,8 @@ class _DashboardPageState extends State<DashboardPage> {
         wiredMembers = wiredList;
         leads = leadList;
         modelAliasLookup = aliasLookup;
+        pendingAlertCount = alertCount;
+        pendingReservationCount = reservationCount;
         todayRebate = dailyRebateSum;
         todayMargin = dailyMarginSum;
         monthRebate = monthlyRebateSum;
@@ -324,6 +357,124 @@ class _DashboardPageState extends State<DashboardPage> {
       });
       debugPrint('dashboard load failed: $e');
     }
+  }
+
+  // "오늘 할 일" 히어로 — 대시보드 최상단에서 처리해야 할 일부터 보여준다.
+  Widget _todayTasksHero(bool mobile) {
+    final hasTasks = pendingAlertCount > 0 || pendingReservationCount > 0;
+
+    Widget taskChip({
+      required IconData icon,
+      required String label,
+      required int count,
+      required VoidCallback? onTap,
+    }) {
+      final active = count > 0;
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: active ? AppTheme.primaryTint : AppTheme.surfaceSubtle,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: active ? AppTheme.primaryTintStrong : AppTheme.borderSubtle,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon,
+                  size: 16,
+                  color:
+                      active ? AppTheme.primary : AppTheme.textDisabled),
+              const SizedBox(width: 7),
+              Text(
+                '$label $count건',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: active ? AppTheme.primary : AppTheme.textSecondary,
+                ),
+              ),
+              if (active) ...[
+                const SizedBox(width: 4),
+                const Icon(Icons.chevron_right_rounded,
+                    size: 16, color: AppTheme.primary),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                hasTasks
+                    ? Icons.notifications_active_rounded
+                    : Icons.check_circle_rounded,
+                size: 18,
+                color: hasTasks ? AppTheme.primary : AppTheme.success,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                hasTasks ? '오늘 할 일' : '오늘 처리할 일이 없습니다',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w900,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          if (hasTasks) ...[
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                taskChip(
+                  icon: Icons.sim_card_alert_outlined,
+                  label: '요금제/부가 미처리',
+                  count: pendingAlertCount,
+                  onTap: widget.onOpenTodayAlert,
+                ),
+                taskChip(
+                  icon: Icons.event_available_rounded,
+                  label: '사전예약 대기',
+                  count: pendingReservationCount,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PreReservationPage(
+                          role: widget.role,
+                          currentStore: widget.currentStore,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
   }
 
   Widget _metricCard({
@@ -477,7 +628,7 @@ class _DashboardPageState extends State<DashboardPage> {
       Color(0xFF2563EB),
       Color(0xFF10B981),
       Color(0xFFF59E0B),
-      Color(0xFFC94C6E),
+      AppTheme.primary,
       Color(0xFFEF4444),
       Color(0xFF8B5CF6),
     ];
@@ -570,19 +721,19 @@ class _DashboardPageState extends State<DashboardPage> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
               color: active
-                  ? const Color(0xFFC94C6E).withValues(alpha: 0.10)
+                  ? AppTheme.primary.withValues(alpha: 0.10)
                   : const Color(0xFFF9FAFB),
               borderRadius: BorderRadius.circular(999),
               border: Border.all(
                 color:
-                    active ? const Color(0xFFC94C6E) : const Color(0xFFE5E7EB),
+                    active ? AppTheme.primary : const Color(0xFFE5E7EB),
               ),
             ),
             child: Text(
               source,
               style: TextStyle(
                 color:
-                    active ? const Color(0xFFC94C6E) : const Color(0xFF6B7280),
+                    active ? AppTheme.primary : const Color(0xFF6B7280),
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
               ),
@@ -1110,7 +1261,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   _settlementActionRow(
                     label: '대납 · 유통망지원금',
                     value: monthSupportMoney,
-                    color: const Color(0xFFC94C6E),
+                    color: AppTheme.primary,
                     onTap: () => _showAdvanceDetailDialog(
                       title: '유통망지원금',
                       monthKey: selectedMonth,
@@ -1359,7 +1510,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 final entry = item.value;
                 final ratio = maxCount == 0 ? 0.0 : entry.value / maxCount;
                 final colors = [
-                  const Color(0xFFC94C6E),
+                  AppTheme.primary,
                   const Color(0xFF2563EB),
                   const Color(0xFFEF4444),
                   const Color(0xFF10B981),
@@ -1763,6 +1914,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    _todayTasksHero(mobile),
                     if (mobile) ...[
                       _metricCard(
                         title: '오늘 개통',
