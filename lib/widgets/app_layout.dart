@@ -2,6 +2,7 @@ import 'dart:io' show Platform, exit;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:crm_app/theme/app_theme.dart';
 import 'package:crm_app/widgets/app_toast.dart';
 import 'package:flutter/services.dart';
@@ -147,7 +148,11 @@ class _AppLayoutState extends State<AppLayout> {
         _NavItem(
           title: '대시보드',
           icon: Icons.monitor_heart_rounded,
-          page: DashboardPage(role: widget.role, currentStore: activeStore),
+          page: DashboardPage(
+            role: widget.role,
+            currentStore: activeStore,
+            onOpenTodayAlert: () => _openTodayPlanAlert(),
+          ),
         ),
       if (canUseInventory(widget.role))
         _NavItem(
@@ -1249,7 +1254,9 @@ class _AppLayoutState extends State<AppLayout> {
         height: 38,
         padding: const EdgeInsets.symmetric(horizontal: 10),
         decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
+          // 검색(통합검색)이 상단바의 주인공이 되도록 나머지 버튼은
+          // 배경 무게를 낮춘다 (미읽음 accent만 강조 유지).
+          color: color.withValues(alpha: accent ? 0.14 : 0.05),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
@@ -2250,11 +2257,56 @@ class _AppLayoutState extends State<AppLayout> {
                       children: navItems.map((e) => e.page).toList(),
                     ),
                   ),
+                  _desktopFooter(),
                 ],
               ),
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+extension on _AppLayoutState {
+  // 데스크톱 하단 얇은 상태 푸터 — 매장/버전. (모바일은 공간상 생략)
+  Widget _desktopFooter() {
+    return Container(
+      height: 30,
+      padding: const EdgeInsets.symmetric(horizontal: 28),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: AppTheme.borderSubtle)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.storefront_outlined,
+              size: 13, color: AppTheme.textDisabled),
+          const SizedBox(width: 5),
+          Text(
+            displayStore,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          const Spacer(),
+          FutureBuilder<PackageInfo>(
+            future: PackageInfo.fromPlatform(),
+            builder: (context, snapshot) {
+              final version = snapshot.data?.version;
+              return Text(
+                version == null ? '핑크폰 CRM' : '핑크폰 CRM v$version',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textDisabled,
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

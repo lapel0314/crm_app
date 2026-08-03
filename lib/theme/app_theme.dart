@@ -47,6 +47,22 @@ class AppTheme {
         primary: primary,
         surface: surface,
       ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        titleTextStyle: const TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w900,
+          color: textPrimary,
+        ),
+        contentTextStyle: const TextStyle(
+          fontSize: 14,
+          color: textBody,
+          height: 1.5,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: textPrimary,
