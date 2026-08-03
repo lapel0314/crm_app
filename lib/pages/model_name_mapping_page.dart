@@ -2,6 +2,7 @@ import 'package:crm_app/utils/debouncer.dart';
 import 'package:crm_app/utils/model_name_utils.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:flutter/material.dart';
+import 'package:crm_app/widgets/app_toast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ModelNameMappingPage extends StatefulWidget {
@@ -280,9 +281,7 @@ class _ModelNameMappingPageState extends State<ModelNameMappingPage> {
 
   void _showMessage(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    showToast(context, message);
   }
 
   Widget _statusBadge(bool isActive) {

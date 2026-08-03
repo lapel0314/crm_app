@@ -1,6 +1,7 @@
 import 'package:crm_app/services/login_policy_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:flutter/material.dart';
+import 'package:crm_app/widgets/app_toast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final supabase = Supabase.instance.client;
@@ -330,9 +331,7 @@ class _StoreManagementPageState extends State<StoreManagementPage> {
 
   void _showSnack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    showToast(context, message);
   }
 
   BoxDecoration _cardDecoration() {

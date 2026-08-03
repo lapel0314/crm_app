@@ -2,6 +2,7 @@ import 'dart:io' show Platform, exit;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:crm_app/widgets/app_toast.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -379,9 +380,7 @@ class _AppLayoutState extends State<AppLayout> {
   }
 
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    showToast(context, message);
   }
 
   Future<void> _toggleStoreAccordion() async {
@@ -653,10 +652,7 @@ class _AppLayoutState extends State<AppLayout> {
     if (searchIndex < 0) return;
 
     if (name.isEmpty && phone.isEmpty) {
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('고객명 또는 핸드폰번호를 입력해 주세요')));
+      showToast(context, '고객명 또는 핸드폰번호를 입력해 주세요', error: true);
       return;
     }
 
@@ -930,17 +926,11 @@ class _AppLayoutState extends State<AppLayout> {
       setState(() {});
 
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('공지사항이 삭제되었습니다.')),
-      );
+      showToast(context, '공지사항이 삭제되었습니다.');
     } catch (e) {
       if (!context.mounted) return;
       final message = e is PostgrestException ? e.message : e.toString();
-      ScaffoldMessenger.of(context).clearSnackBars();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('공지사항 삭제 실패: $message')),
-      );
+      showToast(context, '공지사항 삭제 실패: $message', error: true);
     }
   }
 

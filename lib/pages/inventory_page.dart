@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/widgets/app_toast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/utils/debouncer.dart';
 import 'package:crm_app/utils/postgrest_filter_utils.dart';
@@ -114,10 +115,7 @@ class _InventoryPageState extends State<InventoryPage> {
 
   void showMessage(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(text)),
-    );
+    showToast(context, text);
   }
 
   Future<void> addInventory() async {

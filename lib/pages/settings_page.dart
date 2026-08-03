@@ -3,6 +3,7 @@ import 'package:crm_app/services/login_policy_service.dart';
 import 'package:crm_app/services/desktop_auth_session_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import 'package:flutter/material.dart';
+import 'package:crm_app/widgets/app_toast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 final supabase = Supabase.instance.client;
@@ -192,14 +193,10 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         networkSnapshot = snapshot;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('현재 네트워크를 허용 목록에 등록했습니다.')),
-      );
+      showToast(context, '현재 네트워크를 허용 목록에 등록했습니다.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('네트워크 등록에 실패했습니다: $e')),
-      );
+      showToast(context, '네트워크 등록에 실패했습니다: $e', error: true);
     }
   }
 
@@ -217,14 +214,10 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         networkSnapshot = snapshot;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('현재 네트워크 등록을 요청했습니다.')),
-      );
+      showToast(context, '현재 네트워크 등록을 요청했습니다.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('네트워크 등록 요청에 실패했습니다: $e')),
-      );
+      showToast(context, '네트워크 등록 요청에 실패했습니다: $e', error: true);
     }
   }
 
@@ -296,14 +289,10 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         networkSnapshot = snapshot;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('네트워크 등록 요청을 승인했습니다.')),
-      );
+      showToast(context, '네트워크 등록 요청을 승인했습니다.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('네트워크 요청 승인에 실패했습니다: $e')),
-      );
+      showToast(context, '네트워크 요청 승인에 실패했습니다: $e', error: true);
     }
   }
 
@@ -316,14 +305,10 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         networkSnapshot = snapshot;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('네트워크 등록 요청을 거절했습니다.')),
-      );
+      showToast(context, '네트워크 등록 요청을 거절했습니다.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('네트워크 요청 거절에 실패했습니다: $e')),
-      );
+      showToast(context, '네트워크 요청 거절에 실패했습니다: $e', error: true);
     }
   }
 
@@ -337,14 +322,10 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         networkSnapshot = snapshot;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('허용 네트워크를 비활성화했습니다.')),
-      );
+      showToast(context, '허용 네트워크를 비활성화했습니다.');
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('네트워크 비활성화에 실패했습니다: $e')),
-      );
+      showToast(context, '네트워크 비활성화에 실패했습니다: $e', error: true);
     }
   }
 

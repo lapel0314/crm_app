@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/widgets/app_toast.dart';
 import 'package:crm_app/utils/store_utils.dart';
 import '../services/auth_service.dart';
 import 'home_page.dart';
@@ -27,9 +28,7 @@ class _AuthPageState extends State<AuthPage> {
         );
 
         if (profile == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('로그인 실패')),
-          );
+          showToast(context, '로그인 실패', error: true);
           return;
         }
 
@@ -48,9 +47,7 @@ class _AuthPageState extends State<AuthPage> {
           passwordController.text.trim(),
         );
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('회원가입 완료 (로그인 해주세요)')),
-        );
+        showToast(context, '회원가입 완료 (로그인 해주세요)');
 
         setState(() {
           isLogin = true;

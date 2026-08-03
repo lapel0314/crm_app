@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/widgets/app_toast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/services/data_quality_service.dart';
 import 'package:crm_app/utils/store_utils.dart';
@@ -120,9 +121,7 @@ class _DataQualityPageState extends State<DataQualityPage> {
     } catch (e) {
       debugPrint('dismiss failed: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('무시 처리에 실패했습니다. 다시 시도해 주세요.')),
-      );
+      showToast(context, '무시 처리에 실패했습니다. 다시 시도해 주세요.', error: true);
     }
   }
 
@@ -133,9 +132,7 @@ class _DataQualityPageState extends State<DataQualityPage> {
     } catch (e) {
       debugPrint('restore failed: $e');
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('해제에 실패했습니다. 다시 시도해 주세요.')),
-      );
+      showToast(context, '해제에 실패했습니다. 다시 시도해 주세요.', error: true);
     }
   }
 

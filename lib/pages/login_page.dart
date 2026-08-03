@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/widgets/app_toast.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/services/login_policy_service.dart';
@@ -114,8 +115,7 @@ class _LoginPageState extends State<LoginPage>
 
   void showMessage(String text) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
+    showToast(context, text);
   }
 
   Future<void> showLoginBlockedDialog(String text) async {

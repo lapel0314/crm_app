@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:crm_app/widgets/app_toast.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:crm_app/utils/debouncer.dart';
 import 'package:crm_app/utils/phone_utils.dart';
@@ -54,9 +55,7 @@ class _PreReservationPageState extends State<PreReservationPage> {
 
   void _showMessage(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).clearSnackBars();
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    showToast(context, message);
   }
 
   Future<void> fetchReservations({bool silent = false}) async {
