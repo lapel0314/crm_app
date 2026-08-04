@@ -1,5 +1,5 @@
 #define MyAppName "핑크폰 CRM"
-#define MyAppVersion "1.2.1"
+#define MyAppVersion "1.2.2"
 #define MyAppPublisher "Pink Phone"
 #define MyAppExeName "핑크폰 CRM.exe"
 #define MyBuildExeName "crm_app.exe"
